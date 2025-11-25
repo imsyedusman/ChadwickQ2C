@@ -36,6 +36,34 @@ export default function ItemSelection() {
         fetchCategoryTree('Switchboard');
     }, []);
 
+    // Derive Options from `allSubcategories`
+    const { l1Options, l2Options, l3Options } = useMemo(() => {
+        const l1 = new Set<string>();
+        const l2 = new Set<string>();
+        const l3 = new Set<string>();
+
+        allSubcategories.forEach(sub => {
+            if (!sub) return;
+            const parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
+
+            if (parts.length > 0) l1.add(parts[0]);
+
+            if (selectedL1 && parts[0] === selectedL1) {
+                if (parts.length > 1) l2.add(parts[1]);
+            }
+
+            if (selectedL1 && selectedL2 && parts[0] === selectedL1 && parts[1] === selectedL2) {
+                if (parts.length > 2) l3.add(parts[2]);
+            }
+        });
+
+        return {
+            l1Options: Array.from(l1).sort(),
+            l2Options: Array.from(l2).sort(),
+            l3Options: Array.from(l3).sort()
+        };
+    }, [allSubcategories, selectedL1, selectedL2]);
+
     // Fetch items when selection changes or search changes
     useEffect(() => {
         // If searching, fetch immediately
@@ -46,9 +74,11 @@ export default function ItemSelection() {
             return () => clearTimeout(delayDebounceFn);
         }
 
-        // If browsing Switchboards, only fetch when fully drilled down (L3 selected)
+        // If browsing Switchboards, fetch when fully drilled down OR at leaf category
         if (activeCategory === 'Switchboard') {
-            if (selectedL3) {
+            // Fetch if L3 selected (3-level hierarchy like Circuit Breakers > MCCB > 50kA)
+            // OR if L1 selected with no L2 options (1-level hierarchy like Power Meters)
+            if (selectedL3 || (selectedL1 && l2Options.length === 0)) {
                 fetchItems();
             } else {
                 setItems([]); // Clear items if navigating up
@@ -57,7 +87,7 @@ export default function ItemSelection() {
             // For Basics/Busbar, fetch when any level is selected OR show all if none selected
             fetchItems();
         }
-    }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery]);
+    }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options]);
 
 
 
@@ -73,10 +103,14 @@ export default function ItemSelection() {
             // Subcategory filtering
             if (!searchQuery) {
                 if (activeCategory === 'Switchboard') {
-                    // For Switchboards: only fetch when L3 is selected
+                    // For Switchboards: fetch based on drill-down level
                     if (selectedL3) {
+                        // 3-level hierarchy (e.g., Circuit Breakers > MCCB > 50kA)
                         const fullPath = [selectedL1, selectedL2, selectedL3].join(' > ');
                         params.append('subcategory', fullPath);
+                    } else if (selectedL1 && l2Options.length === 0) {
+                        // 1-level hierarchy (e.g., Power Meters)
+                        params.append('subcategory', selectedL1);
                     }
                 } else if (activeCategory === 'Basics' || activeCategory === 'Busbar') {
                     // For Basics/Busbars: filter by selected level
@@ -130,33 +164,7 @@ export default function ItemSelection() {
         }
     };
 
-    // Derive Options from `allSubcategories`
-    const { l1Options, l2Options, l3Options } = useMemo(() => {
-        const l1 = new Set<string>();
-        const l2 = new Set<string>();
-        const l3 = new Set<string>();
 
-        allSubcategories.forEach(sub => {
-            if (!sub) return;
-            const parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
-
-            if (parts.length > 0) l1.add(parts[0]);
-
-            if (selectedL1 && parts[0] === selectedL1) {
-                if (parts.length > 1) l2.add(parts[1]);
-            }
-
-            if (selectedL1 && selectedL2 && parts[0] === selectedL1 && parts[1] === selectedL2) {
-                if (parts.length > 2) l3.add(parts[2]);
-            }
-        });
-
-        return {
-            l1Options: Array.from(l1).sort(),
-            l2Options: Array.from(l2).sort(),
-            l3Options: Array.from(l3).sort()
-        };
-    }, [allSubcategories, selectedL1, selectedL2]);
 
     const handleAddItem = (item: CatalogItem) => {
         if (!selectedBoardId) {
@@ -262,7 +270,7 @@ export default function ItemSelection() {
                             {cat === 'Switchboard' && <Zap size={18} />}
                             {cat === 'Basics' && <Package size={18} />}
                             {cat === 'Busbar' && <Layers size={18} />}
-                            {cat}s
+                            {cat === 'Basics' ? 'Basics' : `${cat}s`}
                         </button>
                     ))}
                 </div>

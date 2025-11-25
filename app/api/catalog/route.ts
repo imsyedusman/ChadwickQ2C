@@ -38,21 +38,20 @@ export async function GET(request: Request) {
 
             if (category) {
                 if (category.toLowerCase() === 'switchboard') {
-                    // Include both Schneider (switchboard/switchgear) AND vendor items (brand != null)
+                    // Include Schneider Electric items AND all vendor catalog items
+                    // Brand-based filtering is more reliable than category-based
                     treeWhere.OR = [
-                        { category: { contains: 'switchboard' } },
-                        { category: { contains: 'switchgear' } },
-                        { brand: { not: null }, category: { notIn: ['Basics', 'Busbar'] } }
+                        { brand: 'Schneider Electric' },  // Schneider items
+                        { brand: { not: null, notIn: ['Schneider Electric'] } }  // All vendor items
                     ];
                 } else {
                     treeWhere.category = category;
                 }
             } else {
-                // Default to Switchboard/Switchgear + vendor items if no category specified
+                // Default to Schneider + all vendor items if no category specified
                 treeWhere.OR = [
-                    { category: { contains: 'switchboard' } },
-                    { category: { contains: 'switchgear' } },
-                    { brand: { not: null }, category: { notIn: ['Basics', 'Busbar'] } }
+                    { brand: 'Schneider Electric' },
+                    { brand: { not: null, notIn: ['Schneider Electric'] } }
                 ];
             }
 
@@ -90,12 +89,12 @@ export async function GET(request: Request) {
         // 2. Category Filter
         if (category) {
             if (category.toLowerCase() === 'switchboard') {
-                // Include both Schneider items AND vendor catalog items
+                // Include Schneider Electric items AND all vendor catalog items
+                // Brand-based filtering is more reliable than category-based
                 whereClause.AND.push({
                     OR: [
-                        { category: { contains: 'switchboard' } },
-                        { category: { contains: 'switchgear' } },
-                        { brand: { not: null }, category: { notIn: ['Basics', 'Busbar'] } }
+                        { brand: 'Schneider Electric' },  // Schneider items
+                        { brand: { not: null, notIn: ['Schneider Electric'] } }  // All vendor items
                     ]
                 });
             } else {
