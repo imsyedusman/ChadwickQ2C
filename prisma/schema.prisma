@@ -1,0 +1,108 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Quote {
+  id            String   @id @default(uuid())
+  quoteNumber   String   @unique // Auto-generated friendly ID e.g. Q-1001
+  clientName    String?
+  projectRef    String?
+  description   String?
+  status        String   @default("DRAFT") // DRAFT, SENT, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // JSON snapshots for versioning/history
+  settingsSnapshot String? // JSON string of settings at time of quote
+  
+  // Global Commercial Adjustments
+  globalDiscount    Float @default(0) // Percentage or Fixed amount? Let's assume % for now or handle both in logic
+  globalContingency Float @default(0) // Percentage
+  
+  boards        Board[]
+}
+
+model Board {
+  id          String   @id @default(uuid())
+  quoteId     String
+  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  name        String
+  type        String?  // MSB, DB, PANEL, etc.
+  order       Int      @default(0)
+  
+  isOptional  Boolean  @default(false)
+  config      String?  // JSON string storing Pre-Selection values (IP, Form, etc.)
+  
+  items       Item[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Item {
+  id          String   @id @default(uuid())
+  boardId     String
+  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  
+  category    String   // BASICS, SWITCHBOARD, BUSBAR
+  subcategory String?
+  name        String
+  description String?
+  
+  quantity    Int      @default(1)
+  unitPrice   Float    @default(0)
+  labourHours Float    @default(0)
+  cost        Float    @default(0) // Calculated: unitPrice * quantity
+  
+  notes       String?
+  isDefault   Boolean  @default(false) // Was this auto-added?
+  
+  order       Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CatalogItem {
+  id              String   @id @default(uuid())
+  brand           String?
+  category        String?
+  subcategory     String?
+  partNumber      String?
+  description     String
+  unitPrice       Float    @default(0)
+  labourHours     Float    @default(0)
+  imageUrl        String?
+  isAutoAdd       Boolean  @default(false) // For Basics: Auto-add to new boards?
+  defaultQuantity Int      @default(1)
+  notes           String?  // Vendor catalog: auto-add logic rules
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+
+model Settings {
+  id                    String   @id @default("global")
+  labourRate            Float    @default(100)
+  consumablesPct        Float    @default(0.03)
+  overheadPct           Float    @default(0.20)
+  engineeringPct        Float    @default(0.20)
+  targetMarginPct       Float    @default(0.18)
+  gstPct                Float    @default(0.10)
+  roundingIncrement     Int      @default(100)
+  minMarginAlertPct     Float    @default(0.05)
+  
+  companyName           String?
+  companyAddress        String?
+  
+  updatedAt             DateTime @updatedAt
+}
