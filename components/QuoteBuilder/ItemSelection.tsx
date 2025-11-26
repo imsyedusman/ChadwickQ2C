@@ -173,9 +173,9 @@ export default function ItemSelection() {
         }
 
         addItemToBoard(selectedBoardId, {
-            category: activeCategory,
+            category: item.category || activeCategory,  // Use item's actual category for vendor items
             subcategory: item.subcategory,
-            name: item.partNumber,
+            name: item.partNumber || item.description,  // Use description if partNumber is empty
             description: item.description,
             unitPrice: item.unitPrice,
             labourHours: item.labourHours,
@@ -256,21 +256,23 @@ export default function ItemSelection() {
 
                 {/* Master Category Tabs */}
                 <div className="flex space-x-6">
-                    {['Switchboard', 'Basics', 'Busbar'].map((cat) => (
+                    {[
+                        { value: 'Switchboard', label: 'Switchboards', icon: Zap },
+                        { value: 'Basics', label: 'Basics', icon: Package },
+                        { value: 'Busbar', label: 'Busbars', icon: Layers }
+                    ].map((cat) => (
                         <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat as any)}
+                            key={cat.value}
+                            onClick={() => setActiveCategory(cat.value as any)}
                             className={cn(
                                 "pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
-                                activeCategory === cat
+                                activeCategory === cat.value
                                     ? "border-blue-600 text-blue-600"
                                     : "border-transparent text-gray-500 hover:text-gray-700"
                             )}
                         >
-                            {cat === 'Switchboard' && <Zap size={18} />}
-                            {cat === 'Basics' && <Package size={18} />}
-                            {cat === 'Busbar' && <Layers size={18} />}
-                            {cat === 'Basics' ? 'Basics' : `${cat}s`}
+                            <cat.icon size={18} />
+                            {cat.label}
                         </button>
                     ))}
                 </div>

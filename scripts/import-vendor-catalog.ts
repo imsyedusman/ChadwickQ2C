@@ -99,8 +99,8 @@ async function main() {
             data: vendorCatalog.map(item => ({
                 brand: item.brand,
                 partNumber: item.partNo || null,
-                category: item.category,
-                subcategory: item.category, // Use category as subcategory for filtering
+                category: 'Switchboard', // All vendor items belong to Switchboard master category
+                subcategory: item.category, // Original category becomes subcategory for UI grouping
                 description: item.description,
                 defaultQuantity: item.qtyDefault,
                 labourHours: item.hours,
