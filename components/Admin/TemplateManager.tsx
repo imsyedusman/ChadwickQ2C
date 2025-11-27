@@ -207,33 +207,53 @@ export default function TemplateManager() {
                     <Info size={18} />
                     Placeholder Guide
                 </h3>
+                <p className="text-xs text-blue-600 mb-4">Click any placeholder to copy it to your clipboard.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                     <div>
                         <h4 className="font-medium text-blue-800 mb-2">Header & Footer</h4>
                         <ul className="space-y-1 text-blue-700">
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{clientName}}`}</code> - Client Name</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{companyName}}`}</code> - Your Company Name</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{projectName}}`}</code> - Project Name</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{quoteNumber}}`}</code> - Quote Number</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{date}}`}</code> - Today's Date</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{totalPrice}}`}</code> - Total Sell Price</li>
+                            <PlaceholderItem code="{clientName}" label="Client Name" />
+                            <PlaceholderItem code="{companyName}" label="Client Company" />
+                            <PlaceholderItem code="{projectName}" label="Project Name" />
+                            <PlaceholderItem code="{projectRef}" label="Project Reference" />
+                            <PlaceholderItem code="{quoteNumber}" label="Quote Number" />
+                            <PlaceholderItem code="{date}" label="Today's Date" />
+                            <PlaceholderItem code="{totalPrice}" label="Total Sell Price (Ex GST)" />
                         </ul>
                     </div>
                     <div>
                         <h4 className="font-medium text-blue-800 mb-2">Switchboard Table Loop</h4>
                         <ul className="space-y-1 text-blue-700">
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{#boards}...{/boards}`}</code> - Wraps the table row</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{itemNo}}`}</code> - 1, 2, 3...</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{boardTitle}}`}</code> - Board Name + Type</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{qty}}`}</code> - Quantity</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{price}}`}</code> - Board Price</li>
-                            <li className="mt-2 text-xs opacity-80">Description Bullets:</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{#bullets}...{/bullets}`}</code> - Wraps bullet points</li>
-                            <li><code className="bg-white px-1 rounded border border-blue-200">{`{{text}}`}</code> - The bullet text</li>
+                            <PlaceholderItem code="{#boards}...{/boards}" label="Start/End Board Loop" />
+                            <PlaceholderItem code="{itemNo}" label="Item Number (1, 2...)" />
+                            <PlaceholderItem code="{boardTitle}" label="Board Name + Type" />
+                            <PlaceholderItem code="{name}" label="Board Name (Alias)" />
+                            <PlaceholderItem code="{qty}" label="Quantity (1)" />
+                            <PlaceholderItem code="{price}" label="Board Sell Price (Ex GST)" />
+                            <li className="mt-2 text-xs opacity-80 font-semibold">Description Bullets:</li>
+                            <PlaceholderItem code="{#bullets}...{/bullets}" label="Start/End Bullet Loop" />
+                            <PlaceholderItem code="{text}" label="Bullet Text" />
+                            <PlaceholderItem code="{description}" label="Full Description (Alias)" />
                         </ul>
                     </div>
                 </div>
             </div>
         </div>
+    );
+}
+
+function PlaceholderItem({ code, label }: { code: string; label: string }) {
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(code);
+        // Could add a toast here, but for now simple copy is fine
+    };
+
+    return (
+        <li className="flex items-center gap-2 group cursor-pointer" onClick={copyToClipboard} title="Click to copy">
+            <code className="bg-white px-1.5 py-0.5 rounded border border-blue-200 text-blue-800 font-mono text-xs group-hover:border-blue-400 group-hover:bg-blue-50 transition-colors">
+                {code}
+            </code>
+            <span className="text-xs text-blue-600/80 group-hover:text-blue-800">- {label}</span>
+        </li>
     );
 }

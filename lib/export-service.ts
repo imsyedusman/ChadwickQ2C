@@ -12,15 +12,6 @@ export class ExportService {
         // The DocxGenerator expects a structure where it can find the totals.
         // We'll construct the full object here.
 
-        // Enrich boards with their specific totals if available in the 'totals' object
-        // The 'totals' passed here is usually the grand total. 
-        // We might need to calculate per-board totals if they aren't on the board objects.
-        // However, looking at QuoteContext, 'boardTotals' is a separate object for the *selected* board.
-        // We need totals for ALL boards.
-
-        // Let's calculate per-board totals here to be safe, or assume they are on the board items.
-        // A simple summation of item prices for the export is safer.
-
         const quoteData = {
             quoteNumber: quote.quoteNumber,
             clientName: quote.clientName,
@@ -28,18 +19,56 @@ export class ExportService {
             projectRef: quote.projectRef,
             description: quote.description,
             boards: quote.boards.map((board: any) => {
-                // Calculate board total
-                const boardTotal = totals.boardTotals.find((bt: any) => bt.boardId === board.id);
+                // Calculate board total using the same logic as QuoteContext
+                const boardTotal = this.calculateBoardTotal(board.items, settings);
                 return {
                     ...board,
-                    totalSellPrice: boardTotal ? boardTotal.sellPriceRounded : 0
+                    totalSellPrice: boardTotal
                 };
             }),
             totals: {
-                sellPrice: totals.grandTotals.finalSellPrice
+                // Use sellPriceRounded (Ex GST) as requested
+                sellPrice: totals.grandTotals.sellPriceRounded
             }
         };
 
         await DocxGenerator.generate(quoteData, settings, (quote as any).templatePath);
+    }
+
+    private static calculateBoardTotal(items: any[], settings: any): number {
+        let materialCost = 0;
+        let labourHours = 0;
+
+        items.forEach(item => {
+            materialCost += (item.unitPrice || 0) * (item.quantity || 0);
+            labourHours += (item.labourHours || 0) * (item.quantity || 0);
+        });
+
+        // 1. Labour Cost
+        const labourCost = labourHours * settings.labourRate;
+
+        // 2. Consumables Cost (percentage of material cost)
+        const consumablesCost = materialCost * settings.consumablesPct;
+
+        // 3. Cost Base = Material + Labour + Consumables
+        const costBase = materialCost + labourCost + consumablesCost;
+
+        // 4. Overhead Cost (percentage of cost base)
+        const overheadAmount = costBase * settings.overheadPct;
+
+        // 5. Engineering Cost (percentage of cost base)
+        const engineeringCost = costBase * settings.engineeringPct;
+
+        // 6. Total Cost = Cost Base + Overhead + Engineering
+        const totalCost = costBase + overheadAmount + engineeringCost;
+
+        // 7. Sell Price = Total Cost / (1 - Target Margin)
+        const marginFactor = 1 - settings.targetMarginPct;
+        const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
+
+        // 8. Rounded Sell Price
+        const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+
+        return sellPriceRounded;
     }
 }

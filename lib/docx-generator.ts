@@ -93,8 +93,8 @@ export class DocxGenerator {
 
         return {
             clientName: quote.clientName || "",
-            clientCompany: quote.clientCompany || "", // New field
-            companyName: "Chadwick Switchboards", // Default or from settings if available
+            clientCompany: quote.clientCompany || "",
+            companyName: quote.clientCompany || "Chadwick Switchboards", // Map to client company as requested, fallback to default
             projectName: quote.projectRef || "", // Using projectRef as Project Name
             date: today,
             quoteNumber: quote.quoteNumber || "",
