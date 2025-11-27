@@ -12,7 +12,7 @@ import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function QuoteBuilderContent() {
-    const { boards, loading, quoteNumber, clientName, projectRef, updateMetadata, quoteId, selectedBoardId, setSelectedBoardId } = useQuote();
+    const { boards, loading, quoteNumber, clientName, clientCompany, projectRef, updateMetadata, quoteId, selectedBoardId, setSelectedBoardId } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
 
@@ -54,6 +54,21 @@ function QuoteBuilderContent() {
                             onChange={(e) => updateMetadata({ clientName: e.target.value })}
                             className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
                             placeholder="Client Name"
+                        />
+                    </div>
+
+                    <div className="h-8 w-px bg-gray-200" />
+
+                    <div className="group relative flex-1 max-w-xs">
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                            Company
+                        </label>
+                        <input
+                            type="text"
+                            value={clientCompany}
+                            onChange={(e) => updateMetadata({ clientCompany: e.target.value })}
+                            className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                            placeholder="Client Company"
                         />
                     </div>
 

@@ -39,6 +39,7 @@ interface QuoteContextType {
     quoteId: string;
     quoteNumber: string;
     clientName: string;
+    clientCompany: string;
     projectRef: string;
     description: string;
     boards: Board[];
@@ -80,7 +81,7 @@ interface QuoteContextType {
     removeItem: (itemId: string) => Promise<void>;
     refreshQuote: () => Promise<void>;
     updateSettings: (settings: Partial<QuoteSettings>) => void;
-    updateMetadata: (data: { quoteNumber?: string; clientName?: string; projectRef?: string; description?: string }) => Promise<void>;
+    updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -91,6 +92,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
         clientName: '',
+        clientCompany: '',
         projectRef: '',
         description: '',
     });
@@ -116,6 +118,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 setMetadata({
                     quoteNumber: data.quoteNumber || '',
                     clientName: data.clientName || '',
+                    clientCompany: data.clientCompany || '',
                     projectRef: data.projectRef || '',
                     description: data.description || '',
                 });
@@ -321,7 +324,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
-    const updateMetadata = async (data: { quoteNumber?: string; clientName?: string; projectRef?: string; description?: string }) => {
+    const updateMetadata = async (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => {
         setMetadata(prev => ({ ...prev, ...data }));
 
         try {
@@ -341,6 +344,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 quoteId,
                 quoteNumber: metadata.quoteNumber,
                 clientName: metadata.clientName,
+                clientCompany: metadata.clientCompany,
                 projectRef: metadata.projectRef,
                 description: metadata.description,
                 boards,

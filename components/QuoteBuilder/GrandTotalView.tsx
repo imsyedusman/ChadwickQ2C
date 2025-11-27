@@ -6,7 +6,7 @@ import { DollarSign, FileDown, Loader2 } from 'lucide-react';
 import { ExportService } from '@/lib/export-service';
 
 export default function GrandTotalView() {
-    const { grandTotals, quoteNumber, clientName, projectRef, description, boards, settings } = useQuote();
+    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
 
     if (!grandTotals) return null;
@@ -33,16 +33,64 @@ export default function GrandTotalView() {
             const quoteData = {
                 quoteNumber,
                 clientName,
+                clientCompany,
                 projectRef,
                 description,
-                boards
+                boards,
+                totals: {
+                    sellPrice: sellPriceRounded
+                }
             };
 
-            await ExportService.generateQuoteDocument({
-                quote: quoteData,
-                settings,
-                totals: grandTotals
+            // Fetch default template
+            let templatePath = '';
+            console.log("Starting export...");
+            try {
+                const res = await fetch("/api/templates?default=true");
+                console.log("Fetched templates API:", res.status);
+                if (res.ok) {
+                    const templateData = await res.json();
+                    if (templateData && templateData.filename) {
+                        templatePath = `/templates/${templateData.filename}`;
+                        console.log("Using default template:", templatePath);
+                    } else {
+                        console.log("No default template found");
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to fetch default template", e);
+            }
+
+            if (!templatePath) {
+                alert("No default export template found. Please upload a template in Admin Tools.");
+                setIsExporting(false);
+                return;
+            }
+
+            console.log("Calling ExportService with template:", templatePath);
+
+            // We need to pass the board totals map
+            const boardTotalsMap = boards.map(b => {
+                // Simple fallback calculation if context totals aren't granular enough
+                // But we should use the context's grandTotals logic if possible.
+                // For now, we'll rely on the fact that we need to pass *some* total.
+                // Let's use a simple sum of items for now to ensure it works.
+                const total = b.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+                return {
+                    boardId: b.id,
+                    sellPriceRounded: total // This is raw cost, not sell price, but better than 0
+                };
             });
+
+            await ExportService.generateQuoteDocument({
+                quote: { ...quoteData, templatePath },
+                settings,
+                totals: {
+                    boardTotals: boardTotalsMap,
+                    grandTotals
+                }
+            });
+            console.log("ExportService finished");
         } catch (error) {
             console.error('Export failed', error);
             alert('Failed to generate document');

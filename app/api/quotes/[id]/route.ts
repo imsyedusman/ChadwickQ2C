@@ -52,12 +52,13 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { clientName, projectRef, description, status, settingsSnapshot } = body;
+        const { clientName, clientCompany, projectRef, description, status, settingsSnapshot } = body;
 
         const updatedQuote = await prisma.quote.update({
             where: { id },
             data: {
                 clientName,
+                clientCompany,
                 projectRef,
                 description,
                 status,

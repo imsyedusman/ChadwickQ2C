@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import CatalogManager from '@/components/Catalog/CatalogManager';
-import { Database, DollarSign, Save, Loader2, Package, ToggleLeft, Wrench } from 'lucide-react';
+import { Database, DollarSign, Save, Loader2, Package, ToggleLeft, Wrench, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -342,6 +342,23 @@ export default function SettingsPage() {
                                                     <h3 className="font-semibold text-gray-900 mb-1">Manage Basic Items</h3>
                                                     <p className="text-sm text-gray-600">
                                                         Edit, update, and manage your internal Basic items catalog (includes auto-add toggle)
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+
+                                    {/* Manage Templates */}
+                                    <Link href="/admin/templates">
+                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                                    <FileText size={24} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-gray-900 mb-1">Manage Export Templates</h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        Upload and manage DOCX templates for Tender Exports
                                                     </p>
                                                 </div>
                                             </div>
