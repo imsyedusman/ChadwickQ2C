@@ -52,7 +52,6 @@ export class DocxGenerator {
             const doc = new Docxtemplater(zip, {
                 paragraphLoop: true,
                 linebreaks: true,
-                // Reverted to default delimiters {} as per user request
             });
 
             // 4. Prepare the data
@@ -91,12 +90,32 @@ export class DocxGenerator {
             year: "numeric",
         });
 
+        console.log("=== DOCX EXPORT DEBUG ===");
+        console.log("Quote has", quote.boards.length, "boards");
+
         // Collect drawing references from all boards
         const drawingRefs: string[] = [];
-        quote.boards.forEach(board => {
-            const boardDrawingRef = board.config?.drawingRef;
-            if (boardDrawingRef && boardDrawingRef.trim() !== "" && boardDrawingRef !== "---") {
+        quote.boards.forEach((board, index) => {
+            // Parse config if it's a JSON string
+            let parsedConfig = board.config;
+            if (typeof board.config === 'string') {
+                try {
+                    parsedConfig = JSON.parse(board.config);
+                } catch (e) {
+                    console.warn(`Board ${index + 1}: Failed to parse config JSON`);
+                    parsedConfig = {};
+                }
+            }
+
+            console.log(`\nBoard ${index + 1}: "${board.name}" (${board.type})`);
+            console.log("  Config:", parsedConfig);
+
+            const boardDrawingRef = parsedConfig?.drawingRef;
+            console.log(`  Drawing ref:`, boardDrawingRef);
+
+            if (boardDrawingRef && boardDrawingRef.trim() !== "" && boardDrawingRef !== "---" && boardDrawingRef.toLowerCase() !== "as shown") {
                 drawingRefs.push(boardDrawingRef.trim());
+                console.log(`  ✓ Added drawing ref: ${boardDrawingRef.trim()}`);
             }
         });
 
@@ -105,6 +124,12 @@ export class DocxGenerator {
         const finalDrawingRef = uniqueDrawingRefs.length > 0
             ? uniqueDrawingRefs.join(", ")
             : "As Shown";
+
+        console.log("\n=== DRAWING REF SUMMARY ===");
+        console.log("All refs found:", drawingRefs);
+        console.log("Unique refs:", uniqueDrawingRefs);
+        console.log("Final ref:", finalDrawingRef);
+        console.log("=========================\n");
 
         return {
             clientName: quote.clientName || "",
@@ -128,17 +153,13 @@ export class DocxGenerator {
         return {
             itemNo: itemNo,
             boardTitle: boardTitle,
-            // Aliases for robustness
             name: boardTitle,
             board: boardTitle,
-
-            qty: 1, // Default to 1 as per requirements
-            quantity: 1, // Alias
-
+            qty: 1,
+            quantity: 1,
             price: `$${boardPrice.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-
             bullets: bullets,
-            description: bullets, // Alias for description/bullets
+            description: bullets,
         };
     }
 
@@ -146,29 +167,61 @@ export class DocxGenerator {
         const bullets: { text: string }[] = [];
         const type = board.type || "";
         const typeLower = type.toLowerCase();
-        const config = board.config || {};
         const items = board.items || [];
 
-        // Helper to check for item existence
-        const hasItem = (namePart: string) => items.some(i => i.name.toLowerCase().includes(namePart.toLowerCase()) || i.category.toLowerCase().includes(namePart.toLowerCase()));
-        const hasCategory = (cat: string) => items.some(i => i.category.toLowerCase() === cat.toLowerCase());
+        // Parse config if it's a JSON string
+        let config = board.config || {};
+        if (typeof board.config === 'string') {
+            try {
+                config = JSON.parse(board.config);
+            } catch (e) {
+                console.warn(`Failed to parse config for board "${board.name}"`);
+                config = {};
+            }
+        }
+
+        console.log(`\n>>> Generating bullets for: "${board.name}" (${type})`);
+        console.log(`    Config:`, config);
+        console.log(`    Items count:`, items.length);
+
+        // Helper to check for item existence (case-insensitive)
+        const hasItem = (namePart: string) => {
+            const found = items.some(i =>
+                i.name.toLowerCase().includes(namePart.toLowerCase()) ||
+                i.category.toLowerCase().includes(namePart.toLowerCase())
+            );
+            if (found) console.log(`    ✓ Found item matching "${namePart}"`);
+            return found;
+        };
+
+        const hasCategory = (cat: string) => {
+            const found = items.some(i => i.category.toLowerCase() === cat.toLowerCase());
+            if (found) console.log(`    ✓ Found category "${cat}"`);
+            return found;
+        };
 
         // Helper to validate current rating (avoid showing "---")
-        const isValidRating = (rating: any) => rating && rating !== "---" && rating !== "" && String(rating).trim() !== "";
+        const isValidRating = (rating: any) => {
+            return rating &&
+                rating !== "---" &&
+                rating !== "" &&
+                String(rating).trim() !== "" &&
+                String(rating).toLowerCase() !== "as shown";
+        };
 
-        // --- 1. MAIN SWITCHBOARD ---
-        // Match: "Main Switchboard", "Main Switchboard (MSB)", etc.
+        // --- 1. MAIN SWITCHBOARD (MSB) ---
         if (typeLower.includes("main switchboard") || typeLower.includes("(msb)")) {
-            // 1. Indoor/Outdoor
+            console.log("    → Matched MSB logic");
+
+            // 1. Location + IP + Form + Fault + Standard
             const ip = config.ipRating || "IP42";
             const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);
             const location = isOutdoor ? "Outdoor" : "Indoor";
             const form = config.formRating || "Form 3b";
             const fault = config.faultRating || "25";
-
             bullets.push({ text: `${location}, ${ip}, ${form}, ${fault}kA, AS61439` });
 
-            // 2. Enclosure
+            // 2. Enclosure Type
             const encType = config.enclosureType || "Mild Steel";
             if (encType.toLowerCase().includes("stainless")) {
                 bullets.push({ text: "316 Stainless Steel Switchboard Enclosure" });
@@ -176,8 +229,8 @@ export class DocxGenerator {
                 bullets.push({ text: "Powder Coated Mild Steel Switchboard Enclosure" });
             }
 
-            // 3. SPD
-            if (config.spd || hasItem("Surge Diverter")) {
+            // 3. SPD (Service Protection Device)
+            if (config.spd || config.hasSPD || hasItem("Surge Diverter") || hasItem("SPD")) {
                 const currentRating = config.currentRating;
                 if (isValidRating(currentRating)) {
                     bullets.push({ text: `${currentRating}A Service Protection Device` });
@@ -188,7 +241,7 @@ export class DocxGenerator {
 
             // 4. CT Metering
             if (hasCategory("CT Metering") || hasItem("CT")) {
-                if (hasItem("Meter Panel")) {
+                if (hasItem("Meter Panel") || hasItem("Panel")) {
                     bullets.push({ text: "Supply Authority CT Metering (Meter Panel included)" });
                 } else {
                     bullets.push({ text: "Supply Authority CT Metering (Meter Panel not included)" });
@@ -200,7 +253,7 @@ export class DocxGenerator {
                 bullets.push({ text: "Supply Authority Whole Current Metering Positions per Single Line Diagram" });
             }
 
-            // 6. Breakers
+            // 6. Circuit Breakers
             if (hasCategory("Circuit Breakers") || hasItem("CB") || hasItem("MCB") || hasItem("MCCB") || hasItem("Breaker")) {
                 bullets.push({ text: "Circuit Breakers per Single Line Diagram" });
             }
@@ -215,31 +268,32 @@ export class DocxGenerator {
                 bullets.push({ text: "Power Meters" });
             }
 
-            // 9. ATS / MTS
+            // 9. Transfer Switch
             if (hasItem("Automatic Transfer Switch") || hasItem("ATS")) {
                 bullets.push({ text: "Automatic Transfer Switch" });
             } else if (hasItem("Manual Transfer Switch") || hasItem("MTS")) {
                 bullets.push({ text: "Manual Transfer Switch" });
             }
 
-            // 10. Heaters
+            // 10. Heater
             if (hasItem("Heater") || hasItem("Anti-condensation") || hasItem("Anti-Condensation")) {
                 bullets.push({ text: "Anti-condensation Heater" });
             }
         }
 
-        // --- 2. DISTRIBUTION BOARD ---
-        // Match: "Distribution Board", "Main Distribution Board", "MDB", "DB", etc.
+        // --- 2. DISTRIBUTION BOARD (MDB/DB) ---
         else if (typeLower.includes("distribution board") || typeLower.includes("(mdb)") || typeLower.includes("(db)") || typeLower === "mdb" || typeLower === "db") {
+            console.log("    → Matched MDB/DB logic");
+
+            // 1. Location + IP + Wall-Mounted + Form + Icc
             const ip = config.ipRating || "IP42";
             const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);
             const location = isOutdoor ? "Outdoor" : "Indoor";
-            const form = config.formRating || "Form 2bi"; // Default Form 2bi as per requirements
+            const form = config.formRating || "Form 2bi";
             const fault = config.faultRating || "10";
-
             bullets.push({ text: `${location}, ${ip}, Wall-Mounted, ${form}, Icc=${fault}kA` });
 
-            // Main Switch - validate rating
+            // 2. Main Switch
             const rating = config.currentRating;
             if (isValidRating(rating)) {
                 bullets.push({ text: `${rating}A Main Switch` });
@@ -247,21 +301,30 @@ export class DocxGenerator {
                 bullets.push({ text: "Main Switch" });
             }
 
-            // Optional Items
-            if (hasItem("Surge Diverter") || hasItem("Surge")) bullets.push({ text: "Surge Diverter" });
-            if (hasItem("Power Meter") || hasItem("Dual Power Meter")) bullets.push({ text: "Dual Power Meter" });
-            if (hasItem("Lighting Test") || hasItem("Emergency Lighting")) bullets.push({ text: "Emergency Lighting Test Kit" });
+            // 3. Optional Extras (only if items exist)
+            if (hasItem("Surge Diverter") || hasItem("Surge")) {
+                bullets.push({ text: "Surge Diverter" });
+            }
+            if (hasItem("Power Meter") || hasItem("Dual Power Meter")) {
+                bullets.push({ text: "Dual Power Meter" });
+            }
+            if (hasItem("Lighting Test") || hasItem("Emergency Lighting")) {
+                bullets.push({ text: "Emergency Lighting Test Kit" });
+            }
 
-            // Always include
+            // 4. Always include
             bullets.push({ text: "MCB Chassis per Single Line Diagram" });
             bullets.push({ text: "Circuit Breakers per Single Line Diagram" });
         }
 
-        // --- 3. METER PANEL ---
+        // --- 3. PREWIRED WHOLE CURRENT METER PANEL ---
         else if (typeLower.includes("meter panel") || typeLower.includes("prewired")) {
+            console.log("    → Matched Meter Panel logic");
+
+            // 1. Fixed line
             bullets.push({ text: "Indoor, IP2X, Wall-Mounted, Form 1, Complete with Back Plate" });
 
-            // Main Switch - validate rating
+            // 2. Main Switch
             const rating = config.currentRating;
             if (isValidRating(rating)) {
                 bullets.push({ text: `${rating}A Main Switch` });
@@ -269,22 +332,31 @@ export class DocxGenerator {
                 bullets.push({ text: "Main Switch" });
             }
 
-            // Count positions
+            // 3. Count metering positions
             let count1ph = 0;
             let count3ph = 0;
             items.forEach(i => {
                 const name = i.name.toLowerCase();
-                if (name.includes("1ph") || name.includes("single phase") || name.includes("1-phase")) count1ph += i.quantity;
-                if (name.includes("3ph") || name.includes("three phase") || name.includes("3-phase")) count3ph += i.quantity;
+                if (name.includes("1ph") || name.includes("single phase") || name.includes("1-phase")) {
+                    count1ph += i.quantity;
+                }
+                if (name.includes("3ph") || name.includes("three phase") || name.includes("3-phase")) {
+                    count3ph += i.quantity;
+                }
             });
 
-            // Format with leading zeros
-            if (count1ph > 0) bullets.push({ text: `${String(count1ph).padStart(2, '0')} x 63A 1ph Metering Positions` });
-            if (count3ph > 0) bullets.push({ text: `${String(count3ph).padStart(2, '0')} x 63A 3ph Metering Positions` });
+            if (count1ph > 0) {
+                bullets.push({ text: `${String(count1ph).padStart(2, '0')} x 63A 1ph Metering Positions` });
+            }
+            if (count3ph > 0) {
+                bullets.push({ text: `${String(count3ph).padStart(2, '0')} x 63A 3ph Metering Positions` });
+            }
         }
 
-        // --- 4. CT ENCLOSURE ---
+        // --- 4. CT ENCLOSURE / CT CHAMBER ---
         else if (typeLower.includes("ct enclosure") || typeLower.includes("ct chamber")) {
+            console.log("    → Matched CT Enclosure logic");
+
             const rating = config.currentRating;
             if (isValidRating(rating)) {
                 bullets.push({ text: `Supply Authority CT Metering Enclosure ${rating}A` });
@@ -295,25 +367,27 @@ export class DocxGenerator {
 
         // --- FALLBACK / GENERIC ---
         else {
-            // Don't duplicate the type if it's already in the board title
-            // Only show IP and items line
-            if (config.ipRating) bullets.push({ text: `IP Rating: ${config.ipRating}` });
+            console.log("    → Using generic fallback");
+
+            // Don't duplicate the board type name
+            if (config.ipRating) {
+                bullets.push({ text: `IP Rating: ${config.ipRating}` });
+            }
             if (isValidRating(config.currentRating)) {
                 bullets.push({ text: `${config.currentRating}A Main Switch` });
             }
             bullets.push({ text: "Items per Single Line Diagram" });
         }
 
-        // Add individual board notes if they exist
-        // "there is also an individual notes for each switchboard that we add from the pre-selection wizard. i want those notes to show as well at the bottom of the bullet points of that specific switchboard"
-        // Assuming this is stored in `config.notes` or `board.description`
-        if (board.description) {
-            bullets.push({ text: board.description });
+        // Add board-specific notes from config
+        if (board.description && board.description.trim() !== "") {
+            bullets.push({ text: board.description.trim() });
         }
-        if (config.notes) {
-            bullets.push({ text: config.notes });
+        if (config.notes && config.notes.trim() !== "") {
+            bullets.push({ text: config.notes.trim() });
         }
 
+        console.log(`    Generated ${bullets.length} bullets`);
         return bullets;
     }
 }
