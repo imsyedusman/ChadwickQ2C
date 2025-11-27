@@ -91,15 +91,30 @@ export class DocxGenerator {
             year: "numeric",
         });
 
+        // Collect drawing references from all boards
+        const drawingRefs: string[] = [];
+        quote.boards.forEach(board => {
+            const boardDrawingRef = board.config?.drawingRef;
+            if (boardDrawingRef && boardDrawingRef.trim() !== "" && boardDrawingRef !== "---") {
+                drawingRefs.push(boardDrawingRef.trim());
+            }
+        });
+
+        // Remove duplicates and format
+        const uniqueDrawingRefs = Array.from(new Set(drawingRefs));
+        const finalDrawingRef = uniqueDrawingRefs.length > 0
+            ? uniqueDrawingRefs.join(", ")
+            : "As Shown";
+
         return {
             clientName: quote.clientName || "",
             clientCompany: quote.clientCompany || "",
-            companyName: quote.clientCompany || "Chadwick Switchboards", // Map to client company as requested, fallback to default
-            projectName: quote.projectRef || "", // Using projectRef as Project Name
+            companyName: quote.clientCompany || "Chadwick Switchboards",
+            projectName: quote.projectRef || "",
             date: today,
             quoteNumber: quote.quoteNumber || "",
             projectRef: quote.projectRef || "",
-            drawingRef: "", // TODO: Add if available in quote data
+            drawingRef: finalDrawingRef,
             totalPrice: `$${quote.totals.sellPrice.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             boards: quote.boards.map((board, index) => this.generateBoardData(board, index + 1)),
         };
@@ -130,6 +145,7 @@ export class DocxGenerator {
     private static generateDescriptionBullets(board: Board) {
         const bullets: { text: string }[] = [];
         const type = board.type || "";
+        const typeLower = type.toLowerCase();
         const config = board.config || {};
         const items = board.items || [];
 
@@ -137,37 +153,40 @@ export class DocxGenerator {
         const hasItem = (namePart: string) => items.some(i => i.name.toLowerCase().includes(namePart.toLowerCase()) || i.category.toLowerCase().includes(namePart.toLowerCase()));
         const hasCategory = (cat: string) => items.some(i => i.category.toLowerCase() === cat.toLowerCase());
 
+        // Helper to validate current rating (avoid showing "---")
+        const isValidRating = (rating: any) => rating && rating !== "---" && rating !== "" && String(rating).trim() !== "";
+
         // --- 1. MAIN SWITCHBOARD ---
-        if (type === "Main Switchboard") {
+        // Match: "Main Switchboard", "Main Switchboard (MSB)", etc.
+        if (typeLower.includes("main switchboard") || typeLower.includes("(msb)")) {
             // 1. Indoor/Outdoor
             const ip = config.ipRating || "IP42";
             const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);
             const location = isOutdoor ? "Outdoor" : "Indoor";
             const form = config.formRating || "Form 3b";
-            const fault = config.faultRating || "25"; // kA
+            const fault = config.faultRating || "25";
 
             bullets.push({ text: `${location}, ${ip}, ${form}, ${fault}kA, AS61439` });
 
             // 2. Enclosure
             const encType = config.enclosureType || "Mild Steel";
-            if (encType.includes("Stainless")) {
+            if (encType.toLowerCase().includes("stainless")) {
                 bullets.push({ text: "316 Stainless Steel Switchboard Enclosure" });
             } else {
                 bullets.push({ text: "Powder Coated Mild Steel Switchboard Enclosure" });
             }
 
             // 3. SPD
-            // Check config or items
             if (config.spd || hasItem("Surge Diverter")) {
-                // If we have a rating in config, use it, otherwise generic
-                // The requirement says "<Current Rating>A Service Protection Device"
-                // We might need to extract rating from Main Switch if not explicit
-                const currentRating = config.currentRating || "---";
-                bullets.push({ text: `${currentRating}A Service Protection Device` });
+                const currentRating = config.currentRating;
+                if (isValidRating(currentRating)) {
+                    bullets.push({ text: `${currentRating}A Service Protection Device` });
+                } else {
+                    bullets.push({ text: "Service Protection Device" });
+                }
             }
 
             // 4. CT Metering
-            // Logic: If CT metering items found
             if (hasCategory("CT Metering") || hasItem("CT")) {
                 if (hasItem("Meter Panel")) {
                     bullets.push({ text: "Supply Authority CT Metering (Meter Panel included)" });
@@ -177,23 +196,22 @@ export class DocxGenerator {
             }
 
             // 5. Whole Current Metering
-            // "If 100A Series Metering items found" -> usually implies Whole Current
-            if (hasCategory("Whole Current Metering") || hasItem("Whole Current")) {
+            if (hasCategory("Whole Current Metering") || hasItem("Whole Current") || hasItem("100A")) {
                 bullets.push({ text: "Supply Authority Whole Current Metering Positions per Single Line Diagram" });
             }
 
             // 6. Breakers
-            if (hasCategory("Circuit Breakers") || hasItem("CB") || hasItem("MCB") || hasItem("MCCB")) {
+            if (hasCategory("Circuit Breakers") || hasItem("CB") || hasItem("MCB") || hasItem("MCCB") || hasItem("Breaker")) {
                 bullets.push({ text: "Circuit Breakers per Single Line Diagram" });
             }
 
             // 7. Surge Diverters
-            if (hasItem("Surge Diverter")) {
+            if (hasItem("Surge Diverter") || hasItem("Surge")) {
                 bullets.push({ text: "Surge Diverter(s)" });
             }
 
             // 8. Power Meters
-            if (hasCategory("Power Meters") || hasItem("Power Meter")) {
+            if (hasCategory("Power Meters") || hasItem("Power Meter") || hasItem("Meter")) {
                 bullets.push({ text: "Power Meters" });
             }
 
@@ -205,29 +223,34 @@ export class DocxGenerator {
             }
 
             // 10. Heaters
-            if (hasItem("Heater") || hasItem("Anti-condensation")) {
+            if (hasItem("Heater") || hasItem("Anti-condensation") || hasItem("Anti-Condensation")) {
                 bullets.push({ text: "Anti-condensation Heater" });
             }
         }
 
         // --- 2. DISTRIBUTION BOARD ---
-        else if (type === "Distribution Board") {
+        // Match: "Distribution Board", "Main Distribution Board", "MDB", "DB", etc.
+        else if (typeLower.includes("distribution board") || typeLower.includes("(mdb)") || typeLower.includes("(db)") || typeLower === "mdb" || typeLower === "db") {
             const ip = config.ipRating || "IP42";
             const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);
             const location = isOutdoor ? "Outdoor" : "Indoor";
-            const form = config.formRating || "Form 1"; // DBs usually Form 1 or 2
+            const form = config.formRating || "Form 2bi"; // Default Form 2bi as per requirements
             const fault = config.faultRating || "10";
 
             bullets.push({ text: `${location}, ${ip}, Wall-Mounted, ${form}, Icc=${fault}kA` });
 
-            // Main Switch
-            const rating = config.currentRating || "---";
-            bullets.push({ text: `${rating}A Main Switch` });
+            // Main Switch - validate rating
+            const rating = config.currentRating;
+            if (isValidRating(rating)) {
+                bullets.push({ text: `${rating}A Main Switch` });
+            } else {
+                bullets.push({ text: "Main Switch" });
+            }
 
             // Optional Items
-            if (hasItem("Surge Diverter")) bullets.push({ text: "Surge Diverter" });
+            if (hasItem("Surge Diverter") || hasItem("Surge")) bullets.push({ text: "Surge Diverter" });
             if (hasItem("Power Meter") || hasItem("Dual Power Meter")) bullets.push({ text: "Dual Power Meter" });
-            if (hasItem("Lighting Test")) bullets.push({ text: "Emergency Lighting Test Kit" });
+            if (hasItem("Lighting Test") || hasItem("Emergency Lighting")) bullets.push({ text: "Emergency Lighting Test Kit" });
 
             // Always include
             bullets.push({ text: "MCB Chassis per Single Line Diagram" });
@@ -235,35 +258,49 @@ export class DocxGenerator {
         }
 
         // --- 3. METER PANEL ---
-        else if (type.includes("Meter Panel")) {
+        else if (typeLower.includes("meter panel") || typeLower.includes("prewired")) {
             bullets.push({ text: "Indoor, IP2X, Wall-Mounted, Form 1, Complete with Back Plate" });
 
-            const rating = config.currentRating || "---";
-            bullets.push({ text: `${rating}A Main Switch` });
+            // Main Switch - validate rating
+            const rating = config.currentRating;
+            if (isValidRating(rating)) {
+                bullets.push({ text: `${rating}A Main Switch` });
+            } else {
+                bullets.push({ text: "Main Switch" });
+            }
 
-            // Count positions (This is tricky without specific item metadata, will try to parse names)
-            // Assuming items have names like "63A 1ph Meter Position"
+            // Count positions
             let count1ph = 0;
             let count3ph = 0;
             items.forEach(i => {
-                if (i.name.includes("1ph") || i.name.includes("Single Phase")) count1ph += i.quantity;
-                if (i.name.includes("3ph") || i.name.includes("Three Phase")) count3ph += i.quantity;
+                const name = i.name.toLowerCase();
+                if (name.includes("1ph") || name.includes("single phase") || name.includes("1-phase")) count1ph += i.quantity;
+                if (name.includes("3ph") || name.includes("three phase") || name.includes("3-phase")) count3ph += i.quantity;
             });
 
-            if (count1ph > 0) bullets.push({ text: `${count1ph} x 63A 1ph Metering Positions` });
-            if (count3ph > 0) bullets.push({ text: `${count3ph} x 63A 3ph Metering Positions` });
+            // Format with leading zeros
+            if (count1ph > 0) bullets.push({ text: `${String(count1ph).padStart(2, '0')} x 63A 1ph Metering Positions` });
+            if (count3ph > 0) bullets.push({ text: `${String(count3ph).padStart(2, '0')} x 63A 3ph Metering Positions` });
         }
 
         // --- 4. CT ENCLOSURE ---
-        else if (type.includes("CT Enclosure") || type.includes("CT Chamber")) {
-            const rating = config.currentRating || "---";
-            bullets.push({ text: `Supply Authority CT Metering Enclosure ${rating}A` });
+        else if (typeLower.includes("ct enclosure") || typeLower.includes("ct chamber")) {
+            const rating = config.currentRating;
+            if (isValidRating(rating)) {
+                bullets.push({ text: `Supply Authority CT Metering Enclosure ${rating}A` });
+            } else {
+                bullets.push({ text: "Supply Authority CT Metering Enclosure" });
+            }
         }
 
         // --- FALLBACK / GENERIC ---
         else {
-            bullets.push({ text: `${type}` });
+            // Don't duplicate the type if it's already in the board title
+            // Only show IP and items line
             if (config.ipRating) bullets.push({ text: `IP Rating: ${config.ipRating}` });
+            if (isValidRating(config.currentRating)) {
+                bullets.push({ text: `${config.currentRating}A Main Switch` });
+            }
             bullets.push({ text: "Items per Single Line Diagram" });
         }
 
