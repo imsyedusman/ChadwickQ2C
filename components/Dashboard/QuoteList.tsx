@@ -94,6 +94,16 @@ export default function QuoteList() {
         return total;
     };
 
+    const getStatusDisplay = (status: string) => {
+        const statusMap: Record<string, { label: string; className: string }> = {
+            'DRAFT': { label: 'Draft', className: 'bg-yellow-100 text-yellow-700' },
+            'SENT': { label: 'Sent', className: 'bg-blue-100 text-blue-700' },
+            'WON': { label: 'Won', className: 'bg-green-100 text-green-700' },
+            'LOST': { label: 'Lost', className: 'bg-red-100 text-red-700' },
+        };
+        return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
+    };
+
     const handleCreate = async () => {
         try {
             const res = await fetch('/api/quotes', {
@@ -207,11 +217,9 @@ export default function QuoteList() {
                                         </span>
                                         <span className={cn(
                                             "text-xs font-medium px-2 py-0.5 rounded-full",
-                                            quote.status === 'DRAFT' ? "bg-yellow-100 text-yellow-700" :
-                                                quote.status === 'SENT' ? "bg-blue-100 text-blue-700" :
-                                                    "bg-green-100 text-green-700"
+                                            getStatusDisplay(quote.status).className
                                         )}>
-                                            {quote.status}
+                                            {getStatusDisplay(quote.status).label}
                                         </span>
                                     </div>
                                     <p className="text-gray-500 text-sm mt-1">{quote.clientName || 'No Client Name'}</p>

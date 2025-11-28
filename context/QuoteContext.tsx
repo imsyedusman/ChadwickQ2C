@@ -42,9 +42,11 @@ interface QuoteContextType {
     clientCompany: string;
     projectRef: string;
     description: string;
+    status: string;
     boards: Board[];
     settings: QuoteSettings;
     loading: boolean;
+    saving: boolean;
     totals: {
         materialCost: number;
         labourHours: number;
@@ -82,6 +84,7 @@ interface QuoteContextType {
     refreshQuote: () => Promise<void>;
     updateSettings: (settings: Partial<QuoteSettings>) => void;
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
+    updateStatus: (status: string) => Promise<void>;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -95,7 +98,9 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         clientCompany: '',
         projectRef: '',
         description: '',
+        status: 'DRAFT',
     });
+    const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<QuoteSettings>({
         labourRate: 100,
         consumablesPct: 0.03,
@@ -121,6 +126,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     clientCompany: data.clientCompany || '',
                     projectRef: data.projectRef || '',
                     description: data.description || '',
+                    status: data.status || 'DRAFT',
                 });
             }
 
@@ -326,6 +332,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
     const updateMetadata = async (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => {
         setMetadata(prev => ({ ...prev, ...data }));
+        setSaving(true);
 
         try {
             await fetch(`/api/quotes/${quoteId}`, {
@@ -335,6 +342,25 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
         } catch (error) {
             console.error("Failed to update metadata", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const updateStatus = async (status: string) => {
+        setMetadata(prev => ({ ...prev, status }));
+        setSaving(true);
+
+        try {
+            await fetch(`/api/quotes/${quoteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status }),
+            });
+        } catch (error) {
+            console.error("Failed to update status", error);
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -347,9 +373,11 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 clientCompany: metadata.clientCompany,
                 projectRef: metadata.projectRef,
                 description: metadata.description,
+                status: metadata.status,
                 boards,
                 settings,
                 loading,
+                saving,
                 totals: boardTotals,
                 grandTotals,
                 selectedBoardId,
@@ -361,6 +389,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 refreshQuote: fetchQuoteData,
                 updateSettings,
                 updateMetadata,
+                updateStatus,
             }}
         >
             {children}

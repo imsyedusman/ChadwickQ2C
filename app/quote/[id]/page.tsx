@@ -9,10 +9,10 @@ import BoardContent from '@/components/QuoteBuilder/BoardContent';
 import CostingView from '@/components/QuoteBuilder/CostingView';
 import GrandTotalView from '@/components/QuoteBuilder/GrandTotalView';
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 function QuoteBuilderContent() {
-    const { boards, loading, quoteNumber, clientName, clientCompany, projectRef, updateMetadata, quoteId, selectedBoardId, setSelectedBoardId } = useQuote();
+    const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
 
@@ -23,6 +23,16 @@ function QuoteBuilderContent() {
             </div>
         );
     }
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'DRAFT': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+            case 'SENT': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'WON': return 'bg-green-100 text-green-700 border-green-200';
+            case 'LOST': return 'bg-red-100 text-red-700 border-red-200';
+            default: return 'bg-gray-100 text-gray-700 border-gray-200';
+        }
+    };
 
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
@@ -88,11 +98,38 @@ function QuoteBuilderContent() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                    <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-green-500" />
-                        Draft Saved
-                    </span>
+                <div className="flex items-center gap-4">
+                    {/* Status Dropdown */}
+                    <div className="relative group">
+                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
+                            Status
+                        </label>
+                        <select
+                            value={status}
+                            onChange={(e) => updateStatus(e.target.value)}
+                            className={`text-sm font-medium px-3 py-1.5 rounded-md border cursor-pointer transition-colors ${getStatusColor(status)}`}
+                        >
+                            <option value="DRAFT">Draft</option>
+                            <option value="SENT">Sent</option>
+                            <option value="WON">Won</option>
+                            <option value="LOST">Lost</option>
+                        </select>
+                    </div>
+
+                    {/* Autosave Indicator */}
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                        {saving ? (
+                            <span className="flex items-center gap-1.5">
+                                <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                Saving...
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1.5">
+                                <Check className="w-3 h-3 text-green-500" />
+                                All changes saved
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
