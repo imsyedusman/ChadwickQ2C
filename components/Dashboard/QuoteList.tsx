@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, Search, FileDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -17,14 +17,25 @@ interface Quote {
     boards: any[];
 }
 
+interface Settings {
+    labourRate: number;
+    consumablesPct: number;
+    overheadPct: number;
+    engineeringPct: number;
+    targetMarginPct: number;
+    roundingIncrement: number;
+}
+
 export default function QuoteList() {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [settings, setSettings] = useState<Settings | null>(null);
     const router = useRouter();
 
     useEffect(() => {
         fetchQuotes();
+        fetchSettings();
     }, []);
 
     const fetchQuotes = async () => {
@@ -37,6 +48,50 @@ export default function QuoteList() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchSettings = async () => {
+        try {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            setSettings(data);
+        } catch (error) {
+            console.error('Failed to fetch settings', error);
+        }
+    };
+
+    const calculateBoardTotal = (items: any[]): number => {
+        if (!settings) return 0;
+
+        let materialCost = 0;
+        let labourHours = 0;
+
+        items.forEach(item => {
+            materialCost += (item.unitPrice || 0) * (item.quantity || 0);
+            labourHours += (item.labourHours || 0) * (item.quantity || 0);
+        });
+
+        const labourCost = labourHours * settings.labourRate;
+        const consumablesCost = materialCost * settings.consumablesPct;
+        const costBase = materialCost + labourCost + consumablesCost;
+        const overheadAmount = costBase * settings.overheadPct;
+        const engineeringCost = costBase * settings.engineeringPct;
+        const totalCost = costBase + overheadAmount + engineeringCost;
+        const marginFactor = 1 - settings.targetMarginPct;
+        const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
+        const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+
+        return sellPriceRounded;
+    };
+
+    const calculateQuoteTotal = (quote: Quote): number => {
+        let total = 0;
+        quote.boards.forEach(board => {
+            if (board.items) {
+                total += calculateBoardTotal(board.items);
+            }
+        });
+        return total;
     };
 
     const handleCreate = async () => {
@@ -66,6 +121,52 @@ export default function QuoteList() {
             setQuotes(quotes.filter((q) => q.id !== id));
         } catch (error) {
             console.error('Failed to delete quote', error);
+        }
+    };
+
+    const handleDuplicate = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+
+        try {
+            const res = await fetch(`/api/quotes/${id}/duplicate`, {
+                method: 'POST',
+            });
+
+            if (!res.ok) {
+                throw new Error('Failed to duplicate quote');
+            }
+
+            const newQuote = await res.json();
+
+            // Refresh the quotes list
+            await fetchQuotes();
+
+            // Optionally navigate to the new quote
+            router.push(`/quote/${newQuote.id}`);
+        } catch (error) {
+            console.error('Failed to duplicate quote', error);
+            alert('Failed to duplicate quote. Please try again.');
+        }
+    };
+
+    const handleExport = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+
+        try {
+            const res = await fetch(`/api/quotes/${id}/export`);
+
+            if (!res.ok) {
+                throw new Error('Failed to export quote');
+            }
+
+            const data = await res.json();
+
+            if (data.success) {
+                alert('Export completed! Check your downloads folder.');
+            }
+        } catch (error) {
+            console.error('Failed to export quote', error);
+            alert('Failed to export quote. Please try again.');
         }
     };
 
@@ -104,56 +205,80 @@ export default function QuoteList() {
             </div>
 
             <div className="grid gap-4">
-                {filteredQuotes.map((quote) => (
-                    <div
-                        key={quote.id}
-                        onClick={() => router.push(`/quote/${quote.id}`)}
-                        className="group bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-                    >
-                        <div className="flex items-start gap-4">
-                            <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                <FileText size={24} />
-                            </div>
-                            <div>
-                                <div className="flex items-center gap-3">
-                                    <h3 className="font-semibold text-gray-900">{quote.projectRef || 'Untitled Project'}</h3>
-                                    <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                        {quote.quoteNumber}
-                                    </span>
-                                    <span className={cn(
-                                        "text-xs font-medium px-2 py-0.5 rounded-full",
-                                        quote.status === 'DRAFT' ? "bg-yellow-100 text-yellow-700" :
-                                            quote.status === 'SENT' ? "bg-blue-100 text-blue-700" :
-                                                "bg-green-100 text-green-700"
-                                    )}>
-                                        {quote.status}
-                                    </span>
-                                </div>
-                                <p className="text-gray-500 text-sm mt-1">{quote.clientName || 'No Client Name'}</p>
-                                <p className="text-gray-400 text-xs mt-2">
-                                    Updated {format(new Date(quote.updatedAt), 'MMM d, yyyy')}
-                                </p>
-                            </div>
-                        </div>
+                {filteredQuotes.map((quote) => {
+                    const totalPrice = calculateQuoteTotal(quote);
+                    const boardCount = quote.boards.length;
+                    const updatedDate = new Date(quote.updatedAt);
 
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                                onClick={(e) => { e.stopPropagation(); /* Duplicate logic */ }}
-                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Duplicate"
-                            >
-                                <Copy size={18} />
-                            </button>
-                            <button
-                                onClick={(e) => handleDelete(e, quote.id)}
-                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Delete"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                    return (
+                        <div
+                            key={quote.id}
+                            onClick={() => router.push(`/quote/${quote.id}`)}
+                            className="group bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
+                        >
+                            <div className="flex items-start gap-4">
+                                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                    <FileText size={24} />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="font-semibold text-gray-900">{quote.projectRef || 'Untitled Project'}</h3>
+                                        <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
+                                            {quote.quoteNumber}
+                                        </span>
+                                        <span className={cn(
+                                            "text-xs font-medium px-2 py-0.5 rounded-full",
+                                            quote.status === 'DRAFT' ? "bg-yellow-100 text-yellow-700" :
+                                                quote.status === 'SENT' ? "bg-blue-100 text-blue-700" :
+                                                    "bg-green-100 text-green-700"
+                                        )}>
+                                            {quote.status}
+                                        </span>
+                                    </div>
+                                    <p className="text-gray-500 text-sm mt-1">{quote.clientName || 'No Client Name'}</p>
+
+                                    {/* Quick-View Summary */}
+                                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                                        <span>
+                                            Updated {format(updatedDate, 'MMM d, yyyy')} at {format(updatedDate, 'h:mm a')}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                            <span className="font-medium text-gray-700">{boardCount}</span>
+                                            {boardCount === 1 ? 'board' : 'boards'}
+                                        </span>
+                                        <span className="font-semibold text-blue-600">
+                                            ${totalPrice.toLocaleString()} ex GST
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={(e) => handleExport(e, quote.id)}
+                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                    title="Export to Word"
+                                >
+                                    <FileDown size={18} />
+                                </button>
+                                <button
+                                    onClick={(e) => handleDuplicate(e, quote.id)}
+                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Duplicate"
+                                >
+                                    <Copy size={18} />
+                                </button>
+                                <button
+                                    onClick={(e) => handleDelete(e, quote.id)}
+                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Delete"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {filteredQuotes.length === 0 && (
                     <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
