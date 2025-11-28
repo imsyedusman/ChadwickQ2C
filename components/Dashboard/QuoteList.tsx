@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search, FileDown } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -141,32 +141,11 @@ export default function QuoteList() {
             // Refresh the quotes list
             await fetchQuotes();
 
-            // Optionally navigate to the new quote
+            // Navigate to the new quote
             router.push(`/quote/${newQuote.id}`);
         } catch (error) {
             console.error('Failed to duplicate quote', error);
             alert('Failed to duplicate quote. Please try again.');
-        }
-    };
-
-    const handleExport = async (e: React.MouseEvent, id: string) => {
-        e.stopPropagation();
-
-        try {
-            const res = await fetch(`/api/quotes/${id}/export`);
-
-            if (!res.ok) {
-                throw new Error('Failed to export quote');
-            }
-
-            const data = await res.json();
-
-            if (data.success) {
-                alert('Export completed! Check your downloads folder.');
-            }
-        } catch (error) {
-            console.error('Failed to export quote', error);
-            alert('Failed to export quote. Please try again.');
         }
     };
 
@@ -254,13 +233,6 @@ export default function QuoteList() {
                             </div>
 
                             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={(e) => handleExport(e, quote.id)}
-                                    className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                    title="Export to Word"
-                                >
-                                    <FileDown size={18} />
-                                </button>
                                 <button
                                     onClick={(e) => handleDuplicate(e, quote.id)}
                                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
