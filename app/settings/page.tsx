@@ -170,7 +170,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.labourRate}
                                                     onChange={(e) => setSettings({ ...settings, labourRate: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                             </div>
 
@@ -183,7 +183,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.consumablesPct}
                                                     onChange={(e) => setSettings({ ...settings, consumablesPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Percentage of material cost</p>
                                             </div>
@@ -197,7 +197,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.overheadPct}
                                                     onChange={(e) => setSettings({ ...settings, overheadPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Percentage of cost base</p>
                                             </div>
@@ -211,7 +211,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.engineeringPct}
                                                     onChange={(e) => setSettings({ ...settings, engineeringPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Percentage of cost base</p>
                                             </div>
@@ -225,7 +225,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.targetMarginPct}
                                                     onChange={(e) => setSettings({ ...settings, targetMarginPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Target profit margin</p>
                                             </div>
@@ -239,7 +239,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.gstPct}
                                                     onChange={(e) => setSettings({ ...settings, gstPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                             </div>
 
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                                                     type="number"
                                                     value={settings.roundingIncrement}
                                                     onChange={(e) => setSettings({ ...settings, roundingIncrement: parseInt(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Round sell price to nearest</p>
                                             </div>
@@ -265,7 +265,7 @@ export default function SettingsPage() {
                                                     step="0.01"
                                                     value={settings.minMarginAlertPct}
                                                     onChange={(e) => setSettings({ ...settings, minMarginAlertPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">Alert when margin falls below</p>
                                             </div>
@@ -282,7 +282,7 @@ export default function SettingsPage() {
                                                         type="text"
                                                         value={settings.companyName}
                                                         onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                     />
                                                 </div>
 
@@ -294,7 +294,7 @@ export default function SettingsPage() {
                                                         value={settings.companyAddress}
                                                         onChange={(e) => setSettings({ ...settings, companyAddress: e.target.value })}
                                                         rows={3}
-                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                     />
                                                 </div>
                                             </div>
