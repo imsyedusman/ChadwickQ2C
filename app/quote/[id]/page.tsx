@@ -8,6 +8,7 @@ import ItemSelection from '@/components/QuoteBuilder/ItemSelection';
 import BoardContent from '@/components/QuoteBuilder/BoardContent';
 import CostingView from '@/components/QuoteBuilder/CostingView';
 import GrandTotalView from '@/components/QuoteBuilder/GrandTotalView';
+import QuoteCostingOverrides from '@/components/QuoteBuilder/QuoteCostingOverrides';
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
@@ -208,6 +209,7 @@ function QuoteBuilderContent() {
                     {!rightCollapsed && (
                         <Panel defaultSize={20} minSize={15} maxSize={30}>
                             <div className="h-full bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 overflow-y-auto">
+                                <QuoteCostingOverrides />
                                 <div className="flex-1">
                                     <CostingView />
                                 </div>

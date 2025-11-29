@@ -53,6 +53,18 @@ export async function GET(
             }, { status: 400 });
         }
 
+        // Calculate effective settings
+        const effectiveSettings = {
+            ...settings,
+            labourRate: quote.overrideLabourRate ?? settings.labourRate,
+            overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
+            engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
+            targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
+            consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
+            gstPct: quote.overrideGstPct ?? settings.gstPct,
+            roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
+        };
+
         // Calculate board totals using the same logic as ExportService
         const calculateBoardTotal = (items: any[]): number => {
             let materialCost = 0;
@@ -63,15 +75,15 @@ export async function GET(
                 labourHours += (item.labourHours || 0) * (item.quantity || 0);
             });
 
-            const labourCost = labourHours * settings.labourRate;
-            const consumablesCost = materialCost * settings.consumablesPct;
+            const labourCost = labourHours * effectiveSettings.labourRate;
+            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
             const costBase = materialCost + labourCost + consumablesCost;
-            const overheadAmount = costBase * settings.overheadPct;
-            const engineeringCost = costBase * settings.engineeringPct;
+            const overheadAmount = costBase * effectiveSettings.overheadPct;
+            const engineeringCost = costBase * effectiveSettings.engineeringPct;
             const totalCost = costBase + overheadAmount + engineeringCost;
-            const marginFactor = 1 - settings.targetMarginPct;
+            const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-            const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
 
             return sellPriceRounded;
         };
@@ -102,15 +114,15 @@ export async function GET(
                 labourHours += (item.labourHours || 0) * (item.quantity || 0);
             });
 
-            const labourCost = labourHours * settings.labourRate;
-            const consumablesCost = materialCost * settings.consumablesPct;
+            const labourCost = labourHours * effectiveSettings.labourRate;
+            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
             const costBase = materialCost + labourCost + consumablesCost;
-            const overheadAmount = costBase * settings.overheadPct;
-            const engineeringCost = costBase * settings.engineeringPct;
+            const overheadAmount = costBase * effectiveSettings.overheadPct;
+            const engineeringCost = costBase * effectiveSettings.engineeringPct;
             const boardTotalCost = costBase + overheadAmount + engineeringCost;
-            const marginFactor = 1 - settings.targetMarginPct;
+            const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? boardTotalCost / marginFactor : boardTotalCost;
-            const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
 
             totalLabourHours += labourHours;
             totalMaterialCost += materialCost;
@@ -124,7 +136,7 @@ export async function GET(
         });
 
         const profit = grandTotal - totalCost;
-        const gst = grandTotal * settings.gstPct;
+        const gst = grandTotal * effectiveSettings.gstPct;
         const finalSellPrice = grandTotal + gst;
 
         const grandTotals = {
@@ -159,7 +171,7 @@ export async function GET(
         // Generate the DOCX file
         await ExportService.generateQuoteDocument({
             quote: quoteData,
-            settings,
+            settings: effectiveSettings,
             totals: {
                 boardTotals: boardTotalsMap,
                 grandTotals

@@ -52,7 +52,22 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json();
-        const { clientName, clientCompany, projectRef, description, status, settingsSnapshot } = body;
+        const {
+            clientName,
+            clientCompany,
+            projectRef,
+            description,
+            status,
+            settingsSnapshot,
+            // Overrides
+            overrideLabourRate,
+            overrideOverheadPct,
+            overrideEngineeringPct,
+            overrideTargetMarginPct,
+            overrideConsumablesPct,
+            overrideGstPct,
+            overrideRoundingIncrement
+        } = body;
 
         const updatedQuote = await prisma.quote.update({
             where: { id },
@@ -63,6 +78,14 @@ export async function PUT(
                 description,
                 status,
                 settingsSnapshot,
+                // Overrides
+                overrideLabourRate,
+                overrideOverheadPct,
+                overrideEngineeringPct,
+                overrideTargetMarginPct,
+                overrideConsumablesPct,
+                overrideGstPct,
+                overrideRoundingIncrement
             },
         });
 

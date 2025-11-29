@@ -27,6 +27,15 @@ model Quote {
   // Global Commercial Adjustments
   globalDiscount    Float @default(0) // Percentage or Fixed amount? Let's assume % for now or handle both in logic
   globalContingency Float @default(0) // Percentage
+
+  // Per-Quote Costing Overrides (Optional - falls back to Global Settings if null)
+  overrideLabourRate        Float?
+  overrideOverheadPct       Float?
+  overrideEngineeringPct    Float?
+  overrideTargetMarginPct   Float?
+  overrideConsumablesPct    Float?
+  overrideGstPct            Float?
+  overrideRoundingIncrement Int?
   
   boards        Board[]
 }

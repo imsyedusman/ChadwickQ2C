@@ -14,6 +14,16 @@ export interface QuoteSettings {
     minMarginAlertPct: number;
 }
 
+export interface QuoteOverrides {
+    overrideLabourRate?: number | null;
+    overrideOverheadPct?: number | null;
+    overrideEngineeringPct?: number | null;
+    overrideTargetMarginPct?: number | null;
+    overrideConsumablesPct?: number | null;
+    overrideGstPct?: number | null;
+    overrideRoundingIncrement?: number | null;
+}
+
 export interface Item {
     id: string;
     boardId: string;
@@ -44,7 +54,9 @@ interface QuoteContextType {
     description: string;
     status: string;
     boards: Board[];
-    settings: QuoteSettings;
+    settings: QuoteSettings; // Global settings
+    overrides: QuoteOverrides; // Quote-specific overrides
+    effectiveSettings: QuoteSettings; // Merged settings (Global + Overrides)
     loading: boolean;
     saving: boolean;
     totals: {
@@ -83,6 +95,7 @@ interface QuoteContextType {
     removeItem: (itemId: string) => Promise<void>;
     refreshQuote: () => Promise<void>;
     updateSettings: (settings: Partial<QuoteSettings>) => void;
+    updateOverrides: (overrides: Partial<QuoteOverrides>) => Promise<void>;
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
 }
@@ -111,6 +124,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         roundingIncrement: 100,
         minMarginAlertPct: 0.05,
     });
+    const [overrides, setOverrides] = useState<QuoteOverrides>({});
     const [loading, setLoading] = useState(true);
 
     const fetchQuoteData = async () => {
@@ -127,6 +141,17 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     projectRef: data.projectRef || '',
                     description: data.description || '',
                     status: data.status || 'DRAFT',
+                });
+
+                // Load overrides
+                setOverrides({
+                    overrideLabourRate: data.overrideLabourRate,
+                    overrideOverheadPct: data.overrideOverheadPct,
+                    overrideEngineeringPct: data.overrideEngineeringPct,
+                    overrideTargetMarginPct: data.overrideTargetMarginPct,
+                    overrideConsumablesPct: data.overrideConsumablesPct,
+                    overrideGstPct: data.overrideGstPct,
+                    overrideRoundingIncrement: data.overrideRoundingIncrement,
                 });
             }
 
@@ -170,6 +195,18 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         fetchQuoteData();
     }, [quoteId]);
 
+    // Calculate effective settings (Global + Overrides)
+    const effectiveSettings: QuoteSettings = {
+        labourRate: overrides.overrideLabourRate ?? settings.labourRate,
+        consumablesPct: overrides.overrideConsumablesPct ?? settings.consumablesPct,
+        overheadPct: overrides.overrideOverheadPct ?? settings.overheadPct,
+        engineeringPct: overrides.overrideEngineeringPct ?? settings.engineeringPct,
+        targetMarginPct: overrides.overrideTargetMarginPct ?? settings.targetMarginPct,
+        gstPct: overrides.overrideGstPct ?? settings.gstPct,
+        roundingIncrement: overrides.overrideRoundingIncrement ?? settings.roundingIncrement,
+        minMarginAlertPct: settings.minMarginAlertPct, // No override for this yet
+    };
+
     const calculateTotals = () => {
         // Helper to calculate costs for a list of items
         const calculateForItems = (items: Item[]) => {
@@ -182,32 +219,32 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
 
             // 1. Labour Cost
-            const labourCost = labourHours * settings.labourRate;
+            const labourCost = labourHours * effectiveSettings.labourRate;
 
             // 2. Consumables Cost (percentage of material cost)
-            const consumablesCost = materialCost * settings.consumablesPct;
+            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
 
             // 3. Cost Base = Material + Labour + Consumables
             const costBase = materialCost + labourCost + consumablesCost;
 
             // 4. Overhead Cost (percentage of cost base)
-            const overheadAmount = costBase * settings.overheadPct;
+            const overheadAmount = costBase * effectiveSettings.overheadPct;
 
             // 5. Engineering Cost (percentage of cost base)
-            const engineeringCost = costBase * settings.engineeringPct;
+            const engineeringCost = costBase * effectiveSettings.engineeringPct;
 
             // 6. Total Cost = Cost Base + Overhead + Engineering
             const totalCost = costBase + overheadAmount + engineeringCost;
 
             // 7. Sell Price = Total Cost / (1 - Target Margin)
-            const marginFactor = 1 - settings.targetMarginPct;
+            const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
 
             // 8. Profit/Margin
             const profit = sellPrice - totalCost;
 
             // 9. Rounded Sell Price
-            const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
 
             return {
                 materialCost,
@@ -233,7 +270,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         const grandTotalBase = calculateForItems(allItems);
 
         // Use rounded price for GST calculation
-        const gst = grandTotalBase.sellPriceRounded * settings.gstPct;
+        const gst = grandTotalBase.sellPriceRounded * effectiveSettings.gstPct;
         const finalSellPrice = grandTotalBase.sellPriceRounded + gst;
 
         const grandTotals = {
@@ -330,6 +367,24 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
+    const updateOverrides = async (newOverrides: Partial<QuoteOverrides>) => {
+        const updated = { ...overrides, ...newOverrides };
+        setOverrides(updated);
+        setSaving(true);
+
+        try {
+            await fetch(`/api/quotes/${quoteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updated),
+            });
+        } catch (error) {
+            console.error("Failed to save overrides", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const updateMetadata = async (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => {
         setMetadata(prev => ({ ...prev, ...data }));
         setSaving(true);
@@ -376,6 +431,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 status: metadata.status,
                 boards,
                 settings,
+                overrides,
+                effectiveSettings,
                 loading,
                 saving,
                 totals: boardTotals,
@@ -388,6 +445,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 removeItem,
                 refreshQuote: fetchQuoteData,
                 updateSettings,
+                updateOverrides,
                 updateMetadata,
                 updateStatus,
             }}
