@@ -55,7 +55,7 @@ export class DocxGenerator {
             });
 
             // 4. Prepare the data
-            const data = this.prepareData(quote);
+            const data = this.prepareData(quote, settings);
             console.log("Data prepared for render:", data);
 
             // 5. Render the document
@@ -107,7 +107,7 @@ export class DocxGenerator {
         return null;
     }
 
-    private static prepareData(quote: QuoteData) {
+    private static prepareData(quote: QuoteData, settings: any) {
         const today = new Date().toLocaleDateString("en-AU", {
             day: "numeric",
             month: "long",
@@ -156,6 +156,7 @@ export class DocxGenerator {
             drawingRef: finalDrawingRef,
             totalPrice: `$${quote.totals.sellPrice.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
             boards: quote.boards.map((board, index) => this.generateBoardData(board, index + 1)),
+            settings: settings, // Include effective settings for template usage
         };
     }
 
