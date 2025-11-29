@@ -19,8 +19,17 @@ export class ExportService {
             projectRef: quote.projectRef,
             description: quote.description,
             boards: quote.boards.map((board: any) => {
-                // Calculate board total using the same logic as QuoteContext
-                const boardTotal = this.calculateBoardTotal(board.items, settings);
+                // Use pre-calculated board total if available (ensures consistency with route.ts)
+                const preCalculated = totals.boardTotals?.find((t: any) => t.boardId === board.id);
+
+                let boardTotal;
+                if (preCalculated) {
+                    boardTotal = preCalculated.sellPriceRounded;
+                } else {
+                    // Fallback to calculation
+                    boardTotal = this.calculateBoardTotal(board.items, settings);
+                }
+
                 return {
                     ...board,
                     totalSellPrice: boardTotal

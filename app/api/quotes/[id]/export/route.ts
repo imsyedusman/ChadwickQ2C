@@ -54,16 +54,30 @@ export async function GET(
         }
 
         // Calculate effective settings
+        const q = quote as any; // Cast to any to avoid lint errors until prisma generate runs
         const effectiveSettings = {
             ...settings,
-            labourRate: quote.overrideLabourRate ?? settings.labourRate,
-            overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
-            engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
-            targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
-            consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
-            gstPct: quote.overrideGstPct ?? settings.gstPct,
-            roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
+            labourRate: q.overrideLabourRate ?? settings.labourRate,
+            overheadPct: q.overrideOverheadPct ?? settings.overheadPct,
+            engineeringPct: q.overrideEngineeringPct ?? settings.engineeringPct,
+            targetMarginPct: q.overrideTargetMarginPct ?? settings.targetMarginPct,
+            consumablesPct: q.overrideConsumablesPct ?? settings.consumablesPct,
+            gstPct: q.overrideGstPct ?? settings.gstPct,
+            roundingIncrement: q.overrideRoundingIncrement ?? settings.roundingIncrement,
         };
+
+        console.log("=== EXPORT DEBUG ===");
+        console.log("Global Settings:", JSON.stringify(settings, null, 2));
+        console.log("Quote Overrides:", {
+            labourRate: q.overrideLabourRate,
+            overheadPct: q.overrideOverheadPct,
+            engineeringPct: q.overrideEngineeringPct,
+            targetMarginPct: q.overrideTargetMarginPct,
+            consumablesPct: q.overrideConsumablesPct,
+            gstPct: q.overrideGstPct,
+            roundingIncrement: q.overrideRoundingIncrement
+        });
+        console.log("Effective Settings:", JSON.stringify(effectiveSettings, null, 2));
 
         // Calculate board totals using the same logic as ExportService
         const calculateBoardTotal = (items: any[]): number => {
@@ -84,6 +98,8 @@ export async function GET(
             const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
             const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
+
+            console.log(`Board Calculation: Material=${materialCost}, LabourHrs=${labourHours}, SellPrice=${sellPrice}, Rounded=${sellPriceRounded}`);
 
             return sellPriceRounded;
         };

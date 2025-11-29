@@ -51,7 +51,7 @@ export async function PUT(
 ) {
     try {
         const { id } = await params;
-        const body = await request.json();
+        const body = await request.json() as any;
         const {
             clientName,
             clientCompany,

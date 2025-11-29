@@ -6,7 +6,7 @@ import { DollarSign, FileDown, Loader2 } from 'lucide-react';
 import { ExportService } from '@/lib/export-service';
 
 export default function GrandTotalView() {
-    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings } = useQuote();
+    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings, effectiveSettings } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
 
     if (!grandTotals) return null;
@@ -69,24 +69,12 @@ export default function GrandTotalView() {
 
             console.log("Calling ExportService with template:", templatePath);
 
-            // We need to pass the board totals map
-            const boardTotalsMap = boards.map(b => {
-                // Simple fallback calculation if context totals aren't granular enough
-                // But we should use the context's grandTotals logic if possible.
-                // For now, we'll rely on the fact that we need to pass *some* total.
-                // Let's use a simple sum of items for now to ensure it works.
-                const total = b.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-                return {
-                    boardId: b.id,
-                    sellPriceRounded: total // This is raw cost, not sell price, but better than 0
-                };
-            });
-
+            // Pass null for boardTotals so ExportService calculates them using effectiveSettings
             await ExportService.generateQuoteDocument({
                 quote: { ...quoteData, templatePath },
-                settings,
+                settings: effectiveSettings, // Use effective settings (with overrides)
                 totals: {
-                    boardTotals: boardTotalsMap,
+                    boardTotals: null,
                     grandTotals
                 }
             });
