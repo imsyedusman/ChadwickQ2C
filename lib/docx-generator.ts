@@ -38,7 +38,18 @@ export class DocxGenerator {
         try {
             // 1. Load the template
             console.log("Fetching template file...");
-            const response = await fetch(templatePath);
+
+            // Extract filename from path if it's a local path
+            let fetchUrl = templatePath;
+            if (templatePath.startsWith('/templates/')) {
+                const filename = templatePath.split('/').pop();
+                if (filename) {
+                    fetchUrl = `/api/templates/download?filename=${encodeURIComponent(filename)}`;
+                    console.log(`Converted path to API call: ${fetchUrl}`);
+                }
+            }
+
+            const response = await fetch(fetchUrl);
             if (!response.ok) {
                 throw new Error(`Could not find template file at ${templatePath} (Status: ${response.status})`);
             }
