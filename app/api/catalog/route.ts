@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import * as XLSX from 'xlsx';
 
 export async function GET(request: Request) {
     try {
@@ -8,6 +9,8 @@ export async function GET(request: Request) {
         const search = searchParams.get('search') || '';
         const category = searchParams.get('category');
         const subcategory = searchParams.get('subcategory');
+        const exportMode = searchParams.get('export') === 'true';
+        const brand = searchParams.get('brand');
         const take = searchParams.get('take') ? parseInt(searchParams.get('take')!) : 100;
 
         // Mode: Stats (Get unique brands and counts)
@@ -118,11 +121,43 @@ export async function GET(request: Request) {
             whereClause.AND.push({ subcategory: subcategory });
         }
 
+        // 4. Brand Filter (Explicitly for Export or Filtering)
+        if (brand) {
+            whereClause.AND.push({ brand: brand });
+        }
+
         const items = await prisma.catalogItem.findMany({
             where: whereClause,
-            take: take,
+            take: exportMode ? undefined : take, // No limit for export
             orderBy: { brand: 'asc' },
         });
+
+        if (exportMode) {
+            // Generate Excel
+            const worksheet = XLSX.utils.json_to_sheet(items.map(item => ({
+                'Brand': item.brand,
+                'Part Number': item.partNumber,
+                'Description': item.description,
+                'Category': item.category, // Master Category
+                'Subcategory': item.subcategory, // Original Category
+                'Price': item.unitPrice,
+                'Labour': item.labourHours,
+                'Notes': item.notes
+            })));
+
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Catalog');
+
+            // Write to buffer
+            const buf = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+            return new NextResponse(buf, {
+                headers: {
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition': `attachment; filename="catalog_export_${brand || 'all'}.xlsx"`
+                }
+            });
+        }
 
         return NextResponse.json(items);
     } catch (error) {

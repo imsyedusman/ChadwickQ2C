@@ -241,6 +241,26 @@ export default function CatalogManager() {
         }
     };
 
+    const handleDownloadExcel = async (brand: string) => {
+        try {
+            const res = await fetch(`/api/catalog?export=true&brand=${encodeURIComponent(brand)}`);
+            if (!res.ok) throw new Error('Failed to download excel');
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `catalog_export_${brand.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Download failed', error);
+            alert('Failed to download excel');
+        }
+    };
+
     return (
         <div className="space-y-8">
             {/* Manage Pricelists Section */}
@@ -284,6 +304,14 @@ export default function CatalogManager() {
                                 >
                                     {deletingBrand === stat.brand ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
                                     Delete Pricelist
+                                </button>
+                                <button
+                                    onClick={() => handleDownloadExcel(stat.brand)}
+                                    className="w-full py-2 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors flex items-center justify-center gap-2 mt-2"
+                                    title="Download Excel"
+                                >
+                                    <FileSpreadsheet size={14} />
+                                    Download Excel
                                 </button>
                             </div>
                         ))
