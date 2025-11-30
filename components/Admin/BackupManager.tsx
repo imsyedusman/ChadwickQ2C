@@ -164,7 +164,7 @@ export default function BackupManager() {
                             Export Catalog
                         </h3>
                         <p className="text-sm text-gray-600 mb-4">
-                            Download a JSON file containing your entire catalog. Use this to transfer data from Local to Live.
+                            Download a JSON file containing your entire catalog.
                         </p>
                         <button
                             onClick={handleDownloadBackup}
