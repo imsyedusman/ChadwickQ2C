@@ -74,20 +74,27 @@ export default function ItemSelection() {
             return () => clearTimeout(delayDebounceFn);
         }
 
-        // If browsing Switchboards, fetch when fully drilled down OR at leaf category
-        if (activeCategory === 'Switchboard') {
-            // Fetch if L3 selected (3-level hierarchy like Circuit Breakers > MCCB > 50kA)
-            // OR if L1 selected with no L2 options (1-level hierarchy like Power Meters)
-            if (selectedL3 || (selectedL1 && l2Options.length === 0)) {
+        // If browsing Switchboards or Busbars, fetch when fully drilled down
+        if (activeCategory === 'Switchboard' || activeCategory === 'Busbar') {
+            // Case 1: 3-level hierarchy (L3 selected)
+            if (selectedL3) {
+                fetchItems();
+            }
+            // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist)
+            else if (selectedL2 && l3Options.length === 0) {
+                fetchItems();
+            }
+            // Case 3: 1-level hierarchy (L1 selected, and no L2 options exist)
+            else if (selectedL1 && l2Options.length === 0) {
                 fetchItems();
             } else {
-                setItems([]); // Clear items if navigating up
+                setItems([]); // Clear items if navigating up or drilling down
             }
         } else {
-            // For Basics/Busbar, fetch when any level is selected OR show all if none selected
+            // For Basics, fetch when any level is selected OR show all if none selected
             fetchItems();
         }
-    }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options]);
+    }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options, l3Options]);
 
 
 
@@ -102,23 +109,24 @@ export default function ItemSelection() {
 
             // Subcategory filtering
             if (!searchQuery) {
-                if (activeCategory === 'Switchboard') {
-                    // For Switchboards: fetch based on drill-down level
+                if (activeCategory === 'Switchboard' || activeCategory === 'Busbar') {
+                    // Fetch based on deepest selected level
                     if (selectedL3) {
-                        // 3-level hierarchy (e.g., Circuit Breakers > MCCB > 50kA)
                         const fullPath = [selectedL1, selectedL2, selectedL3].join(' > ');
                         params.append('subcategory', fullPath);
+                    } else if (selectedL2) {
+                        // 2-level hierarchy (e.g. Main Bars > Custom Busbar)
+                        const fullPath = [selectedL1, selectedL2].join(' > ');
+                        params.append('subcategory', fullPath);
                     } else if (selectedL1 && l2Options.length === 0) {
-                        // 1-level hierarchy (e.g., Power Meters)
+                        // 1-level hierarchy
                         params.append('subcategory', selectedL1);
                     }
-                } else if (activeCategory === 'Basics' || activeCategory === 'Busbar') {
-                    // For Basics/Busbars: filter by selected level
+                } else if (activeCategory === 'Basics') {
+                    // For Basics: filter by selected level
                     if (selectedL1) {
-                        // If user has drilled down, filter by that subcategory
                         params.append('subcategory', selectedL1);
                     }
-                    // Otherwise, fetch all items in this category (no subcategory filter)
                 }
             }
 
@@ -199,8 +207,8 @@ export default function ItemSelection() {
                         </button>
                         <ChevronRight size={14} className="text-gray-400" />
 
-                        {/* Switchboard: 3-level breadcrumb */}
-                        {activeCategory === 'Switchboard' && selectedL2 ? (
+                        {/* Switchboard & Busbar: Multi-level breadcrumb */}
+                        {(activeCategory === 'Switchboard' || activeCategory === 'Busbar') && selectedL2 ? (
                             <>
                                 <button
                                     onClick={() => { setSelectedL2(null); setSelectedL3(null); setItems([]); }}
@@ -225,7 +233,7 @@ export default function ItemSelection() {
                                 )}
                             </>
                         ) : (
-                            /* Basics/Busbars: 1-level breadcrumb */
+                            /* Basics: 1-level breadcrumb */
                             <span className="text-gray-900 font-semibold">{selectedL1}</span>
                         )}
                     </>
@@ -284,8 +292,8 @@ export default function ItemSelection() {
             {/* Category Selection Grid (Drill-down) */}
             {!searchQuery && (
                 <div className="px-6 py-4 bg-gray-50">
-                    {/* Switchboard: 3-level hierarchy */}
-                    {activeCategory === 'Switchboard' && (
+                    {/* Switchboard & Busbar: Multi-level hierarchy */}
+                    {(activeCategory === 'Switchboard' || activeCategory === 'Busbar') && (
                         <>
                             {!selectedL1 && (
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -337,8 +345,8 @@ export default function ItemSelection() {
                         </>
                     )}
 
-                    {/* Basics/Busbars: 1-level hierarchy (subcategory only) */}
-                    {(activeCategory === 'Basics' || activeCategory === 'Busbar') && !selectedL1 && (
+                    {/* Basics: 1-level hierarchy (subcategory only) */}
+                    {activeCategory === 'Basics' && !selectedL1 && (
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             {l1Options.map(cat => (
                                 <button

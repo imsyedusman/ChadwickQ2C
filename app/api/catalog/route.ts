@@ -107,19 +107,13 @@ export async function GET(request: Request) {
         }
 
         // 3. Subcategory Filter (Exact match for drill-down)
-        if (subcategory) {
-            // If subcategory is provided, we want items that START with this path or match exactly
-            // Actually, for L1/L2 selection, we might want to show all children?
-            // But the UI logic selects specific L3 usually. 
-            // Let's support "starts with" for L1/L2 browsing if needed, but for now exact match or "contains" is safer?
-            // The UI sends the specific subcategory string from the item.
-            // Let's use 'contains' to be safe, or exact match if we are confident.
-            // Given the concatenation ' > ', exact match is best for L3, but for L1/L2 we need 'startsWith'.
-            // However, the current UI logic only fetches items when fully drilled down OR searching.
-            // Let's support a 'subcategory_starts_with' param if we want to show items at L1/L2.
-            // For now, let's assume exact match if 'subcategory' is passed.
-            whereClause.AND.push({ subcategory: subcategory });
-        }
+        // If subcategory is provided, we want items that START with this path or match exactly
+        // This allows selecting "Main Bars" to see "Main Bars > Custom" items
+        whereClause.AND.push({
+            subcategory: {
+                startsWith: subcategory
+            }
+        });
 
         // 4. Brand Filter (Explicitly for Export or Filtering)
         if (brand) {

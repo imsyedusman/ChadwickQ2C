@@ -14,6 +14,7 @@ export default function Navbar() {
                                 width={120}
                                 height={40}
                                 className="h-10 w-auto"
+                                suppressHydrationWarning
                             />
                             <span className="font-bold text-xl text-gray-900 tracking-tight">Q2C</span>
                         </Link>
