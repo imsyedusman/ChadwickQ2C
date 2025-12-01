@@ -46,18 +46,6 @@ export default function BoardContent() {
         updateItem(itemId, { quantity: validQty });
     };
 
-    const handleQuantityInputChange = (itemId: string, value: string) => {
-        // Parse the input, allow empty string temporarily
-        if (value === '' || value === '.') {
-            // User is typing, don't update yet
-            return;
-        }
-        const parsed = parseFloat(value);
-        if (!isNaN(parsed)) {
-            handleQuantityChange(itemId, parsed);
-        }
-    };
-
     const renderItemRow = (item: Item) => (
         <div key={item.id} className="px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm">
             {/* Item Details */}
@@ -78,15 +66,21 @@ export default function BoardContent() {
                 </button>
                 <input
                     type="number"
-                    value={item.quantity}
-                    onChange={(e) => handleQuantityInputChange(item.id, e.target.value)}
+                    defaultValue={item.quantity}
+                    key={`qty-${item.id}-${item.quantity}`}
                     onBlur={(e) => {
-                        // On blur, ensure valid value
+                        // On blur, validate and update
                         const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                         if (isNaN(val) || val < 0) {
                             handleQuantityChange(item.id, 0);
                         } else {
                             handleQuantityChange(item.id, val);
+                        }
+                    }}
+                    onKeyDown={(e) => {
+                        // Allow Enter to blur and save
+                        if (e.key === 'Enter') {
+                            e.currentTarget.blur();
                         }
                     }}
                     step="0.01"

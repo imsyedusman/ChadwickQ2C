@@ -78,6 +78,7 @@ async function main() {
         // Import new data
         const result = await prisma.catalogItem.createMany({
             data: busbarsData.map(item => ({
+                brand: null, // Busbars are internal items without a vendor brand
                 category: item.category,
                 subcategory: item.subcategory,
                 partNumber: item.partNumber,
