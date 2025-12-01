@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuote } from '@/context/QuoteContext';
 import { DollarSign, FileDown, Loader2 } from 'lucide-react';
 import { ExportService } from '@/lib/export-service';
+import { formatCurrency } from '@/lib/utils';
 
 export default function GrandTotalView() {
     const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings, effectiveSettings } = useQuote();
@@ -103,7 +104,7 @@ export default function GrandTotalView() {
                 </div>
                 <div className="bg-gray-50 p-2.5 rounded">
                     <div className="text-xs text-gray-500 mb-0.5">Labour Cost</div>
-                    <div className="text-lg font-bold text-gray-900">${labourCost.toFixed(0)}</div>
+                    <div className="text-lg font-bold text-gray-900">{formatCurrency(labourCost, 0)}</div>
                 </div>
             </div>
 
@@ -111,33 +112,33 @@ export default function GrandTotalView() {
             <div className="space-y-1.5 text-xs mb-4 pb-4 border-b border-gray-200">
                 <div className="flex justify-between text-gray-600">
                     <span>Materials</span>
-                    <span className="font-medium">${materialCost.toFixed(0)}</span>
+                    <span className="font-medium">{formatCurrency(materialCost, 0)}</span>
                 </div>
                 {consumablesCost > 0 && (
                     <div className="flex justify-between text-gray-500 text-[11px] pl-3">
                         <span>+ Consumables</span>
-                        <span>${consumablesCost.toFixed(0)}</span>
+                        <span>{formatCurrency(consumablesCost, 0)}</span>
                     </div>
                 )}
                 <div className="flex justify-between text-gray-700 font-medium pt-1">
                     <span>Cost Base</span>
-                    <span>${costBase.toFixed(0)}</span>
+                    <span>{formatCurrency(costBase, 0)}</span>
                 </div>
                 {overheadAmount > 0 && (
                     <div className="flex justify-between text-gray-600">
                         <span>Overhead</span>
-                        <span>${overheadAmount.toFixed(0)}</span>
+                        <span>{formatCurrency(overheadAmount, 0)}</span>
                     </div>
                 )}
                 {engineeringCost > 0 && (
                     <div className="flex justify-between text-gray-600">
                         <span>Engineering</span>
-                        <span>${engineeringCost.toFixed(0)}</span>
+                        <span>{formatCurrency(engineeringCost, 0)}</span>
                     </div>
                 )}
                 <div className="flex justify-between text-gray-900 font-semibold pt-1.5 border-t border-gray-200">
                     <span>Total Cost</span>
-                    <span>${totalCost.toFixed(0)}</span>
+                    <span>{formatCurrency(totalCost, 0)}</span>
                 </div>
             </div>
 
@@ -146,11 +147,11 @@ export default function GrandTotalView() {
                 <div className="bg-blue-50 border border-blue-100 rounded p-2.5">
                     <div className="flex justify-between items-baseline mb-1">
                         <span className="text-xs text-blue-700">Sell Price (ex GST)</span>
-                        <span className="text-sm font-semibold text-blue-900">${sellPriceRounded.toFixed(0)}</span>
+                        <span className="text-sm font-semibold text-blue-900">{formatCurrency(sellPriceRounded, 0)}</span>
                     </div>
                     <div className="flex justify-between items-baseline text-[11px]">
                         <span className="text-blue-600">+ GST ({(gst / sellPriceRounded * 100).toFixed(0)}%)</span>
-                        <span className="text-blue-700">${gst.toFixed(0)}</span>
+                        <span className="text-blue-700">{formatCurrency(gst, 0)}</span>
                     </div>
                 </div>
 
@@ -160,12 +161,12 @@ export default function GrandTotalView() {
                             <DollarSign size={16} className="opacity-90" />
                             <span className="text-sm font-medium">Total (inc GST)</span>
                         </div>
-                        <span className="text-2xl font-bold">${finalSellPrice.toFixed(0)}</span>
+                        <span className="text-2xl font-bold">{formatCurrency(finalSellPrice, 0)}</span>
                     </div>
                     {profit > 0 && (
                         <div className="mt-2 pt-2 border-t border-blue-500/30 flex justify-between text-xs">
                             <span className="text-blue-100">Margin</span>
-                            <span className="text-blue-100 font-medium">${profit.toFixed(0)} ({((profit / totalCost) * 100).toFixed(0)}%)</span>
+                            <span className="text-blue-100 font-medium">{formatCurrency(profit, 0)} ({((profit / totalCost) * 100).toFixed(0)}%)</span>
                         </div>
                     )}
                 </div>

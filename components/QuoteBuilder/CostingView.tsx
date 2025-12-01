@@ -2,6 +2,7 @@
 
 import { useQuote } from '@/context/QuoteContext';
 import { TrendingUp } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export default function CostingView() {
     const { totals, settings } = useQuote();
@@ -40,7 +41,7 @@ export default function CostingView() {
                         </div>
                         <div className="bg-gray-50 p-2.5 rounded border border-gray-200">
                             <div className="text-xs text-gray-500 mb-0.5">Labour Cost</div>
-                            <div className="text-lg font-bold text-gray-900">${labourCost.toFixed(0)}</div>
+                            <div className="text-lg font-bold text-gray-900">{formatCurrency(labourCost, 0)}</div>
                         </div>
                     </div>
 
@@ -48,37 +49,37 @@ export default function CostingView() {
                     <div className="space-y-1.5 text-xs">
                         <div className="flex justify-between text-gray-600">
                             <span>Materials</span>
-                            <span className="font-medium">${materialCost.toFixed(0)}</span>
+                            <span className="font-medium">{formatCurrency(materialCost, 0)}</span>
                         </div>
                         {consumablesCost > 0 && (
                             <div className="flex justify-between text-gray-500 text-[11px] pl-3">
                                 <span>+ Consumables</span>
-                                <span>${consumablesCost.toFixed(0)}</span>
+                                <span>{formatCurrency(consumablesCost, 0)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-gray-700 font-medium pt-1 border-t border-gray-100">
                             <span>Cost Base</span>
-                            <span>${costBase.toFixed(0)}</span>
+                            <span>{formatCurrency(costBase, 0)}</span>
                         </div>
                         {overheadAmount > 0 && (
                             <div className="flex justify-between text-gray-600">
                                 <span>Overhead</span>
-                                <span>${overheadAmount.toFixed(0)}</span>
+                                <span>{formatCurrency(overheadAmount, 0)}</span>
                             </div>
                         )}
                         {engineeringCost > 0 && (
                             <div className="flex justify-between text-gray-600">
                                 <span>Engineering</span>
-                                <span>${engineeringCost.toFixed(0)}</span>
+                                <span>{formatCurrency(engineeringCost, 0)}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-gray-900 font-semibold pt-1.5 border-t border-gray-200">
                             <span>Total Cost</span>
-                            <span>${totalCost.toFixed(0)}</span>
+                            <span>{formatCurrency(totalCost, 0)}</span>
                         </div>
                         <div className="flex justify-between text-gray-600 pt-1">
                             <span>+ Margin</span>
-                            <span className="text-green-600 font-medium">${profit.toFixed(0)}</span>
+                            <span className="text-green-600 font-medium">{formatCurrency(profit, 0)}</span>
                         </div>
                     </div>
 
@@ -86,7 +87,7 @@ export default function CostingView() {
                     <div className="bg-blue-50 border border-blue-100 rounded p-2.5 mt-3">
                         <div className="flex justify-between items-baseline">
                             <span className="text-xs text-blue-700">Sell Price (ex GST)</span>
-                            <span className="text-lg font-bold text-blue-900">${sellPriceRounded.toFixed(0)}</span>
+                            <span className="text-lg font-bold text-blue-900">{formatCurrency(sellPriceRounded, 0)}</span>
                         </div>
                     </div>
                 </div>

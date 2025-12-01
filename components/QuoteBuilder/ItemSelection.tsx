@@ -384,7 +384,7 @@ export default function ItemSelection() {
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                         {items.map((item) => (
                             <div
                                 key={item.id}
@@ -392,13 +392,24 @@ export default function ItemSelection() {
                                 onClick={() => handleAddItem(item)}
                             >
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                                        <span className="font-bold text-gray-900 truncate max-w-[120px]" title={item.partNumber}>{item.partNumber}</span>
-                                        <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full truncate max-w-[100px]" title={item.brand}>
-                                            {item.brand}
-                                        </span>
+                                    {/* Description (Primary - Bold) */}
+                                    <div className="font-bold text-gray-900 mb-1" title={item.description}>
+                                        {item.description}
                                     </div>
-                                    <p className="text-sm text-gray-600 truncate" title={item.description}>{item.description}</p>
+
+                                    {/* Part Number & Brand (Secondary) */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {item.partNumber && (
+                                            <span className="text-sm text-gray-600">
+                                                {item.partNumber}
+                                            </span>
+                                        )}
+                                        {item.brand && (
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
+                                                {item.brand}
+                                            </span>
+                                        )}
+                                    </div>
 
                                     {/* Breadcrumb hint in item card */}
                                     {item.subcategory && (

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
 import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -40,9 +40,22 @@ export default function BoardContent() {
         }));
     };
 
-    const handleQuantityChange = (itemId: string, currentQty: number, change: number) => {
-        const newQty = Math.max(1, currentQty + change);
-        updateItem(itemId, { quantity: newQty });
+    const handleQuantityChange = (itemId: string, newQty: number) => {
+        // Ensure quantity is valid (>= 0, allow decimals)
+        const validQty = Math.max(0, newQty);
+        updateItem(itemId, { quantity: validQty });
+    };
+
+    const handleQuantityInputChange = (itemId: string, value: string) => {
+        // Parse the input, allow empty string temporarily
+        if (value === '' || value === '.') {
+            // User is typing, don't update yet
+            return;
+        }
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed)) {
+            handleQuantityChange(itemId, parsed);
+        }
     };
 
     const renderItemRow = (item: Item) => (
@@ -58,14 +71,30 @@ export default function BoardContent() {
             {/* Quantity Control */}
             <div className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1 h-6">
                 <button
-                    onClick={() => handleQuantityChange(item.id, item.quantity, -1)}
+                    onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                     className="text-gray-400 hover:text-red-600 transition-colors"
                 >
                     <Minus size={12} />
                 </button>
-                <span className="w-6 text-center text-xs font-medium text-gray-700">{item.quantity}</span>
+                <input
+                    type="number"
+                    value={item.quantity}
+                    onChange={(e) => handleQuantityInputChange(item.id, e.target.value)}
+                    onBlur={(e) => {
+                        // On blur, ensure valid value
+                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                        if (isNaN(val) || val < 0) {
+                            handleQuantityChange(item.id, 0);
+                        } else {
+                            handleQuantityChange(item.id, val);
+                        }
+                    }}
+                    step="0.01"
+                    min="0"
+                    className="w-12 text-center text-xs font-medium text-gray-700 bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
                 <button
-                    onClick={() => handleQuantityChange(item.id, item.quantity, 1)}
+                    onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                     className="text-gray-400 hover:text-blue-600 transition-colors"
                 >
                     <Plus size={12} />
@@ -74,8 +103,8 @@ export default function BoardContent() {
 
             {/* Price & Total */}
             <div className="text-right w-20">
-                <div className="font-medium text-gray-900">${(item.unitPrice * item.quantity).toFixed(2)}</div>
-                <div className="text-[10px] text-gray-400">${item.unitPrice.toFixed(2)} ea</div>
+                <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
+                <div className="text-[10px] text-gray-400">{formatCurrency(item.unitPrice)} ea</div>
             </div>
 
             {/* Actions */}
