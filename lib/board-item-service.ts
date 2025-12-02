@@ -38,6 +38,7 @@ const WC_KIT_ITEMS = [
     '100A-FUSE',
     '100A-PANEL',
     '100A-NEUTRAL-LINK',
+    '100A-MCB-1PH',
     '100A-MCB-3PH'
 ];
 
@@ -75,21 +76,24 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         METER_PANEL_ITEMS.forEach(pn => addTarget(pn, ctQty));
     }
 
+
     // Whole-Current Metering Logic
-    if (config.wholeCurrentMetering === 'Yes' && config.wcType === '100A wiring 3-phase') {
+    if (config.wholeCurrentMetering === 'Yes') {
         const wcQty = config.wcQuantity || 1;
 
-        // 100A-FUSE (3 per meter)
-        addTarget('100A-FUSE', wcQty * 3);
-
-        // 100A-PANEL (1 per meter)
-        addTarget('100A-PANEL', wcQty);
-
-        // 100A-NEUTRAL-LINK (1 per meter)
-        addTarget('100A-NEUTRAL-LINK', wcQty);
-
-        // 100A-MCB-3PH (1 per meter)
-        addTarget('100A-MCB-3PH', wcQty);
+        if (config.wcType === '100A wiring 3-phase') {
+            // 3-phase kit
+            addTarget('100A-FUSE', wcQty * 3);  // 3 fuses per meter
+            addTarget('100A-PANEL', wcQty);
+            addTarget('100A-NEUTRAL-LINK', wcQty);
+            addTarget('100A-MCB-3PH', wcQty);
+        } else if (config.wcType === '100A wiring 1-phase') {
+            // 1-phase kit
+            addTarget('100A-FUSE', wcQty);  // 1 fuse per meter
+            addTarget('100A-PANEL', wcQty);
+            addTarget('100A-NEUTRAL-LINK', wcQty);
+            addTarget('100A-MCB-1PH', wcQty);
+        }
     }
 
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);

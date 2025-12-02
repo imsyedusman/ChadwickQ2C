@@ -65,7 +65,7 @@ const YES_NO = ['Yes', 'No'];
 
 const CT_TYPES = ['S', 'T', 'W', 'U'];
 
-const WC_TYPES = ['100A wiring 3-phase'];
+const WC_TYPES = ['100A wiring 1-phase', '100A wiring 3-phase'];
 
 // --- LOGIC TABLES ---
 
