@@ -72,6 +72,23 @@ export default function CatalogManager() {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
+    /**
+     * Maps legacy category paths to unified structure.
+     * Ensures future Excel imports maintain the unified category organization.
+     */
+    const mapLegacyCategory = (subcategory: string): string => {
+        const categoryMap: Record<string, string> = {
+            // Power Meters unification
+            'Miscellaneous > Metering > Power Meter': 'Power Meters',
+            'Miscellaneous > Metering > Power Meter Accessories': 'Power Meter Accessories',
+
+            // Add more mappings here as needed in the future
+            // 'Old Path > Structure': 'New Simplified Path',
+        };
+
+        return categoryMap[subcategory] || subcategory;
+    };
+
     const findColumnValue = (row: any, possibleHeaders: string[]): string | undefined => {
         // Helper to normalize a string: remove non-alphanumeric, lowercase
         const normalize = (str: string) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -147,10 +164,13 @@ export default function CatalogManager() {
                     const subcatParts = [vendorCat1, vendorCat2, vendorCat3].filter(part => part && String(part).trim().length > 0);
                     const subcat = subcatParts.length > 0 ? subcatParts.join(' > ') : '';
 
+                    // Apply category mapping to unify legacy paths (e.g., power meters)
+                    const mappedSubcat = mapLegacyCategory(subcat);
+
                     return {
                         brand: manualBrand || 'Schneider Electric', // Default to Schneider if not specified
                         category: 'Switchboard', // Enforce Master Category for external uploads
-                        subcategory: subcat,
+                        subcategory: mappedSubcat,
                         partNumber: partNo ? String(partNo) : '',
                         description: desc ? String(desc) : '',
                         unitPrice: priceRaw ? parseFloat(String(priceRaw).replace(/[$,]/g, '')) : 0,

@@ -1,0 +1,33 @@
+﻿=== Checking Power Meter Categories ===
+
+Found 46 power meter items
+
+
+Switchboard > Power Meters
+  Count: 30
+  Brands: IPD, MERCS, NHP
+  Sample items:
+    - 48250402: Diris A20 + RS485
+    - 48250500: Diris A40 + RS485
+    - 48250501: Diris A40 + Ethernet + Webserver
+
+Switchboard > Miscellaneous > Metering > Power Meter
+  Count: 9
+  Brands: Schneider Electric
+  Sample items:
+    - A9MEM3155: iEM3155 63A Cl 1 MID Energy meter RS-485
+    - A9MEM3255: iEM3255 CT op Cl 0.5S MID Energy meter R
+    - A9MEM3355: iEM3355 125A Cl 1 MID Energy meter RS485
+
+Switchboard > Miscellaneous > Metering > Power Meter Accessories
+  Count: 7
+  Brands: Schneider Electric
+  Sample items:
+    - LV434000: Modbus SL communication interface module
+    - LV434001: Ethernet Interface For One Circuit Break
+    - LV434002: ETHERNET FOR LV BREAKERS AND GATEWAY
+
+
+=== Checking for Duplicates ===
+
+No duplicates found by part number
