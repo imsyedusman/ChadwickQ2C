@@ -21,6 +21,8 @@ export interface BoardConfig {
     currentRating: string;
     spd: string;
     ctMetering: string;
+    ctType?: string; // S, T, W, U
+    ctQuantity?: number;
     meterPanel: string;
     wholeCurrentMetering: string;
     drawingRef: string;
@@ -58,6 +60,8 @@ const CURRENT_RATINGS = [
 ];
 
 const YES_NO = ['Yes', 'No'];
+
+const CT_TYPES = ['S', 'T', 'W', 'U'];
 
 // --- LOGIC TABLES ---
 
@@ -97,6 +101,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         currentRating: '',
         spd: '',
         ctMetering: 'No',
+        ctType: 'S',
+        ctQuantity: 1,
         meterPanel: 'No',
         wholeCurrentMetering: 'No',
         drawingRef: 'No',
@@ -123,6 +129,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 currentRating: '',
                 spd: '',
                 ctMetering: 'No',
+                ctType: 'S',
+                ctQuantity: 1,
                 meterPanel: 'No',
                 wholeCurrentMetering: 'No',
                 drawingRef: 'No',
@@ -406,6 +414,30 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
+                                    {config.ctMetering === 'Yes' && (
+                                        <>
+                                            <div className="animate-in fade-in slide-in-from-left-2 duration-200">
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">CT Type</label>
+                                                <select
+                                                    className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                                    value={config.ctType}
+                                                    onChange={e => setConfig({ ...config, ctType: e.target.value })}
+                                                >
+                                                    {CT_TYPES.map(t => <option key={t} value={t}>{t}-Type</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="animate-in fade-in slide-in-from-left-2 duration-200">
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">CT Quantity</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                                    value={config.ctQuantity}
+                                                    onChange={e => setConfig({ ...config, ctQuantity: parseInt(e.target.value) || 1 })}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-600 mb-1">Meter Panel Included</label>
                                         <select

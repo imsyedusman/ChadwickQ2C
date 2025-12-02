@@ -19,6 +19,11 @@ export async function PUT(
             },
         });
 
+        if (config) {
+            const { syncBoardItems } = await import('@/lib/board-item-service');
+            await syncBoardItems(boardId, config);
+        }
+
         return NextResponse.json(updatedBoard);
     } catch (error) {
         console.error('Failed to update board', error);
