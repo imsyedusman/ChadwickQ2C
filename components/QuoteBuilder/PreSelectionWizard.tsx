@@ -25,6 +25,8 @@ export interface BoardConfig {
     ctQuantity?: number;
     meterPanel: string;
     wholeCurrentMetering: string;
+    wcType?: string;
+    wcQuantity?: number;
     drawingRef: string;
     drawingRefNumber: string;
     notes: string;
@@ -62,6 +64,8 @@ const CURRENT_RATINGS = [
 const YES_NO = ['Yes', 'No'];
 
 const CT_TYPES = ['S', 'T', 'W', 'U'];
+
+const WC_TYPES = ['100A wiring 3-phase'];
 
 // --- LOGIC TABLES ---
 
@@ -105,6 +109,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         ctQuantity: 1,
         meterPanel: 'No',
         wholeCurrentMetering: 'No',
+        wcType: '100A wiring 3-phase',
+        wcQuantity: 1,
         drawingRef: 'No',
         drawingRefNumber: '',
         notes: ''
@@ -133,6 +139,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 ctQuantity: 1,
                 meterPanel: 'No',
                 wholeCurrentMetering: 'No',
+                wcType: '100A wiring 3-phase',
+                wcQuantity: 1,
                 drawingRef: 'No',
                 drawingRefNumber: '',
                 notes: ''
@@ -458,6 +466,30 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
                                         </select>
                                     </div>
+                                    {config.wholeCurrentMetering === 'Yes' && (
+                                        <>
+                                            <div className="animate-in fade-in slide-in-from-left-2 duration-200">
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Whole Current Type</label>
+                                                <select
+                                                    className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                                    value={config.wcType}
+                                                    onChange={e => setConfig({ ...config, wcType: e.target.value })}
+                                                >
+                                                    {WC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="animate-in fade-in slide-in-from-left-2 duration-200">
+                                                <label className="block text-xs font-semibold text-gray-600 mb-1">Number of Meters</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                                    value={config.wcQuantity}
+                                                    onChange={e => setConfig({ ...config, wcQuantity: parseInt(e.target.value) || 1 })}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-600 mb-1">Drawing Ref</label>
                                         <select

@@ -6,6 +6,9 @@ interface BoardConfig {
     ctType?: string;
     ctQuantity?: number;
     meterPanel: string;
+    wholeCurrentMetering?: string;
+    wcType?: string;
+    wcQuantity?: number;
     [key: string]: any;
 }
 
@@ -31,6 +34,13 @@ const METER_PANEL_ITEMS = [
     'CT-WIRING'
 ];
 
+const WC_KIT_ITEMS = [
+    '100A-FUSE',
+    '100A-PANEL',
+    '100A-NEUTRAL-LINK',
+    '100A-MCB-3PH'
+];
+
 export async function syncBoardItems(boardId: string, config: BoardConfig) {
     console.log(`Syncing items for board ${boardId} with config:`, config);
 
@@ -41,7 +51,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
     // Helper to add target item
     const addTarget = (partNumber: string, qty: number) => {
         targetItemPartNumbers.add(partNumber);
-        itemQuantities.set(partNumber, qty);
+        // If item already exists, use the larger quantity (e.g. if shared)
+        const currentQty = itemQuantities.get(partNumber) || 0;
+        if (qty > currentQty) {
+            itemQuantities.set(partNumber, qty);
+        }
     };
 
     const ctQty = config.ctQuantity || 1;
@@ -61,6 +75,23 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         METER_PANEL_ITEMS.forEach(pn => addTarget(pn, ctQty));
     }
 
+    // Whole-Current Metering Logic
+    if (config.wholeCurrentMetering === 'Yes' && config.wcType === '100A wiring 3-phase') {
+        const wcQty = config.wcQuantity || 1;
+
+        // 100A-FUSE (3 per meter)
+        addTarget('100A-FUSE', wcQty * 3);
+
+        // 100A-PANEL (1 per meter)
+        addTarget('100A-PANEL', wcQty);
+
+        // 100A-NEUTRAL-LINK (1 per meter)
+        addTarget('100A-NEUTRAL-LINK', wcQty);
+
+        // 100A-MCB-3PH (1 per meter)
+        addTarget('100A-MCB-3PH', wcQty);
+    }
+
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     if (targetPartNumbersArray.length === 0) {
@@ -68,6 +99,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         const allPotentialItems = [
             ...CT_BASE_ITEMS,
             ...METER_PANEL_ITEMS,
+            ...WC_KIT_ITEMS,
             'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE'
         ];
 
@@ -107,6 +139,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
     const allPotentialItems = [
         ...CT_BASE_ITEMS,
         ...METER_PANEL_ITEMS,
+        ...WC_KIT_ITEMS,
         'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE'
     ];
 
