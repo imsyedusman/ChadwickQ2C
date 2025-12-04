@@ -2,12 +2,9 @@
 // const fetch = require('node-fetch'); // Native fetch in Node 18+
 
 const BASE_URL = 'http://localhost:3000/api';
-// You might need to find a valid quote ID first.
-// Let's assume we can list quotes or just use a hardcoded one if we knew it.
-// Better to fetch quotes first.
 
 async function runTest() {
-    console.log('Starting CT Metering Logic Test...');
+    console.log('Starting CT Metering Logic Test (with Busbar & Labour)...');
 
     // 1. Get a Quote ID
     const quotesRes = await fetch(`${BASE_URL}/quotes`);
@@ -19,8 +16,8 @@ async function runTest() {
     const quoteId = quotes[0].id;
     console.log(`Using Quote ID: ${quoteId}`);
 
-    // 2. Create a Board with CT Metering = Yes, Type = S, Qty = 2
-    console.log('\n--- Test 1: Create Board (CT=Yes, Type=S, Qty=2) ---');
+    // 2. Create a Board with CT Metering = Yes, Type = S, Qty = 2, Current = 400A, Enclosure = Custom
+    console.log('\n--- Test 1: Create Board (CT=Yes, Type=S, Qty=2, Current=400A, Enclosure=Custom) ---');
     const boardRes = await fetch(`${BASE_URL}/quotes/${quoteId}/boards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -37,8 +34,9 @@ async function runTest() {
                 ipRating: 'IP42',
                 form: '1',
                 faultRating: '25kA',
-                enclosureType: 'Mild Steel',
-                currentRating: '63A',
+                enclosureType: 'Custom',
+                material: 'Mild Steel',
+                currentRating: '400A',
                 spd: 'No',
                 wholeCurrentMetering: 'No',
                 drawingRef: 'No',
@@ -50,11 +48,15 @@ async function runTest() {
     console.log(`Created Board ID: ${board.id}`);
 
     // Verify Items
-    await verifyItems(quoteId, board.id, 2, 'S');
+    await verifyItems(quoteId, board.id, {
+        ctQty: 2,
+        ctType: 'S',
+        busbar: 'BB-400A',
+        labour: 'CT-400A'
+    });
 
-
-    // 3. Update Board: Change Type to T
-    console.log('\n--- Test 2: Update Board (Type=T) ---');
+    // 3. Update Board: Change Enclosure Type to Cubic
+    console.log('\n--- Test 2: Update Board (Enclosure=Cubic) ---');
     await fetch(`${BASE_URL}/quotes/${quoteId}/boards/${board.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -63,17 +65,32 @@ async function runTest() {
             type: 'Main Switchboard (MSB)',
             config: {
                 ctMetering: 'Yes',
-                ctType: 'T', // Changed
+                ctType: 'S',
                 ctQuantity: 2,
                 meterPanel: 'No',
-                location: 'Indoor', ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Mild Steel', currentRating: '63A', spd: 'No', wholeCurrentMetering: 'No', drawingRef: 'No', notes: ''
+                location: 'Indoor',
+                ipRating: 'IP42',
+                form: '1',
+                faultRating: '25kA',
+                enclosureType: 'Cubic', // Changed
+                material: 'Mild Steel',
+                currentRating: '400A',
+                spd: 'No',
+                wholeCurrentMetering: 'No',
+                drawingRef: 'No',
+                notes: ''
             }
         })
     });
-    await verifyItems(quoteId, board.id, 2, 'T');
+    await verifyItems(quoteId, board.id, {
+        ctQty: 2,
+        ctType: 'S',
+        busbar: 'BBC-400A-2', // Changed to Cubic
+        labour: 'CT-400A'
+    });
 
-    // 4. Update Board: Change Quantity to 5
-    console.log('\n--- Test 3: Update Board (Qty=5) ---');
+    // 4. Update Board: Change Current Rating to 800A
+    console.log('\n--- Test 3: Update Board (Current=800A) ---');
     await fetch(`${BASE_URL}/quotes/${quoteId}/boards/${board.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -82,33 +99,63 @@ async function runTest() {
             type: 'Main Switchboard (MSB)',
             config: {
                 ctMetering: 'Yes',
-                ctType: 'T',
+                ctType: 'S',
+                ctQuantity: 2,
+                meterPanel: 'No',
+                location: 'Indoor',
+                ipRating: 'IP42',
+                form: '1',
+                faultRating: '25kA',
+                enclosureType: 'Cubic',
+                material: 'Mild Steel',
+                currentRating: '800A', // Changed
+                spd: 'No',
+                wholeCurrentMetering: 'No',
+                drawingRef: 'No',
+                notes: ''
+            }
+        })
+    });
+    await verifyItems(quoteId, board.id, {
+        ctQty: 2,
+        ctType: 'S',
+        busbar: 'BBC-800A-2', // Changed to 800A
+        labour: 'CT-800A' // Changed to 800A
+    });
+
+    // 5. Update Board: Change Quantity to 5
+    console.log('\n--- Test 4: Update Board (Qty=5) ---');
+    await fetch(`${BASE_URL}/quotes/${quoteId}/boards/${board.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            name: 'Test CT Board',
+            type: 'Main Switchboard (MSB)',
+            config: {
+                ctMetering: 'Yes',
+                ctType: 'S',
                 ctQuantity: 5, // Changed
                 meterPanel: 'No',
-                location: 'Indoor', ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Mild Steel', currentRating: '63A', spd: 'No', wholeCurrentMetering: 'No', drawingRef: 'No', notes: ''
+                location: 'Indoor',
+                ipRating: 'IP42',
+                form: '1',
+                faultRating: '25kA',
+                enclosureType: 'Cubic',
+                material: 'Mild Steel',
+                currentRating: '800A',
+                spd: 'No',
+                wholeCurrentMetering: 'No',
+                drawingRef: 'No',
+                notes: ''
             }
         })
     });
-    await verifyItems(quoteId, board.id, 5, 'T');
-
-    // 5. Update Board: Enable Meter Panel
-    console.log('\n--- Test 4: Update Board (Meter Panel=Yes) ---');
-    await fetch(`${BASE_URL}/quotes/${quoteId}/boards/${board.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: 'Test CT Board',
-            type: 'Main Switchboard (MSB)',
-            config: {
-                ctMetering: 'Yes',
-                ctType: 'T',
-                ctQuantity: 5,
-                meterPanel: 'Yes', // Changed
-                location: 'Indoor', ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Mild Steel', currentRating: '63A', spd: 'No', wholeCurrentMetering: 'No', drawingRef: 'No', notes: ''
-            }
-        })
+    await verifyItems(quoteId, board.id, {
+        ctQty: 5, // Changed
+        ctType: 'S',
+        busbar: 'BBC-800A-2',
+        labour: 'CT-800A'
     });
-    await verifyItems(quoteId, board.id, 5, 'T', true);
 
     // 6. Update Board: Disable CT Metering
     console.log('\n--- Test 5: Update Board (CT=No) ---');
@@ -120,54 +167,87 @@ async function runTest() {
             type: 'Main Switchboard (MSB)',
             config: {
                 ctMetering: 'No', // Changed
-                ctType: 'T',
+                ctType: 'S',
                 ctQuantity: 5,
-                meterPanel: 'No', // Also disabled for clean check
-                location: 'Indoor', ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Mild Steel', currentRating: '63A', spd: 'No', wholeCurrentMetering: 'No', drawingRef: 'No', notes: ''
+                meterPanel: 'No',
+                location: 'Indoor',
+                ipRating: 'IP42',
+                form: '1',
+                faultRating: '25kA',
+                enclosureType: 'Cubic',
+                material: 'Mild Steel',
+                currentRating: '800A',
+                spd: 'No',
+                wholeCurrentMetering: 'No',
+                drawingRef: 'No',
+                notes: ''
             }
         })
     });
-    await verifyItems(quoteId, board.id, 0, null);
+    await verifyItems(quoteId, board.id, {
+        ctQty: 0, // All CT items should be removed
+        ctType: null,
+        busbar: null,
+        labour: null
+    });
 
     // Clean up
     console.log('\n--- Cleaning Up ---');
     await fetch(`${BASE_URL}/quotes/${quoteId}/boards/${board.id}`, { method: 'DELETE' });
     console.log('Board deleted.');
+    console.log('\n✅ All tests completed!');
 }
 
-async function verifyItems(quoteId, boardId, expectedQty, expectedType, hasMeterPanel = false) {
+async function verifyItems(quoteId, boardId, expected) {
     // Fetch Quote to get boards and items
     const res = await fetch(`${BASE_URL}/quotes/${quoteId}`);
     const quote = await res.json();
     const board = quote.boards.find(b => b.id === boardId);
     const items = board.items;
 
-    console.log(`Verifying Items (Expected Qty: ${expectedQty}, Type: ${expectedType}, MeterPanel: ${hasMeterPanel})`);
+    console.log(`Verifying Items (Expected Qty: ${expected.ctQty}, Type: ${expected.ctType}, Busbar: ${expected.busbar}, Labour: ${expected.labour})`);
 
-    const checkItem = (partNumber, shouldExist) => {
-        const item = items.find(i => i.name === partNumber); // Assuming name is partNumber for these
+    const checkItem = (partNumber, shouldExist, expectedQty) => {
+        const item = items.find(i => i.name === partNumber);
         if (shouldExist) {
-            if (!item) console.error(`[FAIL] Missing item: ${partNumber}`);
-            else if (item.quantity !== expectedQty) console.error(`[FAIL] Wrong quantity for ${partNumber}: ${item.quantity} (Expected: ${expectedQty})`);
-            else console.log(`[PASS] Found ${partNumber} with Qty ${item.quantity}`);
+            if (!item) {
+                console.error(`[FAIL] Missing item: ${partNumber}`);
+            } else if (item.quantity !== expectedQty) {
+                console.error(`[FAIL] Wrong quantity for ${partNumber}: ${item.quantity} (Expected: ${expectedQty})`);
+            } else {
+                console.log(`[PASS] Found ${partNumber} with Qty ${item.quantity}`);
+            }
         } else {
-            if (item) console.error(`[FAIL] Item should NOT exist: ${partNumber}`);
-            else console.log(`[PASS] ${partNumber} is absent`);
+            if (item) {
+                console.error(`[FAIL] Item should NOT exist: ${partNumber}`);
+            } else {
+                console.log(`[PASS] ${partNumber} is absent`);
+            }
         }
     };
 
-    if (expectedQty > 0) {
-        checkItem('CT-COMPARTMENTS', true);
-        checkItem('CT-PANEL', true);
-        checkItem('CT-TEST-BLOCK', true);
-        checkItem('CT-WIRING', true);
+    if (expected.ctQty > 0) {
+        // Check base CT items
+        checkItem('CT-COMPARTMENTS', true, expected.ctQty);
+        checkItem('CT-PANEL', true, expected.ctQty);
+        checkItem('CT-TEST-BLOCK', true, expected.ctQty);
+        checkItem('CT-WIRING', true, expected.ctQty);
 
-        checkItem('CT-S-TYPE', expectedType === 'S');
-        checkItem('CT-T-TYPE', expectedType === 'T');
-        checkItem('CT-W-TYPE', expectedType === 'W');
-        checkItem('CT-U-TYPE', expectedType === 'U');
+        // Check CT Type
+        checkItem('CT-S-TYPE', expected.ctType === 'S', expected.ctQty);
+        checkItem('CT-T-TYPE', expected.ctType === 'T', expected.ctQty);
+        checkItem('CT-W-TYPE', expected.ctType === 'W', expected.ctQty);
+        checkItem('CT-U-TYPE', expected.ctType === 'U', expected.ctQty);
 
-        checkItem('100A-PANEL', hasMeterPanel);
+        // Check Busbar
+        if (expected.busbar) {
+            checkItem(expected.busbar, true, expected.ctQty);
+        }
+
+        // Check Labour
+        if (expected.labour) {
+            checkItem(expected.labour, true, expected.ctQty);
+        }
     } else {
         // All should be gone
         checkItem('CT-COMPARTMENTS', false);
@@ -176,7 +256,22 @@ async function verifyItems(quoteId, boardId, expectedQty, expectedType, hasMeter
         checkItem('CT-WIRING', false);
         checkItem('CT-S-TYPE', false);
         checkItem('CT-T-TYPE', false);
-        checkItem('100A-PANEL', false);
+
+        // Check that no busbars or labour items exist
+        const hasBusbar = items.some(i => i.name.startsWith('BB-') || i.name.startsWith('BBC-'));
+        const hasLabour = items.some(i => i.name.startsWith('CT-') && i.name.endsWith('A'));
+
+        if (hasBusbar) {
+            console.error('[FAIL] Busbar items should be removed');
+        } else {
+            console.log('[PASS] No busbar items present');
+        }
+
+        if (hasLabour) {
+            console.error('[FAIL] Labour items should be removed');
+        } else {
+            console.log('[PASS] No labour items present');
+        }
     }
 }
 

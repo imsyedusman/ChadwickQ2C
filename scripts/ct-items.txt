@@ -1,0 +1,85 @@
+﻿Searching for CT Type items...
+node.exe : (node:24148) 
+[MODULE_TYPELESS_PACKAGE_JSON] 
+Warning: Module type of file://
+/D:/Work/1.%20Projects/3.%20My%
+20Projects/Chadwick/Quotes/My%2
+0Workings/Web%20App/scripts/fin
+d-items.ts is not specified 
+and it doesn't parse as 
+CommonJS.
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~
+    + CategoryInfo          :  
+   NotSpecified: ((node:24148  
+  ) [M...se as CommonJS.:Str   
+ ing) [], RemoteException
+    + FullyQualifiedErrorId :  
+   NativeCommandError
+ 
+Reparsing as ES module because 
+module syntax was detected. 
+This incurs a performance 
+overhead.
+To eliminate this warning, add 
+"type": "module" to D:\Work\1. 
+Projects\3. My 
+Projects\Chadwick\Quotes\My 
+Workings\Web App\package.json.
+(Use `node --trace-warnings 
+...` to show where the warning 
+was created)
+
+CT Type Items:
+CT-S-TYPE: S' type metering CT (100 - 200A) (per set)
+CT-T-TYPE: T' type metering CT (200 - 800A) (per set)
+CT-W-TYPE: W' type metering CT (800 - 1600A) (per set)
+CT-U-TYPE: U' type metering CT (>1600A) (per set)
+
+
+Searching for all BB- busbars...
+
+Custom Busbars (BB-):
+BB-1000A
+BB-1250A
+BB-1600A
+BB-2000A
+BB-2500A
+BB-3000A
+BB-400A
+BB-630A
+BB-800A
+
+
+Searching for all BBC- busbars...
+
+Cubic Busbars (BBC-):
+BBC-1100A
+BBC-1350A
+BBC-1600A
+BBC-1800A
+BBC-2250A
+BBC-2800A
+BBC-3600A
+BBC-4000A
+BBC-400A-2
+BBC-800A-2
+
+
+Searching for CT Chamber Labour items...
+
+CT Labour Items:
+CT-1200A: CT Chamber - 1200A
+CT-1600A: CT Chamber - 1600A
+CT-2000A: CT Chamber - 2000A
+CT-2500A: CT Chamber - 2500A
+CT-3200A: CT Chamber - 3200A
+CT-400A: CT Chamber - 400A
+CT-630A: CT Chamber - 630A
+CT-800A: CT Chamber - 800A
