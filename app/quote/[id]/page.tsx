@@ -13,7 +13,7 @@ import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId } = useQuote();
+    const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
 
@@ -147,7 +147,7 @@ function QuoteBuilderContent() {
                                         selectedBoardId={selectedBoardId}
                                         onSelectBoard={setSelectedBoardId}
                                         quoteId={quoteId}
-                                        onUpdate={() => window.location.reload()}
+                                        onUpdate={refreshQuote}
                                     />
                                 </div>
                             </Panel>
