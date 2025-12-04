@@ -10,6 +10,8 @@ interface BoardConfig {
     wcType?: string;
     wcQuantity?: number;
     tierCount?: number;
+    enclosureType?: string;
+    baseRequired?: string;
     [key: string]: any;
 }
 
@@ -135,6 +137,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
     // 1. Identify Target Items based on Config
     const targetItemPartNumbers = new Set<string>();
     const itemQuantities = new Map<string, number>();
+    const customPricing = new Map<string, number>();
 
     // Helper to add target item
     const addTarget = (partNumber: string, qty: number) => {
@@ -268,6 +271,17 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
     }
     console.log('=== END TIER LOGIC ===');
 
+    // --- BASE COST LOGIC ---
+    // Formula: 200 + (tierCount × 200) for Custom/Outdoor boards when Base Required = Yes
+    if (config.enclosureType !== 'Cubic' && config.baseRequired === 'Yes' && tierCount > 0) {
+        const baseCost = 200 + (tierCount * 200);
+        console.log(`Adding 1B-BASE with calculated cost: ${baseCost} (tierCount: ${tierCount})`);
+        addTarget('1B-BASE', 1);
+        customPricing.set('1B-BASE', baseCost);
+    } else {
+        console.log('Base not required or conditions not met, 1B-BASE will not be added');
+    }
+
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     if (targetPartNumbersArray.length === 0) {
@@ -318,7 +332,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE',
         ...MISC_TIER_ITEMS,
         ...MISC_DELIVERY_ITEMS,
-        ...TIER_ITEMS
+        ...TIER_ITEMS,
+        '1B-BASE'
     ];
 
     // Helper to check if item is a busbar or labour item
@@ -352,6 +367,42 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         const targetQty = itemQuantities.get(partNumber) || 1;
         const existingItem = existingItems.find((i: any) => i.name === partNumber && i.isDefault);
 
+        // Special handling for 1B-BASE with custom pricing
+        if (partNumber === '1B-BASE') {
+            const baseCost = customPricing.get('1B-BASE') || 0;
+            if (existingItem) {
+                // Update if cost changed
+                if (existingItem.cost !== baseCost || existingItem.unitPrice !== baseCost) {
+                    await prisma.item.update({
+                        where: { id: existingItem.id },
+                        data: {
+                            quantity: 1,
+                            unitPrice: baseCost,
+                            cost: baseCost
+                        }
+                    });
+                }
+            } else {
+                // Create new with custom price
+                await prisma.item.create({
+                    data: {
+                        boardId,
+                        category: catalogItem.category || 'Basics',
+                        subcategory: catalogItem.subcategory,
+                        name: partNumber,
+                        description: catalogItem.description,
+                        unitPrice: baseCost,
+                        labourHours: catalogItem.labourHours,
+                        quantity: 1,
+                        cost: baseCost,
+                        isDefault: true
+                    }
+                });
+            }
+            continue; // Skip normal processing
+        }
+
+        // Normal processing for other items
         if (existingItem) {
             // Update if quantity changed
             if (existingItem.quantity !== targetQty) {

@@ -33,6 +33,7 @@ export interface BoardConfig {
     notes: string;
     name: string;
     tierCount: number;
+    baseRequired: string;
 }
 
 // --- CONSTANTS & OPTIONS ---
@@ -117,7 +118,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         drawingRef: 'No',
         drawingRefNumber: '',
         notes: '',
-        tierCount: 0
+        tierCount: 0,
+        baseRequired: 'No'
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -158,7 +160,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 drawingRef: 'No',
                 drawingRefNumber: '',
                 notes: '',
-                tierCount: 0
+                tierCount: 0,
+                baseRequired: 'No'
             });
         }
     }, [isOpen, initialConfig]);
@@ -397,6 +400,17 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             placeholder="0"
                                         />
                                         <p className="text-xs text-gray-500 mt-1">Includes cable zones</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Base Required</label>
+                                        <select
+                                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                            value={config.baseRequired}
+                                            onChange={e => setConfig({ ...config, baseRequired: e.target.value })}
+                                        >
+                                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                                        </select>
+                                        <p className="text-xs text-gray-500 mt-1">For Custom/Outdoor boards</p>
                                     </div>
                                 </div>
                             </div>
