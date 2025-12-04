@@ -24,7 +24,7 @@ export async function PUT(
             await syncBoardItems(boardId, config);
         }
 
-        return NextResponse.json(updatedBoard);
+        return NextResponse.json({ ...updatedBoard, debugConfig: config });
     } catch (error) {
         console.error('Failed to update board', error);
         return NextResponse.json({ error: 'Failed to update board' }, { status: 500 });

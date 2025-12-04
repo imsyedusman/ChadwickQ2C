@@ -9,6 +9,7 @@ interface BoardConfig {
     wholeCurrentMetering?: string;
     wcType?: string;
     wcQuantity?: number;
+    tierCount?: number;
     [key: string]: any;
 }
 
@@ -41,6 +42,15 @@ const WC_KIT_ITEMS = [
     '100A-MCB-1PH',
     '100A-MCB-3PH'
 ];
+
+// Tier items - source of truth for tier count
+const TIER_ITEMS = ['1A-TIERS', '1B-TIERS-400'];
+
+// MISC items that scale with tier count
+const MISC_TIER_ITEMS = ['MISC-LABELS', 'MISC-HARDWARE'];
+
+// Delivery items - only one should exist at a time
+const MISC_DELIVERY_ITEMS = ['MISC-DELIVERY-UTE', 'MISC-DELIVERY-HIAB'];
 
 // Helper function to determine current band based on current rating
 function getCurrentBand(currentRating: string): string {
@@ -120,7 +130,7 @@ function getLabourPartNumber(currentRating: string): string | null {
 
 
 export async function syncBoardItems(boardId: string, config: BoardConfig) {
-    console.log(`Syncing items for board ${boardId} with config:`, config);
+    console.log(`Syncing items for board ${boardId} with config:`, JSON.stringify(config, null, 2));
 
     // 1. Identify Target Items based on Config
     const targetItemPartNumbers = new Set<string>();
@@ -128,6 +138,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
 
     // Helper to add target item
     const addTarget = (partNumber: string, qty: number) => {
+        console.log(`Adding target: ${partNumber}, qty: ${qty}`);
         targetItemPartNumbers.add(partNumber);
         // If item already exists, use the larger quantity (e.g. if shared)
         const currentQty = itemQuantities.get(partNumber) || 0;
@@ -190,6 +201,73 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         }
     }
 
+    // --- TIER & DELIVERY LOGIC ---  
+    // CRITICAL: This must execute BEFORE the early return check below
+    console.log('=== TIER LOGIC DEBUG ===');
+    console.log('Config received:', JSON.stringify(config, null, 2));
+    console.log('config.tierCount:', config.tierCount);
+    console.log('config.enclosureType:', config.enclosureType);
+
+    // Fetch existing items NOW (before tier logic) so we can use fallback
+    const existingItems = await prisma.item.findMany({
+        where: { boardId }
+    });
+
+    // Primary source: config.tierCount (from Pre-Selection Wizard)
+    // Fallback: derive from existing tier items if config.tierCount is missing/0
+    let tierCount = config.tierCount || 0;
+
+    // Fallback detection: check if tier items exist on the board
+    if (tierCount === 0) {
+        const tier1A = existingItems.find((item: any) => item.name === '1A-TIERS');
+        const tier1B = existingItems.find((item: any) => item.name === '1B-TIERS-400');
+
+        if (tier1A) {
+            tierCount = tier1A.quantity;
+            console.log('Fallback: Derived tierCount from 1A-TIERS:', tierCount);
+        } else if (tier1B) {
+            tierCount = tier1B.quantity;
+            console.log('Fallback: Derived tierCount from 1B-TIERS-400:', tierCount);
+        } else {
+            console.log('No tier count in config and no tier items found');
+        }
+    } else {
+        console.log('Using tierCount from config:', tierCount);
+    }
+
+    // 1. Manage Tier Item based on enclosure type
+    if (tierCount > 0) {
+        if (config.enclosureType === 'Cubic') {
+            console.log('Adding target: 1A-TIERS qty', tierCount);
+            addTarget('1A-TIERS', tierCount);
+        } else {
+            console.log('Adding target: 1B-TIERS-400 qty', tierCount, '(enclosureType:', config.enclosureType, ')');
+            addTarget('1B-TIERS-400', tierCount);
+        }
+    } else {
+        console.log('tierCount is 0, no tier items will be added');
+    }
+
+    // 2. Manage MISC Items based on tierCount
+    if (tierCount > 0) {
+        // Labels and hardware scale with tier count
+        console.log('Adding MISC items: LABELS, HARDWARE qty', tierCount);
+        addTarget('MISC-LABELS', tierCount);
+        addTarget('MISC-HARDWARE', tierCount);
+
+        // Delivery based on tier count
+        if (tierCount === 1) {
+            console.log('Adding delivery: MISC-DELIVERY-UTE');
+            addTarget('MISC-DELIVERY-UTE', 1);
+        } else if (tierCount > 1) {
+            console.log('Adding delivery: MISC-DELIVERY-HIAB');
+            addTarget('MISC-DELIVERY-HIAB', 1);
+        }
+    } else {
+        console.log('tierCount is 0, no MISC items will be added');
+    }
+    console.log('=== END TIER LOGIC ===');
+
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     if (targetPartNumbersArray.length === 0) {
@@ -229,12 +307,6 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         if (i.partNumber) catalogMap.set(i.partNumber, i);
     });
 
-    // 3. Fetch Existing Board Items
-    const existingItems = await prisma.item.findMany({
-        where: {
-            boardId
-        }
-    });
 
     // 4. Sync Logic
 
@@ -243,7 +315,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig) {
         ...CT_BASE_ITEMS,
         ...METER_PANEL_ITEMS,
         ...WC_KIT_ITEMS,
-        'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE'
+        'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE',
+        ...MISC_TIER_ITEMS,
+        ...MISC_DELIVERY_ITEMS,
+        ...TIER_ITEMS
     ];
 
     // Helper to check if item is a busbar or labour item

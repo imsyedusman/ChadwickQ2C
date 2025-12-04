@@ -83,6 +83,22 @@ export async function POST(
             },
         });
 
+        // If this is a tier item being added, trigger MISC items sync
+        const isTierItem = name === '1A-TIERS' || name === '1B-TIERS-400';
+        if (isTierItem) {
+            // Fetch board config to pass to syncBoardItems
+            const board = await prisma.board.findUnique({
+                where: { id: boardId },
+                select: { config: true }
+            });
+
+            if (board && board.config) {
+                const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                const { syncBoardItems } = await import('@/lib/board-item-service');
+                await syncBoardItems(boardId, config);
+            }
+        }
+
         return NextResponse.json(newItem);
     } catch (error) {
         console.error('Failed to create/update item:', error);

@@ -10,6 +10,11 @@ export async function POST(
         const body = await request.json();
         const { name, type, config } = body;
 
+        console.log('=== BOARD CREATION ===');
+        console.log('Board name:', name);
+        console.log('Board type:', type);
+        console.log('Config received:', JSON.stringify(config, null, 2));
+
         const count = await prisma.board.count({ where: { quoteId } });
 
         const newBoard = await prisma.board.create({
@@ -22,8 +27,11 @@ export async function POST(
             },
         });
 
+        console.log('Board created:', newBoard.id);
+
         // Auto-add default items based on Pre-Selection Logic and Admin Settings
         if (config) {
+            console.log('Calling syncBoardItems with boardId:', newBoard.id);
             // 1. Run CT Metering Sync Logic
             const { syncBoardItems } = await import('@/lib/board-item-service');
             await syncBoardItems(newBoard.id, config);
@@ -31,17 +39,17 @@ export async function POST(
             // 2. Other Auto-Add Logic (e.g. Enclosure, SPD) - Keeping existing logic for now but could move to service
             const itemsToAdd = [];
 
-            // Fetch Auto-Add Basics from Catalog (General Basics, not CT specific)
-            // Note: CT items are now handled by syncBoardItems, so we should ensure we don't double add if they are marked isAutoAdd in catalog.
-            // But for now, let's assume 'Basics' category items that are isAutoAdd don't overlap with CT items or we filter them.
-            // Actually, to be safe, let's leave the general auto-add logic but maybe we should filter out CT items if they were somehow marked auto-add?
-            // The user said "All these items already exist in the catalog — you only need to auto-add/remove them in the board’s item list."
-            // It's likely they are NOT marked isAutoAdd=true globally, but rather we are adding them conditionally.
-
+            // Fetch Auto-Add Basics from Catalog (General Basics, not CT/MISC specific)
+            // Note: CT items and MISC items (labels, hardware, delivery) are now handled by syncBoardItems
+            // MISC-LABELS and MISC-HARDWARE are marked isAutoAdd=true in catalog but should be excluded here
             const autoAddBasics = await prisma.catalogItem.findMany({
                 where: {
                     category: 'Basics',
-                    isAutoAdd: true
+                    isAutoAdd: true,
+                    // Exclude MISC items - they're handled by syncBoardItems based on tier count
+                    partNumber: {
+                        notIn: ['MISC-LABELS', 'MISC-HARDWARE', 'MISC-DELIVERY-HIAB', 'MISC-DELIVERY-UTE']
+                    }
                 }
             });
 

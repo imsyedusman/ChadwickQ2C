@@ -32,6 +32,7 @@ export interface BoardConfig {
     drawingRefNumber: string;
     notes: string;
     name: string;
+    tierCount: number;
 }
 
 // --- CONSTANTS & OPTIONS ---
@@ -115,7 +116,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         wcQuantity: 1,
         drawingRef: 'No',
         drawingRefNumber: '',
-        notes: ''
+        notes: '',
+        tierCount: 0
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -155,7 +157,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 wcQuantity: 1,
                 drawingRef: 'No',
                 drawingRefNumber: '',
-                notes: ''
+                notes: '',
+                tierCount: 0
             });
         }
     }, [isOpen, initialConfig]);
@@ -382,6 +385,19 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             {getIpOptions().map(ip => <option key={ip} value={ip}>{ip}</option>)}
                                         </select>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Total No. of Tiers</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max="20"
+                                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                            value={config.tierCount}
+                                            onChange={e => setConfig({ ...config, tierCount: parseInt(e.target.value) || 0 })}
+                                            placeholder="0"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Includes cable zones</p>
+                                    </div>
                                 </div>
                             </div>
 
@@ -558,17 +574,19 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                     </div>
                                 </div>
                             </div>
-
-                            {validationError && (
-                                <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
-                                    <AlertCircle size={16} />
-                                    {validationError}
-                                </div>
-                            )}
-
                         </div>
                     )}
+
                 </div>
+
+                {validationError && (
+                    <div className="p-6 pt-0">
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700 text-sm">
+                            <AlertCircle size={16} />
+                            {validationError}
+                        </div>
+                    </div>
+                )}
 
                 {/* Footer */}
                 <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
