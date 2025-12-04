@@ -80,11 +80,12 @@ export async function GET(
         console.log("Effective Settings:", JSON.stringify(effectiveSettings, null, 2));
 
         // Calculate board totals using the same logic as ExportService
-        const calculateBoardTotal = (items: any[]): number => {
+        const calculateBoardTotal = (board: any): number => {
+            const items = board.items || [];
             let materialCost = 0;
             let labourHours = 0;
 
-            items.forEach(item => {
+            items.forEach((item: any) => {
                 materialCost += (item.unitPrice || 0) * (item.quantity || 0);
                 labourHours += (item.labourHours || 0) * (item.quantity || 0);
             });
@@ -94,7 +95,21 @@ export async function GET(
             const costBase = materialCost + labourCost + consumablesCost;
             const overheadAmount = costBase * effectiveSettings.overheadPct;
             const engineeringCost = costBase * effectiveSettings.engineeringPct;
-            const totalCost = costBase + overheadAmount + engineeringCost;
+            let totalCost = costBase + overheadAmount + engineeringCost;
+
+            // --- SURCHARGES ---
+            // REMOVED as per user request (2025-12-04)
+            /*
+            if (board.config) {
+                try {
+                    const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                    if (config.enclosureType === 'Custom' && config.material && config.material.includes('Stainless')) {
+                        totalCost *= 1.25; // 25% Surcharge
+                    }
+                } catch (e) { }
+            }
+            */
+
             const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
             const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
@@ -107,7 +122,7 @@ export async function GET(
         // Calculate board totals map
         const boardTotalsMap = quote.boards.map(board => ({
             boardId: board.id,
-            sellPriceRounded: calculateBoardTotal(board.items)
+            sellPriceRounded: calculateBoardTotal(board)
         }));
 
         // Calculate grand totals
@@ -135,7 +150,20 @@ export async function GET(
             const costBase = materialCost + labourCost + consumablesCost;
             const overheadAmount = costBase * effectiveSettings.overheadPct;
             const engineeringCost = costBase * effectiveSettings.engineeringPct;
-            const boardTotalCost = costBase + overheadAmount + engineeringCost;
+            let boardTotalCost = costBase + overheadAmount + engineeringCost;
+
+            // --- SURCHARGES ---
+            // REMOVED as per user request (2025-12-04)
+            /*
+            if (board.config) {
+                try {
+                    const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                    if (config.enclosureType === 'Custom' && config.material && config.material.includes('Stainless')) {
+                        boardTotalCost *= 1.25; // 25% Surcharge
+                    }
+                } catch (e) { }
+            }
+            */
             const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? boardTotalCost / marginFactor : boardTotalCost;
             const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;

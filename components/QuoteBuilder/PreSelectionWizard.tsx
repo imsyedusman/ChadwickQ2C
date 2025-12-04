@@ -17,7 +17,8 @@ export interface BoardConfig {
     ipRating: string;
     form: string;
     faultRating: string;
-    enclosureType: string;
+    enclosureType: string; // Custom, Cubic
+    material: string;      // Mild Steel, Stainless Steel
     currentRating: string;
     spd: string;
     ctMetering: string;
@@ -48,13 +49,10 @@ const BOARD_TYPES = [
 
 const LOCATIONS = ['Indoor', 'Outdoor'];
 
-const IP_RATINGS = ['IP42', 'IP43', 'IP54', 'IP55', 'IP56', 'IP65', 'IP66'];
+const ENCLOSURE_TYPES = ['Custom', 'Cubic'];
 
-const FORMS = ['1', '2b', '2bi', '3b', '3bih', '4a', '4b', '4aih'];
-
-const FAULT_RATINGS = ['25kA', '36kA', '50kA', '63kA', '70kA'];
-
-const ENCLOSURES = ['Mild Steel', 'Stainless Steel', 'Aluminium', 'Plastic', 'Special / Custom'];
+// Base materials - filtered by logic
+const MATERIALS = ['Mild Steel', 'Stainless Steel - Natural Finish', 'Aluminium', 'Plastic', 'Special / Custom'];
 
 const CURRENT_RATINGS = [
     '63A', '100A', '160A', '250A', '400A', '630A', '800A',
@@ -71,14 +69,14 @@ const WC_TYPES = ['100A wiring 1-phase', '100A wiring 3-phase'];
 
 // 2. Switchboard Type -> Default Technical Values
 const TYPE_DEFAULTS: Record<string, Partial<BoardConfig>> = {
-    'Main Switchboard (MSB)': { ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Mild Steel', currentRating: '63A', spd: 'Yes' },
-    'Main Distribution Board (MDB)': { ipRating: 'IP43', form: '2bi', faultRating: '36kA', enclosureType: 'Stainless Steel', currentRating: '100A', spd: 'No' },
-    'Distribution Board (DB)': { ipRating: 'IP54', form: '3b', faultRating: '50kA', currentRating: '160A' },
-    'Prewired Whole Current Meter Panel': { ipRating: 'IP55', form: '3bih', faultRating: '63kA', currentRating: '250A' },
-    'Supply Authority CT Metering Enclosure 200-400A': { ipRating: 'IP56', form: '4a', faultRating: '70kA', currentRating: '400A' },
-    'Tee-Off-Box Riser': { ipRating: 'IP65', form: '4b', currentRating: '630A' },
-    'Tee-Off-Box End of Run': { ipRating: 'IP66', form: '4aih', currentRating: '800A' },
-    'Remote Meter Panel with Test Block': { currentRating: '1000A' },
+    'Main Switchboard (MSB)': { ipRating: 'IP42', form: '1', faultRating: '25kA', enclosureType: 'Custom', material: 'Mild Steel', currentRating: '63A', spd: 'Yes' },
+    'Main Distribution Board (MDB)': { ipRating: 'IP43', form: '2bi', faultRating: '36kA', enclosureType: 'Custom', material: 'Stainless Steel - Natural Finish', currentRating: '100A', spd: 'No' },
+    'Distribution Board (DB)': { ipRating: 'IP54', form: '3b', faultRating: '50kA', enclosureType: 'Custom', currentRating: '160A' },
+    'Prewired Whole Current Meter Panel': { ipRating: 'IP55', form: '3bih', faultRating: '63kA', enclosureType: 'Custom', currentRating: '250A' },
+    'Supply Authority CT Metering Enclosure 200-400A': { ipRating: 'IP56', form: '4a', faultRating: '70kA', enclosureType: 'Custom', currentRating: '400A' },
+    'Tee-Off-Box Riser': { ipRating: 'IP65', form: '4b', enclosureType: 'Custom', currentRating: '630A' },
+    'Tee-Off-Box End of Run': { ipRating: 'IP66', form: '4aih', enclosureType: 'Custom', currentRating: '800A' },
+    'Remote Meter Panel with Test Block': { currentRating: '1000A', enclosureType: 'Custom' },
 };
 
 // 3. Switchboard Type -> Allowed Current Rating
@@ -93,6 +91,9 @@ const ALLOWED_CURRENTS: Record<string, string[]> = {
     'Remote Meter Panel with Test Block': ['1000A', '1250A', '1600A', '2500A', '3200A', '4000A'],
 };
 
+const FORMS = ['1', '2b', '2bi', '3b', '3bih', '4a', '4b', '4aih'];
+const FAULT_RATINGS = ['25kA', '36kA', '50kA', '63kA', '70kA'];
+
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
     const [config, setConfig] = useState<Partial<BoardConfig>>({
         type: '',
@@ -102,6 +103,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         form: '',
         faultRating: '',
         enclosureType: '',
+        material: '',
         currentRating: '',
         spd: '',
         ctMetering: 'No',
@@ -121,7 +123,16 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     // Initialize with initialConfig if provided (Edit Mode)
     useEffect(() => {
         if (isOpen && initialConfig) {
-            setConfig(prev => ({ ...prev, ...initialConfig }));
+            const newConfig = { ...initialConfig };
+
+            // Migration: If enclosureType is a material (legacy), move it to material and set enclosureType to Custom
+            const oldEnclosureType = initialConfig.enclosureType;
+            if (oldEnclosureType && !['Custom', 'Cubic'].includes(oldEnclosureType)) {
+                newConfig.material = oldEnclosureType;
+                newConfig.enclosureType = 'Custom'; // Default to Custom for legacy
+            }
+
+            setConfig(prev => ({ ...prev, ...newConfig }));
         } else if (isOpen && !initialConfig) {
             // Reset for new board
             setConfig({
@@ -132,6 +143,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 form: '',
                 faultRating: '',
                 enclosureType: '',
+                material: '',
                 currentRating: '',
                 spd: '',
                 ctMetering: 'No',
@@ -150,51 +162,53 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
     // --- DEPENDENCY RULES ---
 
-    // 2. Type -> Defaults (Only apply if Type changes and we are NOT in edit mode initial load)
-    // To avoid overwriting existing edits, we only trigger this when the user interacts with the Type dropdown.
-    // Handled in handleTypeChange.
-
+    // 2. Type -> Defaults
     const handleTypeChange = (newType: string) => {
         const defaults = TYPE_DEFAULTS[newType] || {};
 
         setConfig(prev => ({
             ...prev,
             type: newType,
-            // Apply defaults, but respect existing name
             ...defaults,
-            // Reset fields that don't have defaults to force choice (or keep previous if compatible? Let's reset for safety)
             enclosureType: defaults.enclosureType || '',
+            material: defaults.material || '',
             spd: defaults.spd || '',
-            // Auto-generate name if empty
             name: prev.name || `${newType.split('(')[0].trim()} 01`
         }));
     };
 
-    // 4. Location + IP -> Enclosure Logic (Derived Options)
-    const getEnclosureOptions = () => {
-        const { location, ipRating } = config;
-        if (!location || !ipRating) return ENCLOSURES;
+    // 2.1 & 2.2 Enclosure Type Logic
+    const getMaterialOptions = () => {
+        const { enclosureType } = config;
 
-        if (location === 'Indoor') {
-            if (['IP42', 'IP43', 'IP54'].includes(ipRating)) {
-                return ['Mild Steel', 'Stainless Steel', 'Special / Custom'];
-            }
-        } else if (location === 'Outdoor') {
-            if (['IP54', 'IP55', 'IP56'].includes(ipRating)) {
-                return ['Stainless Steel', 'Special / Custom']; // Default Stainless
-            }
-            if (['IP65', 'IP66'].includes(ipRating)) {
-                return ['Stainless Steel', 'Special / Custom']; // No Mild Steel
-            }
+        if (enclosureType === 'Cubic') {
+            return ['Mild Steel'];
         }
-        return ENCLOSURES;
+
+        if (enclosureType === 'Custom') {
+            return ['Mild Steel', 'Stainless Steel - Natural Finish', 'Special / Custom'];
+        }
+
+        return MATERIALS;
     };
 
-    // 1. Location -> IP Options
     const getIpOptions = () => {
-        if (config.location === 'Indoor') return ['IP42', 'IP43', 'IP54'];
-        if (config.location === 'Outdoor') return ['IP54', 'IP55', 'IP56', 'IP65', 'IP66'];
-        return IP_RATINGS;
+        const { enclosureType, location } = config;
+
+        if (enclosureType === 'Cubic') {
+            return ['IP42', 'IP43', 'IP44', 'IP54'];
+        }
+
+        if (enclosureType === 'Custom') {
+            // Custom allows wider range
+            if (location === 'Outdoor') {
+                // Outdoor Custom should be high IP
+                return ['IP54', 'IP55', 'IP56', 'IP65'];
+            }
+            return ['IP42', 'IP43', 'IP44', 'IP54', 'IP55', 'IP56', 'IP65'];
+        }
+
+        return ['IP42', 'IP43', 'IP44', 'IP54', 'IP55', 'IP56', 'IP65', 'IP66'];
     };
 
     // 3. Type -> Allowed Current
@@ -205,9 +219,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         return CURRENT_RATINGS;
     };
 
-    // 5. IP + Type -> Allowed Form (Simplified logic based on request)
+    // 5. IP + Type -> Allowed Form
     const getFormOptions = () => {
-        // "If Fault Rating >= 50kA -> restrict Form options to 3b, 3bih, 4a, 4b, 4aih"
         if (config.faultRating) {
             const kA = parseInt(config.faultRating.replace('kA', ''));
             if (kA >= 50) {
@@ -217,14 +230,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         return FORMS;
     };
 
-    // 6. Current -> Fault Suggestions (Logic to run when Current changes)
+    // 6. Current -> Fault Suggestions
     useEffect(() => {
         if (!config.currentRating) return;
         const amps = parseInt(config.currentRating.replace('A', ''));
 
-        // Only auto-set if fault rating is empty to avoid overwriting user choice
         if (!config.faultRating) {
-            if (amps <= 160) setConfig(prev => ({ ...prev, faultRating: '25kA' })); // Default low
+            if (amps <= 160) setConfig(prev => ({ ...prev, faultRating: '25kA' }));
             else if (amps <= 400) setConfig(prev => ({ ...prev, faultRating: '36kA' }));
             else setConfig(prev => ({ ...prev, faultRating: '50kA' }));
         }
@@ -233,21 +245,30 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
     // --- VALIDATION ---
     useEffect(() => {
-        // Check for invalid combinations
-        if (config.enclosureType === 'Mild Steel' && config.location === 'Outdoor') {
-            setValidationError('Mild Steel is not recommended for Outdoor use.');
-        } else if (config.location === 'Indoor' && ['IP55', 'IP56', 'IP65', 'IP66'].includes(config.ipRating || '')) {
-            // Not strictly invalid, but unusual. User said "Allowed IP Ratings: IP42, IP43, IP54" for Indoor.
-            // Let's enforce the dropdown filter, so this state shouldn't be reachable via UI, but good to check.
-            if (!getIpOptions().includes(config.ipRating!)) {
-                setValidationError(`IP Rating ${config.ipRating} is not valid for ${config.location} location.`);
-            } else {
-                setValidationError(null);
-            }
-        } else {
-            setValidationError(null);
+        const { enclosureType, location, ipRating, material } = config;
+
+        // 1. Cubic + Outdoor -> Invalid
+        if (enclosureType === 'Cubic' && location === 'Outdoor') {
+            setValidationError('Cubic enclosures are not available for Outdoor use.');
+            return;
         }
-    }, [config.location, config.ipRating, config.enclosureType]);
+
+        // 2. Custom + Outdoor + Low IP -> Invalid
+        if (enclosureType === 'Custom' && location === 'Outdoor') {
+            if (['IP42', 'IP43'].includes(ipRating || '')) {
+                setValidationError(`IP Rating ${ipRating} is too low for Outdoor Custom enclosure.`);
+                return;
+            }
+        }
+
+        // 3. Mild Steel + Outdoor -> Warning
+        if (material === 'Mild Steel' && location === 'Outdoor') {
+            setValidationError('Mild Steel is not recommended for Outdoor use.');
+            return;
+        }
+
+        setValidationError(null);
+    }, [config.location, config.ipRating, config.enclosureType, config.material]);
 
 
     const handleConfirm = () => {
@@ -309,21 +330,44 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     {config.type && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
 
-                            {/* Location & Environment */}
+                            {/* Location & Enclosure */}
                             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                                     <div className="w-1 h-4 bg-blue-500 rounded-full"></div>
                                     Environment & Enclosure
                                 </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-600 mb-1">Location</label>
                                         <select
                                             className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
                                             value={config.location}
-                                            onChange={e => setConfig({ ...config, location: e.target.value, ipRating: '' })} // Reset IP on location change
+                                            onChange={e => setConfig({ ...config, location: e.target.value, ipRating: '' })}
                                         >
                                             {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Enclosure Type</label>
+                                        <select
+                                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                            value={config.enclosureType}
+                                            onChange={e => setConfig({ ...config, enclosureType: e.target.value, material: '', ipRating: '' })}
+                                        >
+                                            <option value="">Select...</option>
+                                            {ENCLOSURE_TYPES.map(e => <option key={e} value={e}>{e}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Material</label>
+                                        <select
+                                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
+                                            value={config.material}
+                                            onChange={e => setConfig({ ...config, material: e.target.value })}
+                                            disabled={!config.enclosureType}
+                                        >
+                                            <option value="">Select...</option>
+                                            {getMaterialOptions().map(m => <option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -332,20 +376,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
                                             value={config.ipRating}
                                             onChange={e => setConfig({ ...config, ipRating: e.target.value })}
+                                            disabled={!config.enclosureType}
                                         >
                                             <option value="">Select...</option>
                                             {getIpOptions().map(ip => <option key={ip} value={ip}>{ip}</option>)}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-600 mb-1">Enclosure Type</label>
-                                        <select
-                                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900"
-                                            value={config.enclosureType}
-                                            onChange={e => setConfig({ ...config, enclosureType: e.target.value })}
-                                        >
-                                            <option value="">Select...</option>
-                                            {getEnclosureOptions().map(e => <option key={e} value={e}>{e}</option>)}
                                         </select>
                                     </div>
                                 </div>

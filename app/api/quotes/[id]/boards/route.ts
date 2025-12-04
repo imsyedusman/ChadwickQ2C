@@ -57,6 +57,8 @@ export async function POST(
             })));
 
             // Enclosure (from Config)
+            // REMOVED as per user request (2025-12-04): Do not auto-add generic enclosure item.
+            /*
             if (config.enclosureType) {
                 itemsToAdd.push({
                     category: 'Switchboard',
@@ -69,8 +71,11 @@ export async function POST(
                     isDefault: true
                 });
             }
+            */
 
             // SPD (if "Yes")
+            // REMOVED as per user request (2025-12-04): SPD flag is story-only.
+            /*
             if (config.spd === 'Yes') {
                 itemsToAdd.push({
                     category: 'Switchboard',
@@ -83,6 +88,7 @@ export async function POST(
                     isDefault: true
                 });
             }
+            */
 
             // Batch create items
             if (itemsToAdd.length > 0) {

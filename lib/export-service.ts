@@ -27,7 +27,7 @@ export class ExportService {
                     boardTotal = preCalculated.sellPriceRounded;
                 } else {
                     // Fallback to calculation
-                    boardTotal = this.calculateBoardTotal(board.items, settings);
+                    boardTotal = this.calculateBoardTotal(board, settings);
                 }
 
                 return {
@@ -44,11 +44,12 @@ export class ExportService {
         await DocxGenerator.generate(quoteData, settings, (quote as any).templatePath);
     }
 
-    private static calculateBoardTotal(items: any[], settings: any): number {
+    private static calculateBoardTotal(board: any, settings: any): number {
+        const items = board.items || [];
         let materialCost = 0;
         let labourHours = 0;
 
-        items.forEach(item => {
+        items.forEach((item: any) => {
             materialCost += (item.unitPrice || 0) * (item.quantity || 0);
             labourHours += (item.labourHours || 0) * (item.quantity || 0);
         });
@@ -69,7 +70,23 @@ export class ExportService {
         const engineeringCost = costBase * settings.engineeringPct;
 
         // 6. Total Cost = Cost Base + Overhead + Engineering
-        const totalCost = costBase + overheadAmount + engineeringCost;
+        let totalCost = costBase + overheadAmount + engineeringCost;
+
+        // --- SURCHARGES ---
+        // Stainless Steel Surcharge (Custom + Stainless)
+        // REMOVED as per user request (2025-12-04): Stainless should be costing-neutral for now.
+        /*
+        if (board.config) {
+            try {
+                const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                if (config.enclosureType === 'Custom' && config.material && config.material.includes('Stainless')) {
+                    totalCost *= 1.25;
+                }
+            } catch (e) {
+                // Ignore parse error
+            }
+        }
+        */
 
         // 7. Sell Price = Total Cost / (1 - Target Margin)
         const marginFactor = 1 - settings.targetMarginPct;

@@ -279,7 +279,7 @@ export class DocxGenerator {
             bullets.push({ text: `${location}, ${ip}, ${form}, ${fault}kA, AS61439` });
 
             // 2. Enclosure Type
-            const encType = config.enclosureType || "Mild Steel";
+            const encType = config.material || "Mild Steel";
             if (encType.toLowerCase().includes("stainless")) {
                 bullets.push({ text: "316 Stainless Steel Switchboard Enclosure" });
             } else {
