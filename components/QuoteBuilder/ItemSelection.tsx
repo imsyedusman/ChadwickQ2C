@@ -265,8 +265,8 @@ export default function ItemSelection() {
                 {/* Master Category Tabs */}
                 <div className="flex space-x-6">
                     {[
-                        { value: 'Switchboard', label: 'Switchboards', icon: Zap },
                         { value: 'Basics', label: 'Basics', icon: Package },
+                        { value: 'Switchboard', label: 'Switchgears', icon: Zap },
                         { value: 'Busbar', label: 'Busbars', icon: Layers }
                     ].map((cat) => (
                         <button
