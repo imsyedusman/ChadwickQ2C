@@ -98,13 +98,33 @@ interface QuoteContextType {
     updateOverrides: (overrides: Partial<QuoteOverrides>) => Promise<void>;
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
+    updateUiState: (key: string, value: any) => void;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
 
 export function QuoteProvider({ children, quoteId }: { children: ReactNode; quoteId: string }) {
     const [boards, setBoards] = useState<Board[]>([]);
-    const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
+
+    // UI State Helper
+    const updateUiState = (key: string, value: any) => {
+        try {
+            const storageKey = `chadwick_ui_state_${quoteId}`;
+            const existing = localStorage.getItem(storageKey);
+            const state = existing ? JSON.parse(existing) : {};
+            state[key] = value;
+            localStorage.setItem(storageKey, JSON.stringify(state));
+        } catch (e) {
+            console.error("Failed to save UI state", e);
+        }
+    };
+
+    const [selectedBoardId, _setSelectedBoardId] = useState<string | null>(null);
+
+    const setSelectedBoardId = (id: string | null) => {
+        _setSelectedBoardId(id);
+        updateUiState('lastSelectedBoardId', id);
+    };
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
         clientName: '',
@@ -157,9 +177,31 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
             if (data.boards) {
                 setBoards(data.boards);
-                // Select first board if none selected
-                if (!selectedBoardId && data.boards.length > 0) {
-                    setSelectedBoardId(data.boards[0].id);
+
+                // Persistence Logic: Restore last selected board
+                let boardToSelect = null;
+                try {
+                    const storageKey = `chadwick_ui_state_${quoteId}`;
+                    const savedState = localStorage.getItem(storageKey);
+                    if (savedState) {
+                        const parsed = JSON.parse(savedState);
+                        if (parsed.lastSelectedBoardId) {
+                            const found = data.boards.find((b: any) => b.id === parsed.lastSelectedBoardId);
+                            if (found) boardToSelect = found.id;
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to load UI state", e);
+                }
+
+                // Fallback to first board if no valid saved state
+                if (!boardToSelect && data.boards.length > 0) {
+                    boardToSelect = data.boards[0].id;
+                }
+
+                // Only change if different (avoids loops if we already have one selected, though usually this runs on fresh load)
+                if (selectedBoardId !== boardToSelect) {
+                    setSelectedBoardId(boardToSelect);
                 }
             }
 
@@ -263,6 +305,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
         // 1. Selected Board Totals
         const selectedBoard = boards.find(b => b.id === selectedBoardId);
+        // Fallback for totals calculation if selected ID is invalid/stale (though main UI handles this via render checks)
         const boardTotals = calculateForItems(selectedBoard?.items || []);
 
         // 2. Grand Totals (All Boards)
@@ -295,7 +338,9 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             if (res.ok) {
                 const newBoard = await res.json();
                 await fetchQuoteData();
-                setSelectedBoardId(newBoard.id);
+
+                // Explicitly select and persist the new board
+                setSelectedBoardId(newBoard.id); // This now auto-persists via our wrapper
             }
         } catch (error) {
             console.error('Failed to add board', error);
@@ -448,6 +493,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateOverrides,
                 updateMetadata,
                 updateStatus,
+                updateUiState,
             }}
         >
             {children}

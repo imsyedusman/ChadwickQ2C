@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BoardConfig } from '@/lib/board-item-service';
+import { applyBoardPrefix } from '@/lib/board-naming';
 
 interface PreSelectionWizardProps {
     isOpen: boolean;
@@ -204,12 +205,16 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     // Auto-fill defaults on Type Change
     const handleTypeChange = (newType: string) => {
         const defaults = TYPE_DEFAULTS[newType] || {};
+
+        // Calculate new name with smart prefix swapping
+        // We pass the current name (config.name) to preserve custom text if it exists
+        const newName = applyBoardPrefix(newType, config.name || '');
+
         setConfig(prev => ({
             ...prev,
             type: newType,
             ...defaults,
-            // Ensure we don't overwrite Name if user already typed one, unless it's empty
-            name: prev.name === 'New Board' || !prev.name ? `${newType.split('(')[0].trim()} 01` : prev.name
+            name: newName
         }));
     };
 
@@ -277,7 +282,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
             return;
         }
 
-        onConfirm(config as BoardConfig);
+        // Enforce Naming Convention one last time
+        const finalName = applyBoardPrefix(config.type, config.name);
+        // Update config locally before sending (optional, but good for consistency if we were staying open)
+        // Actually we just pass the fixed config to onConfirm
+        const finalConfig = { ...config, name: finalName };
+
+        onConfirm(finalConfig as BoardConfig);
         onClose();
     };
 

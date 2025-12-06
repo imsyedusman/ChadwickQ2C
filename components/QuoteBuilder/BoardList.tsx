@@ -74,7 +74,19 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
 
         try {
             await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, { method: 'DELETE' });
-            if (selectedBoardId === boardId) onSelectBoard('');
+
+            // Smart Fallback if we deleted the selected board
+            if (selectedBoardId === boardId) {
+                const remaining = boards.filter(b => b.id !== boardId);
+                if (remaining.length > 0) {
+                    // Try to select the previous one, or the first one
+                    const deletedIndex = boards.findIndex(b => b.id === boardId);
+                    const fallback = remaining[Math.max(0, deletedIndex - 1)];
+                    onSelectBoard(fallback.id);
+                } else {
+                    onSelectBoard('');
+                }
+            }
             onUpdate();
         } catch (error) {
             console.error('Failed to delete board', error);

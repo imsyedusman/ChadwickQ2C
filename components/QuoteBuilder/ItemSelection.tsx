@@ -17,13 +17,50 @@ interface CatalogItem {
 }
 
 export default function ItemSelection() {
-    const { addItemToBoard, selectedBoardId } = useQuote();
+    const { addItemToBoard, selectedBoardId, quoteId, updateUiState } = useQuote();
+    const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
+
+    // Stable Tab Keys
+    const TAB_KEYS = {
+        'Basics': 'TAB_BASICS',
+        'Switchboard': 'TAB_SWITCHGEAR',
+        'Busbar': 'TAB_BUSBARS'
+    };
+
+    // Reverse lookup for restoring state
+    const TAB_KEYS_REV = {
+        'TAB_BASICS': 'Basics',
+        'TAB_SWITCHGEAR': 'Switchboard',
+        'TAB_BUSBARS': 'Busbar'
+    };
+
+    const setActiveCategory = (cat: 'Basics' | 'Switchboard' | 'Busbar') => {
+        setActiveCategoryState(cat);
+        // Persist
+        updateUiState('lastActiveTab', TAB_KEYS[cat]);
+    };
+
+    // Initial State Restoration
+    useEffect(() => {
+        try {
+            const savedState = localStorage.getItem(`chadwick_ui_state_${quoteId}`);
+            if (savedState) {
+                const parsed = JSON.parse(savedState);
+                if (parsed.lastActiveTab) {
+                    const restoredCat = TAB_KEYS_REV[parsed.lastActiveTab as keyof typeof TAB_KEYS_REV];
+                    if (restoredCat) {
+                        setActiveCategoryState(restoredCat as any);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Failed to restore tab state", e);
+        }
+    }, [quoteId]);
+
     const [items, setItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-
-    // Master Category State
-    const [activeCategory, setActiveCategory] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
 
     // Hierarchical Navigation State
     const [allSubcategories, setAllSubcategories] = useState<string[]>([]); // Full list of subcat strings
