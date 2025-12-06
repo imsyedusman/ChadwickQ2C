@@ -21,7 +21,7 @@ export async function PUT(
 
         if (config) {
             const { syncBoardItems } = await import('@/lib/board-item-service');
-            await syncBoardItems(boardId, config);
+            await syncBoardItems(boardId, config, { forceTiers: true });
         }
 
         return NextResponse.json({ ...updatedBoard, debugConfig: config });

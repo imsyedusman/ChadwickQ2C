@@ -50,10 +50,13 @@ export default function BoardContent() {
         <div key={item.id} className="px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm">
             {/* Item Details */}
             <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate" title={item.name}>{item.name}</div>
-                {item.subcategory && (
-                    <div className="text-[10px] text-gray-500 truncate">{item.subcategory}</div>
-                )}
+                <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
+                    {item.description || item.name}
+                </div>
+                <div className="text-[10px] text-gray-500 truncate">
+                    <span className="font-medium">{item.name}</span>
+                    {item.subcategory ? ` • ${item.subcategory}` : ''}
+                </div>
             </div>
 
             {/* Quantity Control */}

@@ -24,10 +24,19 @@ export async function PUT(
             },
         });
 
-        // If this is a tier item and quantity changed, trigger MISC items sync
+        // Check if item update should trigger a board sync
+        // Triggers: Tier Items (affects Base/Misc) OR Sheet Metal Items (affects SS Uplift)
         const isTierItem = item && (item.name === '1A-TIERS' || item.name === '1B-TIERS-400');
-        if (isTierItem && quantity !== undefined && item.quantity !== parseFloat(quantity)) {
-            // Fetch board config to pass to syncBoardItems
+        const isSheetMetalItem = item && [
+            '1B-COMPARTMENTS',
+            '1B-BASE',
+            '1B-DOORS',
+            '1B-600MM',
+            '1B-800MM'
+        ].includes(item.name);
+
+        if ((isTierItem || isSheetMetalItem) && quantity !== undefined) {
+            // Fetch board config
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },
                 select: { config: true }
@@ -36,7 +45,8 @@ export async function PUT(
             if (board && board.config) {
                 const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
                 const { syncBoardItems } = await import('@/lib/board-item-service');
-                await syncBoardItems(item.boardId, config);
+                // Manual edit: do NOT force tiers from config
+                await syncBoardItems(item.boardId, config, { forceTiers: false });
             }
         }
 

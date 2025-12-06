@@ -136,7 +136,12 @@ export default function ItemSelection() {
             const res = await fetch(`/api/catalog?${params.toString()}`);
             if (res.ok) {
                 const data = await res.json();
-                setItems(data);
+
+                // Filter out system-managed basics that shouldn't be added manually
+                const HIDDEN_ITEMS = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4', 'MISC-LABELS', 'MISC-HARDWARE'];
+                const filteredData = data.filter((i: any) => !HIDDEN_ITEMS.includes(i.partNumber));
+
+                setItems(filteredData);
             }
         } catch (error) {
             console.error('Failed to fetch items', error);

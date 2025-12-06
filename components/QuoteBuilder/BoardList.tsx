@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Plus, Trash2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import PreSelectionWizard, { BoardConfig } from './PreSelectionWizard';
+import PreSelectionWizard from './PreSelectionWizard';
+import { BoardConfig } from '@/lib/board-item-service';
 import { useQuote } from '@/context/QuoteContext';
 
 interface Board {
