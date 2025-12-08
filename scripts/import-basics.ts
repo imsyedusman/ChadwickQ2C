@@ -470,6 +470,17 @@ const basicsData = [
         brand: null,
         category: 'Basics',
         subcategory: 'Miscellaneous',
+        partNumber: 'MISC-TEST-TIERS',
+        description: 'Test (no. of tiers)',
+        unitPrice: 0.00,
+        labourHours: 1,
+        defaultQuantity: 1,
+        isAutoAdd: true // Auto-added based on tier count
+    },
+    {
+        brand: null,
+        category: 'Basics',
+        subcategory: 'Miscellaneous',
         partNumber: 'MISC-DELIVERY-HIAB',
         description: 'Delivery - Hiab (Sydney CBD)',
         unitPrice: 800.00,

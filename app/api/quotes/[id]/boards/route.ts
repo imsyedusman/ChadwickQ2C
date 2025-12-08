@@ -48,7 +48,7 @@ export async function POST(
                     isAutoAdd: true,
                     // Exclude MISC items - they're handled by syncBoardItems based on tier count
                     partNumber: {
-                        notIn: ['MISC-LABELS', 'MISC-HARDWARE', 'MISC-DELIVERY-HIAB', 'MISC-DELIVERY-UTE']
+                        notIn: ['MISC-LABELS', 'MISC-HARDWARE', 'MISC-DELIVERY-HIAB', 'MISC-DELIVERY-UTE', 'MISC-TEST-TIERS']
                     }
                 }
             });

@@ -49,7 +49,7 @@ const WC_KIT_ITEMS = [
 const TIER_ITEMS = ['1A-TIERS', '1B-TIERS-400'];
 
 // MISC items that scale with tier count
-const MISC_TIER_ITEMS = ['MISC-LABELS', 'MISC-HARDWARE'];
+const MISC_TIER_ITEMS = ['MISC-LABELS', 'MISC-HARDWARE', 'MISC-TEST-TIERS'];
 
 // Delivery items - only one should exist at a time
 const MISC_DELIVERY_ITEMS = ['MISC-DELIVERY-UTE', 'MISC-DELIVERY-HIAB'];
@@ -207,6 +207,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     if (tierCount > 0) {
         addTarget('MISC-LABELS', tierCount);
         addTarget('MISC-HARDWARE', tierCount);
+        addTarget('MISC-TEST-TIERS', tierCount);
 
         if (tierCount === 1) {
             addTarget('MISC-DELIVERY-UTE', 1);

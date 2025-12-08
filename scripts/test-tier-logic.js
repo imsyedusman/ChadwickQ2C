@@ -44,6 +44,7 @@ async function runTest() {
         let items = await getBoardItems(quoteId, boardId);
         checkItem(items, '1A-TIERS', 0);
         checkItem(items, 'MISC-LABELS', 0);
+        checkItem(items, 'MISC-TEST-TIERS', 0);
         checkItem(items, 'MISC-DELIVERY-UTE', 0);
 
         // 4. Create Board with 1 Tier (Cubic)
@@ -65,6 +66,7 @@ async function runTest() {
         items = await getBoardItems(quoteId, board1TierData.id);
         checkItem(items, '1A-TIERS', 1);
         checkItem(items, 'MISC-LABELS', 1);
+        checkItem(items, 'MISC-TEST-TIERS', 1);
         checkItem(items, 'MISC-HARDWARE', 1);
         checkItem(items, 'MISC-DELIVERY-UTE', 1);
         checkItem(items, 'MISC-DELIVERY-HIAB', 0);
@@ -88,6 +90,7 @@ async function runTest() {
         items = await getBoardItems(quoteId, board2TiersData.id);
         checkItem(items, '1A-TIERS', 2);
         checkItem(items, 'MISC-LABELS', 2);
+        checkItem(items, 'MISC-TEST-TIERS', 2);
         checkItem(items, 'MISC-HARDWARE', 2);
         checkItem(items, 'MISC-DELIVERY-UTE', 0);
         checkItem(items, 'MISC-DELIVERY-HIAB', 1);
@@ -136,6 +139,7 @@ async function runTest() {
         items = await getBoardItems(quoteId, boardId);
         checkItem(items, '1A-TIERS', 3);
         checkItem(items, 'MISC-LABELS', 3);
+        checkItem(items, 'MISC-TEST-TIERS', 3);
         checkItem(items, 'MISC-HARDWARE', 3);
         checkItem(items, 'MISC-DELIVERY-UTE', 0);
         checkItem(items, 'MISC-DELIVERY-HIAB', 1);
