@@ -12,6 +12,7 @@ export interface BoardConfig {
     tierCount?: number;
     enclosureType?: string;
     baseRequired?: string;
+    insulationLevel?: 'none' | 'air' | 'fully';
     [key: string]: any;
 }
 
@@ -44,6 +45,8 @@ const WC_KIT_ITEMS = [
     '100A-MCB-1PH',
     '100A-MCB-3PH'
 ];
+
+const BUSBAR_INSULATION_ITEM = 'Busbar Insulation';
 
 // Tier items - source of truth for tier count
 const TIER_ITEMS = ['1A-TIERS', '1B-TIERS-400'];
@@ -181,14 +184,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const targetItemPartNumbers = new Set<string>();
     const itemQuantities = new Map<string, number>();
     const customPricing = new Map<string, number>(); // Map<PartNumber, UnitPrice>
+    const customLabour = new Map<string, number>(); // Map<PartNumber, LabourHours>
 
-    const addTarget = (partNumber: string, qty: number, unitPrice?: number) => {
+    const addTarget = (partNumber: string, qty: number, unitPrice?: number, labourHours?: number) => {
         targetItemPartNumbers.add(partNumber);
         // If item already exists in map, take max (logic specific) or just strict set
         // Here we strictly set what we want.
         itemQuantities.set(partNumber, qty);
         if (unitPrice !== undefined) {
             customPricing.set(partNumber, unitPrice);
+        }
+        if (labourHours !== undefined) {
+            customLabour.set(partNumber, labourHours);
         }
     };
 
@@ -314,8 +321,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
 
-    // --- 4. EXECUTE DB OPERATIONS ---
-
+    // --- 3.5 PREPARE CATALOG MAP (Needed for Busbar Logic & DB Ops) ---
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     // Fetch catalog info for all targets (to get descriptions, defaults, and prices for non-customized items)
@@ -324,6 +330,116 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     });
     const catalogMap = new Map<string, CatalogItem>();
     catalogItems.forEach((i: any) => { if (i.partNumber) catalogMap.set(i.partNumber, i); });
+
+
+    // --- 4. BUSBAR INSULATION ---
+    // Rule: One item "Busbar Insulation".
+    // Cost = (Total Busbar Material * Factor * 0.6)
+    // Labour = (Total Busbar Labour * Factor * 0.4)
+    // Factor: Air=0.25, Fully=1.0. None=0 (remove item).
+
+    const insulationLevel = config.insulationLevel?.toLowerCase() || 'none';
+    const hasInsulation = insulationLevel === 'air' || insulationLevel === 'fully';
+    const insulationFactor = insulationLevel === 'fully' ? 1.0 : (insulationLevel === 'air' ? 0.25 : 0);
+
+    // Identify Busbars on this board
+    // We must look at the EFFECTIVE list of items (Existing items + New Targets).
+    // Note: We do NOT fetch the catalog for this. We use what is on the board.
+
+    const effectiveBusbarItems = new Map<string, { qty: number, price: number, labour: number, category: string }>();
+
+    // 1. Process Existing Items first
+    existingItems.forEach(item => {
+        // Skip if this item is being removed (it's not in targets and is managed/default)
+        // Actually, the removal logic happens later (Step 5A). We need to simulate it here.
+        // A simple heuristic: If it's a "Managed Item" (like auto-added tier items), it MIGHT be removed if not in targets.
+        // BUT Busbars are usually user-added or auto-added.
+        // Let's rely on: If it's in existing items, count it, UNLESS it's strictly a target that we know we are setting to 0 (unlikely for busbars).
+
+        // Critical: Don't count "Busbar Insulation" itself to avoid recursion/loops
+        if (item.name === BUSBAR_INSULATION_ITEM) return;
+
+        // Check isBusbar
+        // Rule: Category "Busbar" OR (Fallback) Name starts with BB-/BBC-
+        const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
+            (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
+
+        if (isBusbar) {
+            effectiveBusbarItems.set(item.name, {
+                qty: item.quantity,
+                price: item.unitPrice,
+                labour: item.labourHours,
+                category: item.category
+            });
+        }
+    });
+
+    // 2. Process Targets (Overrides existing)
+    targetItemPartNumbers.forEach(pn => {
+        if (pn === BUSBAR_INSULATION_ITEM) return;
+
+        const qty = itemQuantities.get(pn) || 0;
+
+        // If target logic set qty to 0, remove it from effective list
+        if (qty <= 0) {
+            effectiveBusbarItems.delete(pn);
+            return;
+        }
+
+        // Check if this target is a busbar
+        // We might not have category for a pure target if it's new.
+        // We can inspect the existing item (if any) or look at the name pattern.
+        // In this specific flow, targets are usually things `syncBoardItems` controls (Tiers, Misc, etc.)
+        // Busbars are rarely "Targets" unless we add auto-busbars later.
+        // IF we have auto-busbars, they will be here.
+
+        // For now, let's blindly check name pattern if we don't have category context,
+        // OR check if we have it in our set.
+        let isBusbar = false;
+        let category = 'Basics'; // Default for targets if unknown
+
+        // Try to find category from existing
+        const existing = existingItems.find(i => i.name === pn);
+        if (existing) category = existing.category;
+
+        if (category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) {
+            isBusbar = true;
+        }
+
+        if (isBusbar) {
+            // Price/Labour?
+            // If customPricing has it, use it. Else use existing. Price defaults to 0 if neither (will get fixed in DB step but for calc we use 0)
+            const price = customPricing.get(pn) ?? (existing?.unitPrice || 0);
+            const labour = customLabour.get(pn) ?? (existing?.labourHours || 0);
+
+            effectiveBusbarItems.set(pn, {
+                qty,
+                price,
+                labour,
+                category
+            });
+        }
+    });
+
+    // 3. Calculate Totals
+    let totalBusbarMaterial = 0;
+    let totalBusbarLabour = 0;
+
+    effectiveBusbarItems.forEach((val) => {
+        totalBusbarMaterial += (val.price * val.qty);
+        totalBusbarLabour += (val.labour * val.qty);
+    });
+
+    // 4. Apply Factor & Create Insulation Item
+    if (hasInsulation && (totalBusbarMaterial > 0 || totalBusbarLabour > 0)) {
+        const extraMaterial = totalBusbarMaterial * insulationFactor * 0.6;
+        const extraLabour = totalBusbarLabour * insulationFactor * 0.4;
+
+        addTarget(BUSBAR_INSULATION_ITEM, 1, extraMaterial, extraLabour);
+    }
+
+
+    // --- 5. EXECUTE DB OPERATIONS ---
 
 
     // A. Remove Items
@@ -338,7 +454,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         ...MISC_DELIVERY_ITEMS,
         ...TIER_ITEMS,
         '1B-BASE',
-        '1B-SS-2B', '1B-SS-NO4'
+        '1B-SS-2B', '1B-SS-NO4',
+        BUSBAR_INSULATION_ITEM
     ];
 
     // Also add Busbars/Labour patterns to removal check
@@ -358,57 +475,85 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // B. Add / Update Items
-    for (const partNumber of targetPartNumbersArray) {
+    // Optimization: Use Promise.all for parallel execution to reduce lag
+    // CRITICAL FIX: Re-generate array from Set because BUSBAR_INSULATION_ITEM was added AFTER the initial array creation.
+    const finalTargetPartNumbers = Array.from(targetItemPartNumbers);
+
+    await Promise.all(finalTargetPartNumbers.map(async (partNumber) => {
         const targetQty = itemQuantities.get(partNumber) || 1;
         const targetPrice = customPricing.get(partNumber); // undefined if not custom
+        const targetLabour = customLabour.get(partNumber);
 
         const existingItem = existingItems.find(i => i.name === partNumber && i.isDefault);
         const catalogItem = catalogMap.get(partNumber);
 
-        if (!existingItem && !catalogItem) {
-            console.warn(`Skipping ${partNumber}: No catalog item found and not existing.`);
-            continue;
+        if (!existingItem && !catalogItem && !customPricing.has(partNumber)) {
+            // It's possible for valid items (e.g. Busbar Insulation) to be purely dynamic with no catalog entry
+            // but we must have pushed them via addTarget.
+            console.warn(`Skipping ${partNumber}: No catalog item found and not existing/custom.`);
+            return;
         }
 
         // Visibility Logic: Force Bascis category for these critical items
         const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4'].includes(partNumber);
-        const forcedCategory = isCoreItem ? 'Basics' : undefined;
+        const isBusbarInsulation = partNumber === BUSBAR_INSULATION_ITEM;
+        const forcedCategory = isBusbarInsulation ? 'Busbar' : (isCoreItem ? 'Basics' : undefined);
+
+        if (isBusbarInsulation) {
+            console.log(`[BusbarInsulation] Processing item: ${partNumber}. Force Cat: ${forcedCategory}. Target Qty: ${targetQty}. Target Price: ${targetPrice}`);
+        }
 
         if (existingItem) {
             // Update logic
             const newUnitPrice = targetPrice !== undefined ? targetPrice : existingItem.unitPrice;
+            const newLabour = targetLabour !== undefined ? targetLabour : existingItem.labourHours;
             const newQty = targetQty; // We enforce quantity for auto-items
 
             // Only update if changes needed
-            if (existingItem.quantity !== newQty || (targetPrice !== undefined && Math.abs(existingItem.unitPrice - targetPrice) > 0.01) || (isCoreItem && existingItem.category !== 'Basics')) {
+            if (existingItem.quantity !== newQty ||
+                (Math.abs(existingItem.unitPrice - newUnitPrice) > 0.01) ||
+                (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
+                (forcedCategory && existingItem.category !== forcedCategory)) {
+
                 await prisma.item.update({
                     where: { id: existingItem.id },
                     data: {
                         quantity: newQty,
                         unitPrice: newUnitPrice,
+                        labourHours: newLabour,
                         cost: newUnitPrice * newQty,
-                        category: forcedCategory || existingItem.category // Enforce basics if needed
+                        category: forcedCategory || existingItem.category // Enforce basics/busbar if needed
                     }
                 });
             }
-        } else if (catalogItem) {
+        } else {
             // Create new
-            const unitPrice = targetPrice !== undefined ? targetPrice : catalogItem.unitPrice;
+            // Catalog item might be undefined for dynamic items!
+            const catItem = catalogItem || {
+                category: 'Switchboard',
+                subcategory: '',
+                description: partNumber,
+                unitPrice: 0,
+                labourHours: 0
+            };
+
+            const unitPrice = targetPrice !== undefined ? targetPrice : catItem.unitPrice;
+            const labourHours = targetLabour !== undefined ? targetLabour : catItem.labourHours;
 
             await prisma.item.create({
                 data: {
                     boardId,
-                    category: forcedCategory || catalogItem.category || 'Basics',
-                    subcategory: catalogItem.subcategory,
-                    name: catalogItem.partNumber || partNumber,
-                    description: catalogItem.description,
+                    category: forcedCategory || catItem.category || 'Basics',
+                    subcategory: catItem.subcategory,
+                    name: catalogItem?.partNumber || partNumber,
+                    description: catItem.description,
                     unitPrice: unitPrice,
-                    labourHours: catalogItem.labourHours,
+                    labourHours: labourHours,
                     quantity: targetQty,
                     cost: unitPrice * targetQty,
                     isDefault: true
                 }
             });
         }
-    }
+    }));
 }

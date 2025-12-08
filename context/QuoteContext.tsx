@@ -42,6 +42,7 @@ export interface Board {
     quoteId: string;
     name: string;
     description: string | null;
+    config?: any;
     items: Item[];
 }
 
@@ -99,6 +100,7 @@ interface QuoteContextType {
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
     updateUiState: (key: string, value: any) => void;
+    updateBoardConfig: (boardId: string, config: any) => Promise<void>;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -176,7 +178,25 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             }
 
             if (data.boards) {
-                setBoards(data.boards);
+                // Parse config strings to objects
+                const boardsWithParsedConfig = data.boards.map((b: any) => {
+                    let parsedConfig = {};
+                    if (b.config) {
+                        try {
+                            parsedConfig = typeof b.config === 'string' ? JSON.parse(b.config) : b.config;
+                            // Critical: Ensure result is an object to prevent spread errors
+                            if (typeof parsedConfig !== 'object' || parsedConfig === null) {
+                                parsedConfig = {};
+                            }
+                        } catch (e) {
+                            console.error('Failed to parse board config', e);
+                            parsedConfig = {};
+                        }
+                    }
+                    return { ...b, config: parsedConfig };
+                });
+
+                setBoards(boardsWithParsedConfig);
 
                 // Persistence Logic: Restore last selected board
                 let boardToSelect = null;
@@ -464,6 +484,23 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
+    const updateBoardConfig = async (boardId: string, config: any) => {
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config })
+            });
+
+            if (!response.ok) throw new Error('Failed to update board config');
+
+            await fetchQuoteData();
+        } catch (error) {
+            console.error('Error updating board config:', error);
+            throw error;
+        }
+    };
+
     return (
         <QuoteContext.Provider
             value={{
@@ -494,6 +531,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateMetadata,
                 updateStatus,
                 updateUiState,
+                updateBoardConfig,
             }}
         >
             {children}

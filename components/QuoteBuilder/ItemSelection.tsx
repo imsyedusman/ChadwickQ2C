@@ -18,7 +18,7 @@ interface CatalogItem {
 }
 
 export default function ItemSelection() {
-    const { addItemToBoard, selectedBoardId, quoteId, updateUiState } = useQuote();
+    const { addItemToBoard, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
 
     // Stable Tab Keys
@@ -444,6 +444,32 @@ export default function ItemSelection() {
 
             {/* Item List */}
             <div className="flex-1 overflow-y-auto p-4">
+                {/* Busbar Insulation Configuration */}
+                {activeCategory === 'Busbar' && (
+                    <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center justify-between">
+                        <div>
+                            <h4 className="text-sm font-semibold text-blue-900">Busbar Insulation</h4>
+                            <p className="text-xs text-blue-700 mt-1">
+                                Applies insulation cost to all Busbars on this board.
+                            </p>
+                        </div>
+                        <select
+                            value={boards.find(b => b.id === selectedBoardId)?.config?.insulationLevel || 'none'}
+                            onChange={(e) => {
+                                if (selectedBoardId && updateBoardConfig) {
+                                    const currentConfig = boards.find(b => b.id === selectedBoardId)?.config || {};
+                                    updateBoardConfig(selectedBoardId, { ...currentConfig, insulationLevel: e.target.value });
+                                }
+                            }}
+                            className="block w-48 rounded-md border-gray-300 py-1.5 text-sm font-medium text-gray-900 focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                        >
+                            <option value="none">None</option>
+                            <option value="air">Air Insulated (0.25)</option>
+                            <option value="fully">Fully Insulated (1.0)</option>
+                        </select>
+                    </div>
+                )}
+
                 {loading ? (
                     <div className="space-y-3">
                         {[1, 2, 3].map(i => (

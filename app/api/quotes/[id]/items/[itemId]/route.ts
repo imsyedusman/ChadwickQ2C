@@ -13,7 +13,7 @@ export async function PUT(
         // Get the item before update to check if it's a tier item
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, quantity: true }
+            select: { name: true, boardId: true, quantity: true, category: true }
         });
 
         const updatedItem = await prisma.item.update({
@@ -35,7 +35,9 @@ export async function PUT(
             '1B-800MM'
         ].includes(item.name);
 
-        if ((isTierItem || isSheetMetalItem) && quantity !== undefined) {
+        const isBusbarItem = item && ((item.category && item.category.toLowerCase() === 'busbar') || (item.name && (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))));
+
+        if ((isTierItem || isSheetMetalItem || isBusbarItem) && quantity !== undefined) {
             // Fetch board config
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },
@@ -67,7 +69,7 @@ export async function DELETE(
         // Get the item before deletion to check if it's a tier item
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true }
+            select: { name: true, boardId: true, category: true }
         });
 
         await prisma.item.delete({
@@ -76,7 +78,9 @@ export async function DELETE(
 
         // If this was a tier item, trigger MISC items sync to remove delivery/labels/hardware
         const isTierItem = item && (item.name === '1A-TIERS' || item.name === '1B-TIERS-400');
-        if (isTierItem) {
+        const isBusbarItem = item && ((item.category && item.category.toLowerCase() === 'busbar') || (item.name && (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))));
+
+        if (isTierItem || isBusbarItem) {
             // Fetch board config to pass to syncBoardItems
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },

@@ -59,6 +59,24 @@ export async function POST(
             },
         });
 
+        // Check if item addition should trigger a board sync (e.g. Busbar items affect Insulation Cost)
+        const isBusbarItem = (category && category.toLowerCase() === 'busbar') ||
+            (name && (name.startsWith('BB-') || name.startsWith('BBC-')));
+
+        if (isBusbarItem) {
+            const board = await prisma.board.findUnique({
+                where: { id: boardId },
+                select: { config: true }
+            });
+
+            if (board && board.config) {
+                const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                // Dynamically import to avoid circular dep if any (though unlikely here)
+                const { syncBoardItems } = await import('@/lib/board-item-service');
+                await syncBoardItems(boardId, config);
+            }
+        }
+
         return NextResponse.json(newItem);
     } catch (error) {
         console.error('Failed to create/update item:', error);

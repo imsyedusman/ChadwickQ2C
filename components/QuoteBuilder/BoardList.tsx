@@ -13,7 +13,7 @@ interface Board {
     type: string | null;
     order: number;
     items?: any[];
-    config?: string | null; // JSON string
+    config?: any; // Object or JSON string
 }
 
 interface BoardListProps {
@@ -159,7 +159,9 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                 isOpen={isWizardOpen}
                 onClose={handleCloseWizard}
                 onConfirm={handleCreateBoard}
-                initialConfig={editingBoard?.config ? JSON.parse(editingBoard.config) : undefined}
+                initialConfig={typeof editingBoard?.config === 'string'
+                    ? JSON.parse(editingBoard.config)
+                    : (editingBoard?.config || {})}
             />
         </div>
     );
