@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Search, Trash2, Filter, Database, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { classifyCatalogItem } from '@/lib/catalog-service';
 
 interface CatalogItem {
     id?: string;
@@ -14,6 +15,7 @@ interface CatalogItem {
     description: string;
     unitPrice: number;
     labourHours: number;
+    meterType?: string | null;
 }
 
 export default function CatalogManager() {
@@ -31,6 +33,7 @@ export default function CatalogManager() {
     const [loadingSaved, setLoadingSaved] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [deletingBrand, setDeletingBrand] = useState<string | null>(null);
+    const [reclassifying, setReclassifying] = useState(false);
 
     useEffect(() => {
         fetchCatalog();
@@ -158,23 +161,25 @@ export default function CatalogManager() {
                     const vendorCat2 = findColumnValue(row, ['CATEGORY 2', 'Subcategory', 'Sub']);
                     const vendorCat3 = findColumnValue(row, ['CATEGORY 3', 'Detail', 'Type']);
 
-                    // Construct a detailed subcategory string
-                    // User wants "Switchboards" as Master Category.
-                    // We'll join the vendor categories to create a rich subcategory path
-                    const subcatParts = [vendorCat1, vendorCat2, vendorCat3].filter(part => part && String(part).trim().length > 0);
-                    const subcat = subcatParts.length > 0 ? subcatParts.join(' > ') : '';
-
-                    // Apply category mapping to unify legacy paths (e.g., power meters)
-                    const mappedSubcat = mapLegacyCategory(subcat);
+                    // Use centralized classification service
+                    const classification = classifyCatalogItem(
+                        desc ? String(desc) : '',
+                        partNo ? String(partNo) : '',
+                        vendorCat1 ? String(vendorCat1) : '',
+                        vendorCat2 ? String(vendorCat2) : '',
+                        vendorCat3 ? String(vendorCat3) : '',
+                        manualBrand
+                    );
 
                     return {
-                        brand: manualBrand || 'Schneider Electric', // Default to Schneider if not specified
-                        category: 'Switchboard', // Enforce Master Category for external uploads
-                        subcategory: mappedSubcat,
+                        brand: classification.brand,
+                        category: classification.category,
+                        subcategory: classification.subcategory,
                         partNumber: partNo ? String(partNo) : '',
                         description: desc ? String(desc) : '',
                         unitPrice: priceRaw ? parseFloat(String(priceRaw).replace(/[$,]/g, '')) : 0,
                         labourHours: labourRaw ? parseFloat(String(labourRaw)) : 0,
+                        meterType: classification.meterType
                     };
                 }).filter(item => item.description && item.partNumber); // Filter out empty rows
 
@@ -281,6 +286,25 @@ export default function CatalogManager() {
         }
     };
 
+    const handleReclassify = async () => {
+        setReclassifying(true);
+        try {
+            const res = await fetch('/api/catalog?action=reclassify', { method: 'PATCH' });
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message);
+                fetchCatalog(); // Refresh to see changes if any
+            } else {
+                throw new Error('Failed to re-classify');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Failed to re-classify catalog');
+        } finally {
+            setReclassifying(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             {/* Manage Pricelists Section */}
@@ -290,6 +314,14 @@ export default function CatalogManager() {
                         <Database className="text-blue-600" size={20} />
                         Manage Pricelists
                     </h2>
+                    <button
+                        onClick={handleReclassify}
+                        disabled={reclassifying}
+                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors mr-2"
+                        title="Re-classify Metadata (Fixes Missing Tags)"
+                    >
+                        {reclassifying ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
+                    </button>
                     <button
                         onClick={fetchBrandStats}
                         className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"

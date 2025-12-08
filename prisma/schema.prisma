@@ -94,6 +94,7 @@ model CatalogItem {
   isAutoAdd       Boolean  @default(false) // For Basics: Auto-add to new boards?
   defaultQuantity Int      @default(1)
   notes           String?  // Vendor catalog: auto-add logic rules
+  meterType       String?  // Direct, CT, NMI, Special
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

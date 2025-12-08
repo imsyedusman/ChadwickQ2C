@@ -14,6 +14,7 @@ interface CatalogItem {
     description: string;
     unitPrice: number;
     labourHours: number;
+    meterType?: string | null;
 }
 
 export default function ItemSelection() {
@@ -68,16 +69,21 @@ export default function ItemSelection() {
     const [selectedL2, setSelectedL2] = useState<string | null>(null);
     const [selectedL3, setSelectedL3] = useState<string | null>(null);
 
+    // Power Meter Specific State
+    const [meterBrandFilter, setMeterBrandFilter] = useState<string>('All');
+    const [meterTypeFilter, setMeterTypeFilter] = useState<string>('All');
+
     // Initial Load: Get the Category Tree
     useEffect(() => {
         fetchCategoryTree('Switchboard');
     }, []);
 
     // Derive Options from `allSubcategories`
-    const { l1Options, l2Options, l3Options } = useMemo(() => {
+    const { l1Options, l2Options, l3Options, isPowerMeterSelection } = useMemo(() => {
         const l1 = new Set<string>();
         const l2 = new Set<string>();
         const l3 = new Set<string>();
+        let powerMeterActive = false;
 
         allSubcategories.forEach(sub => {
             if (!sub) return;
@@ -94,12 +100,50 @@ export default function ItemSelection() {
             }
         });
 
+        // Detect if we are in Power Meters section (L2 = 'Power Meters')
+        // OR if the user clicked "Power Meters" directly if it's L1 (though mapped as subcat)
+        if (selectedL1 === 'Power Meters' || selectedL2 === 'Power Meters' || selectedL3 === 'Power Meters') {
+            powerMeterActive = true;
+        }
+
         return {
             l1Options: Array.from(l1).sort(),
             l2Options: Array.from(l2).sort(),
-            l3Options: Array.from(l3).sort()
+            l3Options: Array.from(l3).sort(),
+            isPowerMeterSelection: powerMeterActive
         };
-    }, [allSubcategories, selectedL1, selectedL2]);
+    }, [allSubcategories, selectedL1, selectedL2, selectedL3]);
+
+    // Derived Power Meter Filters
+    const { uniqueBrands, filteredItems } = useMemo(() => {
+        if (!isPowerMeterSelection) return { uniqueBrands: [], filteredItems: items };
+
+        // 1. Get Unique Brands from CURRENT items
+        const brands = new Set<string>();
+        items.forEach(i => {
+            if (i.brand) brands.add(i.brand);
+        });
+        const sortedBrands = Array.from(brands).sort();
+
+        // 2. Filter Logic
+        const filtered = items.filter(item => {
+            // Brand Filter
+            if (meterBrandFilter !== 'All' && item.brand !== meterBrandFilter) return false;
+
+            // Type Filter
+            if (meterTypeFilter !== 'All') {
+                if (meterTypeFilter === 'Special') {
+                    // Special Logic: Show items where meterType is 'Special' OR null/undefined (Legacy/Fallback)
+                    return item.meterType === 'Special' || !item.meterType;
+                }
+                return item.meterType === meterTypeFilter;
+            }
+            return true;
+        });
+
+        return { uniqueBrands: sortedBrands, filteredItems: filtered };
+
+    }, [items, isPowerMeterSelection, meterBrandFilter, meterTypeFilter]);
 
     // Fetch items when selection changes or search changes
     useEffect(() => {
@@ -132,8 +176,6 @@ export default function ItemSelection() {
             fetchItems();
         }
     }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options, l3Options]);
-
-
 
     const fetchItems = async () => {
         setLoading(true);
@@ -194,11 +236,6 @@ export default function ItemSelection() {
         setSelectedL3(null);
         setSearchQuery('');
         setItems([]);
-        // Re-fetch category tree for the new master category? 
-        // The current API /api/catalog?mode=tree returns ALL subcategories. 
-        // If we want to filter the tree by master category, we should update the API or filter client-side.
-        // For now, let's assume the tree API returns everything and we filter client-side if needed, 
-        // OR we pass the category to the tree API.
         fetchCategoryTree(activeCategory);
     }, [activeCategory]);
 
@@ -213,8 +250,6 @@ export default function ItemSelection() {
             console.error('Failed to fetch category tree', error);
         }
     };
-
-
 
     const handleAddItem = (item: CatalogItem) => {
         if (!selectedBoardId) {
@@ -427,7 +462,61 @@ export default function ItemSelection() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 gap-3">
-                        {items.map((item) => (
+                        {/* Power Meters: Filter UI Header */}
+                        {isPowerMeterSelection && items.length > 0 && (
+                            <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm space-y-4">
+                                {/* Brand Tabs */}
+                                <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-100 no-scrollbar">
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2 shrink-0">Brand:</span>
+                                    <button
+                                        onClick={() => setMeterBrandFilter('All')}
+                                        className={cn(
+                                            "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
+                                            meterBrandFilter === 'All'
+                                                ? "bg-blue-600 text-white shadow-md"
+                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                        )}
+                                    >
+                                        All Brands
+                                    </button>
+                                    {uniqueBrands.map(brand => (
+                                        <button
+                                            key={brand}
+                                            onClick={() => setMeterBrandFilter(brand)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
+                                                meterBrandFilter === brand
+                                                    ? "bg-blue-600 text-white shadow-md"
+                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            )}
+                                        >
+                                            {brand}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Type Filters */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Type:</span>
+                                    {['All', 'Direct', 'CT', 'NMI', 'Special'].map(type => (
+                                        <button
+                                            key={type}
+                                            onClick={() => setMeterTypeFilter(type)}
+                                            className={cn(
+                                                "px-4 py-1.5 rounded-md text-xs font-semibold border transition-all",
+                                                meterTypeFilter === type
+                                                    ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-200"
+                                                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                                            )}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {(isPowerMeterSelection ? filteredItems : items).map((item) => (
                             <div
                                 key={item.id}
                                 className="group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center gap-4"

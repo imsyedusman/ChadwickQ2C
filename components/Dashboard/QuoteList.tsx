@@ -159,11 +159,11 @@ export default function QuoteList() {
         }
     };
 
-    const filteredQuotes = quotes.filter((q) =>
+    const filteredQuotes = Array.isArray(quotes) ? quotes.filter((q) =>
         (q.clientName || '').toLowerCase().includes(search.toLowerCase()) ||
         (q.projectRef || '').toLowerCase().includes(search.toLowerCase()) ||
         (q.quoteNumber || '').toLowerCase().includes(search.toLowerCase())
-    );
+    ) : [];
 
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Loading quotes...</div>;

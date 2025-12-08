@@ -181,6 +181,8 @@ export async function POST(request: Request) {
                 description: item.description,
                 unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
                 labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
+                notes: item.notes,
+                meterType: item.meterType // Persist meterType
             }))
         });
 
@@ -192,6 +194,67 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to import catalog', details: String(error) }, { status: 500 });
     }
 }
+
+import { classifyCatalogItem } from '@/lib/catalog-service';
+
+export async function PATCH(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const action = searchParams.get('action');
+
+        if (action === 'reclassify') {
+            console.log("Starting full catalog re-classification...");
+            // Fetch all items that might be Power Meters
+            const potentialMeters = await prisma.catalogItem.findMany({
+                where: {
+                    OR: [
+                        { subcategory: { contains: 'Power Meter', mode: 'insensitive' } },
+                        { description: { contains: 'meter', mode: 'insensitive' } },
+                        { category: 'Switchboard' }
+                    ]
+                }
+            });
+
+            let updatedCount = 0;
+
+            for (const item of potentialMeters) {
+                // Re-run heuristics
+                const classification = classifyCatalogItem(
+                    item.description,
+                    item.partNumber || '',
+                    item.category || '',
+                    item.subcategory || '',
+                    '', // No original vendor cats available in DB, relies on current state
+                    ''
+                );
+
+                // Only update if something changed (improves perf)
+                if (classification.meterType && classification.meterType !== item.meterType) {
+                    await prisma.catalogItem.update({
+                        where: { id: item.id },
+                        data: {
+                            meterType: classification.meterType,
+                            // Optionally update brand/subcat if we want to enforce consistency
+                            brand: classification.brand !== 'Unknown' ? classification.brand : item.brand
+                        }
+                    });
+                    updatedCount++;
+                }
+            }
+
+            return NextResponse.json({ message: `Re-classified ${updatedCount} items.`, count: updatedCount });
+        }
+
+        return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+
+    } catch (error) {
+        console.error('Re-classification Error:', error);
+        return NextResponse.json({ error: 'Failed' }, { status: 500 });
+    }
+}
+
+
+
 
 export async function DELETE(request: Request) {
     try {
