@@ -108,7 +108,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         drawingRefNumber: '',
         notes: '',
         tierCount: 0,
-        baseRequired: 'No'
+        baseRequired: 'No',
+        insulationLevel: 'air'
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -149,7 +150,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     drawingRefNumber: '',
                     notes: '',
                     tierCount: 0,
-                    baseRequired: 'No'
+                    baseRequired: 'No',
+                    insulationLevel: 'air'
                 });
             }
         }

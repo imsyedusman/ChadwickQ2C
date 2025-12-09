@@ -454,7 +454,7 @@ export default function ItemSelection() {
                             </p>
                         </div>
                         <select
-                            value={boards.find(b => b.id === selectedBoardId)?.config?.insulationLevel || 'none'}
+                            value={boards.find(b => b.id === selectedBoardId)?.config?.insulationLevel || 'air'}
                             onChange={(e) => {
                                 if (selectedBoardId && updateBoardConfig) {
                                     const currentConfig = boards.find(b => b.id === selectedBoardId)?.config || {};
