@@ -334,11 +334,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // --- 4. BUSBAR INSULATION ---
     // Rule: One item "Busbar Insulation".
-    // Cost = (Total Busbar Material * Factor * 0.6)
-    // Labour = (Total Busbar Labour * Factor * 0.4)
-    // Factor: Air=0.25, Fully=1.0. None=0 (remove item).
+    // Cost = (Total Busbar Material * Factor * 0.4)
+    // Labour = (Total Busbar Labour * Factor * 0.6)
+    // Factor: Air=0.25 (Default), Fully=1.0. None=0 (remove item).
 
-    const insulationLevel = config.insulationLevel?.toLowerCase() || 'none';
+    // Default to 'air' as per requirement
+    const insulationLevel = config.insulationLevel?.toLowerCase() || 'air';
     const hasInsulation = insulationLevel === 'air' || insulationLevel === 'fully';
     const insulationFactor = insulationLevel === 'fully' ? 1.0 : (insulationLevel === 'air' ? 0.25 : 0);
 
@@ -431,9 +432,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     });
 
     // 4. Apply Factor & Create Insulation Item
-    if (hasInsulation && (totalBusbarMaterial > 0 || totalBusbarLabour > 0)) {
-        const extraMaterial = totalBusbarMaterial * insulationFactor * 0.6;
-        const extraLabour = totalBusbarLabour * insulationFactor * 0.4;
+    // Requirement: Factor=0 OR Totals=0 -> Remove Item (Don't addTarget)
+    if (insulationFactor > 0 && (totalBusbarMaterial > 0 || totalBusbarLabour > 0)) {
+        // Excel Logic:
+        // ExtraLabourHours = SUM(G:G) * Factor * 0.6
+        // ExtraMaterialCost = SUM(H:H) * Factor * 0.4
+        const extraMaterial = totalBusbarMaterial * insulationFactor * 0.4;
+        const extraLabour = totalBusbarLabour * insulationFactor * 0.6;
 
         addTarget(BUSBAR_INSULATION_ITEM, 1, extraMaterial, extraLabour);
     }
