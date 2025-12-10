@@ -12,6 +12,7 @@ export interface BoardConfig {
     tierCount?: number;
     enclosureType?: string;
     baseRequired?: string;
+    location?: string;
     insulationLevel?: 'none' | 'air' | 'fully';
     [key: string]: any;
 }
@@ -223,7 +224,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
 
-    // C. Base Logic (Custom Only)
+    // D. Base Logic (Custom Only)
     // Applies if Enclosure != Cubic AND BaseRequired = Yes AND TierCount > 0
     if (config.enclosureType !== 'Cubic' && config.baseRequired === 'Yes' && tierCount > 0) {
         const totalBaseCost = 200 + (tierCount * 200);
@@ -232,6 +233,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
         console.log(`Base Calculation: Tiers=${tierCount}, Total=${totalBaseCost}, Unit=${unitPrice}`);
         addTarget('1B-BASE', tierCount, unitPrice);
+    }
+
+    // New 2025-12-10: 1B-DOORS for Outdoor Custom boards
+    // Rule: Custom + Outdoor + Tiers > 0 -> Add 1B-DOORS (Qty = TierCount)
+    // Used for "Extra for Doors Over (Yes = 1)"
+    if (config.enclosureType === 'Custom' && config.location === 'Outdoor' && tierCount > 0) {
+        addTarget('1B-DOORS', tierCount);
     }
 
     // D. CT Metering
@@ -459,6 +467,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         ...MISC_DELIVERY_ITEMS,
         ...TIER_ITEMS,
         '1B-BASE',
+        '1B-DOORS',
         '1B-SS-2B', '1B-SS-NO4',
         BUSBAR_INSULATION_ITEM
     ];
