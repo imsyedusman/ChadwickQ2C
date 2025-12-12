@@ -109,6 +109,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         notes: '',
         tierCount: 0,
         baseRequired: 'No',
+        enclosureDepth: '400',
         insulationLevel: 'air'
     });
 
@@ -151,6 +152,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     notes: '',
                     tierCount: 0,
                     baseRequired: 'No',
+                    enclosureDepth: '400',
                     insulationLevel: 'air'
                 });
             }
@@ -415,6 +417,25 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         <p className="text-xs text-gray-500 mt-1">Adds base implementation charge</p>
                     </div>
                 </div>
+
+                {/* Enclosure Depth - Custom Outdoor Only */}
+                {config.enclosureType === 'Custom' && config.location === 'Outdoor' && (
+                    <div className="mt-6 border-t border-gray-100 pt-4">
+                        <div className="space-y-1 w-full md:w-1/2">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Enclosure Depth</label>
+                            <select
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.enclosureDepth || '400'}
+                                onChange={e => setConfig({ ...config, enclosureDepth: e.target.value })}
+                            >
+                                <option value="400">400 mm (Standard)</option>
+                                <option value="600">600 mm</option>
+                                <option value="800">800 mm</option>
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">Deeper enclosures require additional material cost per tier.</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">

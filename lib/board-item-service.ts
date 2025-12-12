@@ -11,6 +11,7 @@ export interface BoardConfig {
     wcQuantity?: number;
     tierCount?: number;
     enclosureType?: string;
+    enclosureDepth?: string; // '400', '600', '800'
     baseRequired?: string;
     location?: string;
     insulationLevel?: 'none' | 'air' | 'fully';
@@ -240,6 +241,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // Used for "Extra for Doors Over (Yes = 1)"
     if (config.enclosureType === 'Custom' && config.location === 'Outdoor' && tierCount > 0) {
         addTarget('1B-DOORS', tierCount);
+
+        // Enclosure Depth Logic (Added 2025-12-12)
+        // Rule: If 600mm -> 1B-600MM @ $500/tier
+        //       If 800mm -> 1B-800MM @ $1000/tier
+        //       If 400mm (Standard) -> None
+        const depth = config.enclosureDepth || '400';
+        if (depth === '600') {
+            addTarget('1B-600MM', tierCount, 500);
+        } else if (depth === '800') {
+            addTarget('1B-800MM', tierCount, 1000);
+        }
+        // 400mm falls through, no target added (so it will be removed if present)
     }
 
     // D. CT Metering
@@ -468,6 +481,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         ...TIER_ITEMS,
         '1B-BASE',
         '1B-DOORS',
+        '1B-600MM',
+        '1B-800MM',
         '1B-SS-2B', '1B-SS-NO4',
         BUSBAR_INSULATION_ITEM
     ];
