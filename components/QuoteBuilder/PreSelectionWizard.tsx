@@ -110,7 +110,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         tierCount: 0,
         baseRequired: 'No',
         enclosureDepth: '400',
-        insulationLevel: 'air'
+        insulationLevel: 'air',
+        totalCompartments: 0,
+        isOver50kA: 'No',
+        isNonStandardColour: 'No'
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -153,7 +156,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     tierCount: 0,
                     baseRequired: 'No',
                     enclosureDepth: '400',
-                    insulationLevel: 'air'
+                    insulationLevel: 'air',
+                    totalCompartments: 0,
+                    isOver50kA: 'No',
+                    isNonStandardColour: 'No'
                 });
             }
         }
@@ -433,6 +439,48 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 <option value="800">800 mm</option>
                             </select>
                             <p className="text-xs text-gray-500 mt-1">Deeper enclosures require additional material cost per tier.</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Cubic Options */}
+                {config.enclosureType === 'Cubic' && (
+                    <div className="mt-6 border-t border-gray-100 pt-4 space-y-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Total No. of Compartments</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.totalCompartments || ''}
+                                onChange={e => setConfig({ ...config, totalCompartments: parseInt(e.target.value) || 0 })}
+                                placeholder="0"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Required for Cubic pricing calculations</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Is Switchboard Over 50kA?</label>
+                                <select
+                                    className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                    value={config.isOver50kA || 'No'}
+                                    onChange={e => setConfig({ ...config, isOver50kA: e.target.value })}
+                                >
+                                    {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Non-standard Colour?</label>
+                                <select
+                                    className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                    value={config.isNonStandardColour || 'No'}
+                                    onChange={e => setConfig({ ...config, isNonStandardColour: e.target.value })}
+                                >
+                                    {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
                 )}

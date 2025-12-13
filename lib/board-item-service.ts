@@ -12,6 +12,9 @@ export interface BoardConfig {
     tierCount?: number;
     enclosureType?: string;
     enclosureDepth?: string; // '400', '600', '800'
+    totalCompartments?: number;
+    isOver50kA?: string; // 'Yes' | 'No'
+    isNonStandardColour?: string; // 'Yes' | 'No'
     baseRequired?: string;
     location?: string;
     insulationLevel?: 'none' | 'air' | 'fully';
@@ -143,6 +146,12 @@ const SHEET_METAL_BASE_ITEMS = [
     '1B-DOORS',
     '1B-600MM',
     '1B-800MM'
+];
+
+const CUBIC_OPTIONS_ITEMS = [
+    '1A-COMPARTMENTS',
+    '1A-50KA',
+    '1A-COLOUR'
 ];
 
 export async function syncBoardItems(boardId: string, config: BoardConfig, options?: { forceTiers?: boolean }) {
@@ -343,6 +352,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
 
     // --- 3.5 PREPARE CATALOG MAP (Needed for Busbar Logic & DB Ops) ---
+    // We need to look up 1A-COMPARTMENTS price for calculation even if it's not a target yet (though it should be)
+    if (config.enclosureType === 'Cubic') {
+        targetItemPartNumbers.add('1A-COMPARTMENTS');
+    }
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     // Fetch catalog info for all targets (to get descriptions, defaults, and prices for non-customized items)
@@ -351,6 +364,40 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     });
     const catalogMap = new Map<string, CatalogItem>();
     catalogItems.forEach((i: any) => { if (i.partNumber) catalogMap.set(i.partNumber, i); });
+
+    // --- 3.6 CUBIC OPTIONS LOGIC (Post-Catalog Fetch) ---
+    // We need the catalog unit price for 1A-COMPARTMENTS to calculate 50kA cost
+    if (config.enclosureType === 'Cubic' && (config.totalCompartments || 0) > 0) {
+        const totalCompartments = config.totalCompartments || 0;
+
+        // 1. 1A-COMPARTMENTS (Auto-add)
+        // Ref: "Auto-add 1A-COMPARTMENTS with qty = totalCompartments. Pull its unit price from catalog"
+        const compartmentsItem = catalogMap.get('1A-COMPARTMENTS');
+        const compartmentUnitPrice = compartmentsItem?.unitPrice || 0;
+
+        if (compartmentsItem) {
+            // Note: We already added it to targets in step 3.5 to ensure fetch, now we set qty/price
+            addTarget('1A-COMPARTMENTS', totalCompartments, compartmentUnitPrice);
+        } else {
+            console.warn('1A-COMPARTMENTS missing from catalog. Cannot price Cubic options correctly.');
+        }
+
+        // 2. 1A-50KA (Over 50kA)
+        if (config.isOver50kA === 'Yes') {
+            // Formula: (Material Total of Compartments) / 4
+            // Material Total = totalCompartments * compartmentUnitPrice
+            const materialTotal = totalCompartments * compartmentUnitPrice;
+            const cost50kA = materialTotal / 4;
+            // Qty = 1, Unit Price = Cost
+            addTarget('1A-50KA', 1, cost50kA);
+        }
+
+        // 3. 1A-COLOUR (Non-standard Colour)
+        if (config.isNonStandardColour === 'Yes') {
+            // Formula: Qty = compartments, Unit Price = 80 (Fixed)
+            addTarget('1A-COLOUR', totalCompartments, 80);
+        }
+    }
 
 
     // --- 4. BUSBAR INSULATION ---
@@ -484,6 +531,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B-600MM',
         '1B-800MM',
         '1B-SS-2B', '1B-SS-NO4',
+        ...CUBIC_OPTIONS_ITEMS,
         BUSBAR_INSULATION_ITEM
     ];
 
@@ -524,7 +572,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
 
         // Visibility Logic: Force Bascis category for these critical items
-        const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4'].includes(partNumber);
+        const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4', ...CUBIC_OPTIONS_ITEMS].includes(partNumber);
         const isBusbarInsulation = partNumber === BUSBAR_INSULATION_ITEM;
         const forcedCategory = isBusbarInsulation ? 'Busbar' : (isCoreItem ? 'Basics' : undefined);
 
