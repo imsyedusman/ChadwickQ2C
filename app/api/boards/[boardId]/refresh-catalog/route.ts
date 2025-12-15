@@ -2,16 +2,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// Items whose price is purely formula driven and should NOT be updated from catalog
-// (Even if they have a matching part number in basics)
-const FORMULA_ITEMS = [
-    '1B-BASE',
-    '1B-SS-2B', '1B-SS-NO4',
-    '1B-600MM', '1B-800MM',
-    '1A-50KA', '1A-COLOUR',
-    'Busbar Insulation',
-    'MISC-SITE-RECONNECTION'
-];
+import { isFormulaPriced } from '@/lib/system-definitions';
 
 export async function POST(
     request: Request,
@@ -35,10 +26,10 @@ export async function POST(
             return NextResponse.json({ error: `Cannot refresh items. Quote is ${board.quote.status}.` }, { status: 403 });
         }
 
-        // 2. Identify items to process
+        // 3. Identify items to process
         // Skip formula items
         // We want to process CUSTOM/MANUAL items primarily, but we can also catch any drift in managed items that aren't formulaic (like hardware)
-        const itemsToProcess = board.items.filter(item => !FORMULA_ITEMS.includes(item.name));
+        const itemsToProcess = board.items.filter(item => !isFormulaPriced(item.name));
 
         if (itemsToProcess.length === 0) {
             return NextResponse.json({ message: 'No eligible items to refresh.', updatedCount: 0 });
@@ -147,7 +138,7 @@ export async function POST(
 
         // Also sync Metadata for Formula Items (as per requirement)
         // "Formula-managed... keep computed PRICE/LABOUR, but sync metadata"
-        const formulaItemsOnBoard = board.items.filter(item => FORMULA_ITEMS.includes(item.name));
+        const formulaItemsOnBoard = board.items.filter(item => isFormulaPriced(item.name));
         let metaUpdatesCount = 0;
 
         // We need to fetch catalog for these too

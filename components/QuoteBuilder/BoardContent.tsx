@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
 import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
+import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -46,120 +47,133 @@ export default function BoardContent() {
         updateItem(itemId, { quantity: validQty });
     };
 
-    const renderItemRow = (item: Item) => (
-        <div
-            key={item.id}
-            className={cn(
-                "px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm",
-                item.isDefault && "bg-gray-50/50"
-            )}
-        >
-            {/* Item Details */}
-            <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                    <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
-                        {item.description || item.name}
-                    </div>
-                    {item.isDefault && (
-                        <div className="flex items-center gap-1">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20" title="This item is automatically calculated based on board configuration">
-                                <Lock size={8} className="text-amber-700" />
-                                System-calculated
-                            </span>
-                        </div>
-                    )}
-                </div>
-                <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
-                    <span className="font-medium">{item.name}</span>
-                    {item.subcategory ? ` • ${item.subcategory}` : ''}
-                </div>
-            </div>
+    const renderItemRow = (item: Item) => {
+        const autoManaged = isAutoManaged(item.name) || item.isDefault;
+        const formulaPriced = isFormulaPriced(item.name);
 
-            {/* Quantity Control */}
+        return (
             <div
+                key={item.id}
                 className={cn(
-                    "flex items-center gap-1 border rounded px-1 h-6",
-                    item.isDefault ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
+                    "px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm",
+                    autoManaged && "bg-gray-50/50"
                 )}
-                title={item.isDefault ? "Quantity is calculated automatically based on board configuration" : undefined}
             >
-                <button
-                    onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                    className={cn(
-                        "transition-colors",
-                        item.isDefault ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
-                    )}
-                    disabled={!!item.isDefault}
-                >
-                    <Minus size={12} />
-                </button>
-                <input
-                    type="number"
-                    defaultValue={item.quantity}
-                    key={`qty-${item.id}-${item.quantity}`}
-                    onBlur={(e) => {
-                        if (item.isDefault) return;
-                        // On blur, validate and update
-                        const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                        if (isNaN(val) || val < 0) {
-                            handleQuantityChange(item.id, 0);
-                        } else {
-                            handleQuantityChange(item.id, val);
-                        }
-                    }}
-                    onKeyDown={(e) => {
-                        // Allow Enter to blur and save
-                        if (e.key === 'Enter') {
-                            e.currentTarget.blur();
-                        }
-                    }}
-                    step="0.01"
-                    min="0"
-                    readOnly={!!item.isDefault}
-                    className={cn(
-                        "w-12 text-center text-xs font-medium bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                        item.isDefault ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
-                    )}
-                />
-                <button
-                    onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                    className={cn(
-                        "transition-colors",
-                        item.isDefault ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
-                    )}
-                    disabled={!!item.isDefault}
-                >
-                    <Plus size={12} />
-                </button>
-            </div>
-
-            {/* Price & Total */}
-            <div className="text-right w-20">
-                <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
-                <div
-                    className="text-[10px] text-gray-400 cursor-help"
-                    title={item.isDefault ? "Price is managed by system logic or catalog defaults" : "Unit Price"}
-                >
-                    {formatCurrency(item.unitPrice)} ea
+                {/* Item Details */}
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                        <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
+                            {item.description || item.name}
+                        </div>
+                        {formulaPriced && (
+                            <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Price/Labour is calculated from configuration">
+                                    <Lock size={8} className="text-amber-700" />
+                                    Calculated
+                                </span>
+                            </div>
+                        )}
+                        {autoManaged && !formulaPriced && (
+                            <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20" title="System-managed item">
+                                    <Lock size={8} className="text-blue-700" />
+                                    Auto
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                    <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
+                        <span className="font-medium">{item.name}</span>
+                        {item.subcategory ? ` • ${item.subcategory}` : ''}
+                    </div>
                 </div>
-            </div>
 
-            {/* Actions */}
-            <button
-                onClick={() => removeItem(item.id)}
-                className={cn(
-                    "transition-colors",
-                    item.isDefault
-                        ? "text-gray-200 cursor-not-allowed"
-                        : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
-                )}
-                disabled={!!item.isDefault}
-                title={item.isDefault ? "System-calculated items cannot be manually removed" : "Remove item"}
-            >
-                {item.isDefault ? <Lock size={14} /> : <Trash2 size={14} />}
-            </button>
-        </div>
-    );
+                {/* Quantity Control (Lock if Auto-Managed) */}
+                <div
+                    className={cn(
+                        "flex items-center gap-1 border rounded px-1 h-6",
+                        autoManaged ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
+                    )}
+                    title={autoManaged ? "Quantity is controlled by board configuration" : undefined}
+                >
+                    <button
+                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                        className={cn(
+                            "transition-colors",
+                            autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
+                        )}
+                        disabled={!!autoManaged}
+                    >
+                        <Minus size={12} />
+                    </button>
+                    <input
+                        type="number"
+                        defaultValue={item.quantity}
+                        key={`qty-${item.id}-${item.quantity}`}
+                        onBlur={(e) => {
+                            if (autoManaged) return;
+                            // On blur, validate and update
+                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                            if (isNaN(val) || val < 0) {
+                                handleQuantityChange(item.id, 0);
+                            } else {
+                                handleQuantityChange(item.id, val);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            // Allow Enter to blur and save
+                            if (e.key === 'Enter') {
+                                e.currentTarget.blur();
+                            }
+                        }}
+                        step="0.01"
+                        min="0"
+                        readOnly={!!autoManaged}
+                        className={cn(
+                            "w-12 text-center text-xs font-medium bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                            autoManaged ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
+                        )}
+                    />
+                    <button
+                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                        className={cn(
+                            "transition-colors",
+                            autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
+                        )}
+                        disabled={!!autoManaged}
+                    >
+                        <Plus size={12} />
+                    </button>
+                </div>
+
+                {/* Price & Total (Lock if Formula-Priced - though price edit UI not fully exposed here anyway) */}
+                <div className="text-right w-20">
+                    <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
+                    <div
+                        className="text-[10px] text-gray-400 cursor-help"
+                        title={formulaPriced ? "Price is formula-driven" : "Unit Price"}
+                    >
+                        {formatCurrency(item.unitPrice)} ea
+                    </div>
+                </div>
+
+                {/* Actions (Delete Lock if Auto-Managed) */}
+                <button
+                    onClick={() => removeItem(item.id)}
+                    className={cn(
+                        "transition-colors",
+                        autoManaged
+                            ? "text-gray-200 cursor-not-allowed"
+                            : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                    )}
+                    disabled={!!autoManaged}
+                    title={autoManaged ? "Auto-managed items cannot be manually removed" : "Remove item"}
+                >
+                    {autoManaged ? <Lock size={14} /> : <Trash2 size={14} />}
+                </button>
+            </div>
+        )
+    };
 
     const renderSwitchboardsContent = (items: Item[]) => {
         // Group Switchboards items by subcategory (Power Meters, Fuses, Circuit Breakers, etc.)

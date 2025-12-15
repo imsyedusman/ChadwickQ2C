@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder } from 'lucide-react';
+import { Search, Plus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2 } from 'lucide-react';
+import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
 
@@ -217,16 +218,7 @@ export default function ItemSelection() {
                 const data = await res.json();
 
                 // Filter out system-managed basics that shouldn't be added manually
-                const HIDDEN_ITEMS = [
-                    '1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4',
-                    'MISC-LABELS', 'MISC-HARDWARE', 'MISC-TEST-TIERS',
-                    '1A-COMPARTMENTS', '1A-50KA', '1A-COLOUR',
-                    'CT-COMPARTMENTS', 'CT-PANEL', 'CT-TEST-BLOCK', 'CT-WIRING',
-                    '100A-PANEL', '100A-FUSE', '100A-NEUTRAL-LINK', '100A-MCB-1PH', '100A-MCB-3PH',
-                    'MISC-DELIVERY-UTE', 'MISC-DELIVERY-HIAB', 'MISC-SITE-RECONNECTION',
-                    'Busbar Insulation', '1B-DOORS', '1B-600MM', '1B-800MM'
-                ];
-                const filteredData = data.filter((i: any) => !HIDDEN_ITEMS.includes(i.partNumber));
+                const filteredData = data.filter((i: any) => !isAutoManaged(i.partNumber));
 
                 setItems(filteredData);
             }

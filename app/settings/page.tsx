@@ -324,103 +324,153 @@ export default function SettingsPage() {
 
                         {/* Admin Tools Tab */}
                         {activeTab === 'admin' && (
-                            <div>
-                                <h2 className="text-xl font-semibold text-gray-900 mb-2">Admin Tools</h2>
-                                <p className="text-sm text-gray-600 mb-6">
-                                    Manage internal catalogs and system settings
-                                </p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
-                                    {/* Manage Basics */}
-                                    <Link href="/admin/basics">
-                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                    <Package size={24} className="text-blue-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Manage Basic Items</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Edit, update, and manage your internal Basic items catalog (includes auto-add toggle)
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* Manage Busbars */}
-                                    <Link href="/admin/busbars">
-                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                    <ToggleLeft size={24} className="text-blue-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Manage Busbar Items</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Edit copper, labour, and busbar components pricing.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* Manage Templates */}
-                                    <Link href="/admin/templates">
-                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                    <FileText size={24} className="text-blue-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Manage Export Templates</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Upload and manage DOCX templates for Tender Exports
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* Catalog Integrity */}
-                                    <Link href="/admin/integrity">
-                                        <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                                                    <AlertOctagon size={24} className="text-amber-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Catalog Integrity</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Validate catalog consistency and identify risks.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-
-                                    {/* Backup & Restore */}
-                                    <Link href="/admin/backup">
-                                        <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
-                                                    <HardDrive size={24} className="text-amber-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Backup & Restore</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Create system checkpoints or restore from file. Use with caution.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </div>
-                            </div>
+                            <AdminToolsSection />
                         )}
                     </div>
                 </div>
             </div>
         </div >
+    );
+}
+
+function AdminToolsSection() {
+    const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'integrity' | 'exports'>('catalog');
+
+    const tabs = [
+        { id: 'catalog', label: 'Catalog Management', count: 2 },
+        { id: 'integrity', label: 'Data Integrity & Safety', count: 2 },
+        { id: 'exports', label: 'Documents & Exports', count: 1 },
+    ] as const;
+
+    return (
+        <div>
+            <div className="mb-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Admin Tools</h2>
+                <p className="text-sm text-gray-600">
+                    Manage internal catalogs and system settings
+                </p>
+            </div>
+
+            {/* Sub Navigation */}
+            <div className="flex gap-2 mb-6 border-b border-gray-200">
+                {tabs.map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveSubTab(tab.id as any)}
+                        className={cn(
+                            "px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-2",
+                            activeSubTab === tab.id
+                                ? "border-blue-600 text-blue-600"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                        )}
+                    >
+                        {tab.label}
+                        <span className={cn(
+                            "px-1.5 py-0.5 rounded-full text-[10px]",
+                            activeSubTab === tab.id ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                        )}>
+                            {tab.count}
+                        </span>
+                    </button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+                {/* Catalog Management Group */}
+                {activeSubTab === 'catalog' && (
+                    <>
+                        <Link href="/admin/basics">
+                            <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group h-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                        <Package size={24} className="text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-1">Manage Basic Items</h3>
+                                        <p className="text-sm text-gray-600">
+                                            Edit, update, and manage your internal Basic items catalog (includes auto-add toggle)
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+
+                        <Link href="/admin/busbars">
+                            <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group h-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                        <ToggleLeft size={24} className="text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-1">Manage Busbar Items</h3>
+                                        <p className="text-sm text-gray-600">
+                                            Edit copper, labour, and busbar components pricing.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+                    </>
+                )}
+
+                {/* Integrity Group */}
+                {activeSubTab === 'integrity' && (
+                    <>
+                        <Link href="/admin/integrity">
+                            <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group h-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                        <AlertOctagon size={24} className="text-amber-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-1">Catalog Integrity</h3>
+                                        <p className="text-sm text-gray-600">
+                                            Validate catalog consistency and identify risks.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+
+                        <Link href="/admin/backup">
+                            <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group h-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                        <HardDrive size={24} className="text-amber-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-1">Backup & Restore</h3>
+                                        <p className="text-sm text-gray-600">
+                                            Create system checkpoints or restore from file. Use with caution.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+                    </>
+                )}
+
+                {/* Exports Group */}
+                {activeSubTab === 'exports' && (
+                    <>
+                        <Link href="/admin/templates">
+                            <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group h-full">
+                                <div className="flex items-start gap-4">
+                                    <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                        <FileText size={24} className="text-blue-600" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold text-gray-900 mb-1">Manage Export Templates</h3>
+                                        <p className="text-sm text-gray-600">
+                                            Upload and manage DOCX templates for Tender Exports
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+                    </>
+                )}
+            </div>
+        </div>
     );
 }
