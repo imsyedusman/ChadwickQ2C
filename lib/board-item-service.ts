@@ -18,6 +18,8 @@ export interface BoardConfig {
     baseRequired?: string;
     location?: string;
     insulationLevel?: 'none' | 'air' | 'fully';
+    boardWidth?: number; // Metres
+    shippingSections?: number; // Integer, min 1
     [key: string]: any;
 }
 
@@ -301,6 +303,21 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
 
+    // G. Site Reconnection (Auto-Add)
+    // Rule: TRUNC((sections + 1) / 2)
+    // Only applies if Board Width > 4m AND Shipping Sections > 1
+    const boardWidth = config.boardWidth || 0;
+    const shippingSections = config.shippingSections || 1;
+
+    // console.log(`[Site Reconnection Check] Width: ${boardWidth}, Sections: ${shippingSections}`); // noisy log removed
+
+    if (boardWidth > 4 && shippingSections > 1) {
+        const reconnectionUnits = Math.floor((shippingSections + 1) / 2);
+        if (reconnectionUnits > 0) {
+            addTarget('MISC-SITE-RECONNECTION', reconnectionUnits);
+        }
+    }
+
     // --- 3. STAINLESS UPLIFT CALCULATION ---
     // Zero-Tier Check: If tierCount == 0, we don't do uplift (Misc/Base/Tiers are gone).
     // Technically compartments/doors might exist, but usually Custom board implies tiers.
@@ -511,6 +528,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         addTarget(BUSBAR_INSULATION_ITEM, 1, extraMaterial, extraLabour);
     }
 
+    // --- 4.5 SITE RECONNECTION (MOVED UP) ---
+    // See section 2.G below
 
     // --- 5. EXECUTE DB OPERATIONS ---
 
@@ -532,7 +551,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B-800MM',
         '1B-SS-2B', '1B-SS-NO4',
         ...CUBIC_OPTIONS_ITEMS,
-        BUSBAR_INSULATION_ITEM
+        BUSBAR_INSULATION_ITEM,
+        'MISC-SITE-RECONNECTION'
     ];
 
     // Also add Busbars/Labour patterns to removal check
@@ -572,7 +592,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
 
         // Visibility Logic: Force Bascis category for these critical items
-        const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4', ...CUBIC_OPTIONS_ITEMS].includes(partNumber);
+        const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4', ...CUBIC_OPTIONS_ITEMS, 'MISC-SITE-RECONNECTION'].includes(partNumber);
         const isBusbarInsulation = partNumber === BUSBAR_INSULATION_ITEM;
         const forcedCategory = isBusbarInsulation ? 'Busbar' : (isCoreItem ? 'Basics' : undefined);
 

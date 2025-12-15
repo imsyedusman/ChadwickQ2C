@@ -113,7 +113,9 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         insulationLevel: 'air',
         totalCompartments: 0,
         isOver50kA: 'No',
-        isNonStandardColour: 'No'
+        isNonStandardColour: 'No',
+        boardWidth: undefined,
+        shippingSections: 1
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -159,7 +161,9 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     insulationLevel: 'air',
                     totalCompartments: 0,
                     isOver50kA: 'No',
-                    isNonStandardColour: 'No'
+                    isNonStandardColour: 'No',
+                    boardWidth: undefined,
+                    shippingSections: 1
                 });
             }
         }
@@ -442,6 +446,46 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </div>
                     </div>
                 )}
+
+                {/* Shipping & Reconnection Logic (Added 2025-12-15) */}
+                <div className="mt-6 border-t border-gray-100 pt-4">
+                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Shipping & Dimensions</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Board Width (Metres)</label>
+                            <input
+                                type="number"
+                                step="0.1"
+                                min="0"
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.boardWidth || ''}
+                                onChange={e => setConfig({ ...config, boardWidth: parseFloat(e.target.value) || undefined })}
+                                placeholder="e.g. 3.2"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Shipping Sections</label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.shippingSections || 1}
+                                onChange={e => setConfig({ ...config, shippingSections: parseInt(e.target.value) || 1 })}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Warning if Width > 4m */}
+                    {(config.boardWidth || 0) > 4.0 && (
+                        <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md flex items-start gap-3">
+                            <AlertCircle size={18} className="text-orange-600 shrink-0 mt-0.5" />
+                            <div className="text-xs text-orange-800">
+                                <p className="font-bold mb-1">Board width exceeds 4m.</p>
+                                <p>This board may need to be delivered in multiple sections. If so, increase <strong>Shipping Sections</strong> to apply Site Reconnection automatically.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Cubic Options */}
                 {config.enclosureType === 'Cubic' && (
