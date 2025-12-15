@@ -93,57 +93,62 @@ export default function SettingsPage() {
                     <p className="text-gray-600">Manage your application settings, catalog, and admin tools</p>
                 </div>
 
-                {/* Tab Navigation */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div className="flex border-b border-gray-200">
-                        <button
-                            onClick={() => setActiveTab('catalog')}
-                            className={cn(
-                                "flex items-center gap-2 px-6 py-4 font-medium text-sm border-b-2 transition-colors",
-                                activeTab === 'catalog'
-                                    ? "border-blue-600 text-blue-600"
-                                    : "border-transparent text-gray-600 hover:text-gray-900"
-                            )}
-                        >
-                            <Database size={18} />
-                            Manage Pricelists
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('costing')}
-                            className={cn(
-                                "flex items-center gap-2 px-6 py-4 font-medium text-sm border-b-2 transition-colors",
-                                activeTab === 'costing'
-                                    ? "border-blue-600 text-blue-600"
-                                    : "border-transparent text-gray-600 hover:text-gray-900"
-                            )}
-                        >
-                            <DollarSign size={18} />
-                            Costing Defaults
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('admin')}
-                            className={cn(
-                                "flex items-center gap-2 px-6 py-4 font-medium text-sm border-b-2 transition-colors",
-                                activeTab === 'admin'
-                                    ? "border-blue-600 text-blue-600"
-                                    : "border-transparent text-gray-600 hover:text-gray-900"
-                            )}
-                        >
-                            <Wrench size={18} />
-                            Admin Tools
-                        </button>
-                    </div>
+                <div className="flex flex-col md:flex-row gap-8">
+                    {/* Sidebar Navigation */}
+                    <aside className="w-full md:w-64 flex-shrink-0">
+                        <nav className="space-y-1">
+                            <button
+                                onClick={() => setActiveTab('catalog')}
+                                className={cn(
+                                    "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                                    activeTab === 'catalog'
+                                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-gray-200"
+                                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                )}
+                            >
+                                <Database size={18} className={cn(activeTab === 'catalog' ? "text-blue-600" : "text-gray-400")} />
+                                Manage Pricelists
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('costing')}
+                                className={cn(
+                                    "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                                    activeTab === 'costing'
+                                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-gray-200"
+                                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                )}
+                            >
+                                <DollarSign size={18} className={cn(activeTab === 'costing' ? "text-blue-600" : "text-gray-400")} />
+                                Costing Defaults
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('admin')}
+                                className={cn(
+                                    "w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors",
+                                    activeTab === 'admin'
+                                        ? "bg-white text-blue-700 shadow-sm ring-1 ring-gray-200"
+                                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                                )}
+                            >
+                                <Wrench size={18} className={cn(activeTab === 'admin' ? "text-blue-600" : "text-gray-400")} />
+                                Admin Tools
+                            </button>
+                        </nav>
+                    </aside>
 
-                    <div className="p-6">
+                    {/* Main Content Area */}
+                    <main className="flex-1 bg-white rounded-lg shadow-sm border border-gray-200 p-8 min-h-[600px]">
                         {/* Catalog Tab */}
                         {activeTab === 'catalog' && (
                             <div>
-                                <div className="mb-4">
+                                <div className="mb-6">
                                     <h2 className="text-xl font-semibold text-gray-900 mb-2">External Pricelists</h2>
                                     <p className="text-sm text-gray-600">
                                         Upload and manage external supplier pricelists (Schneider, Mercs, etc.).
-                                        <strong className="text-gray-900"> Note: Basic items are managed separately in Admin Tools.</strong>
                                     </p>
+                                    <div className="mt-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded px-3 py-2 inline-block">
+                                        <strong>Note:</strong> Basic items are managed separately in Admin Tools.
+                                    </div>
                                 </div>
                                 <CatalogManager />
                             </div>
@@ -152,126 +157,156 @@ export default function SettingsPage() {
                         {/* Costing Tab */}
                         {activeTab === 'costing' && (
                             <div>
-                                <h2 className="text-xl font-semibold text-gray-900 mb-6">Default Costing Parameters</h2>
+                                <div className="mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Costing Defaults</h2>
+                                    <p className="text-sm text-gray-600">
+                                        Configure default profit margins, labour rates, and overheads.
+                                    </p>
+                                </div>
 
                                 {loading ? (
                                     <div className="flex items-center justify-center py-12">
                                         <Loader2 className="animate-spin text-blue-600" size={32} />
                                     </div>
                                 ) : (
-                                    <div className="space-y-6 max-w-4xl">
-                                        <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-8 max-w-2xl">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                                            <div className="col-span-1 md:col-span-2">
+                                                <h3 className="text-sm font-semibold text-gray-900 border-b pb-2 mb-4">Financial Parameters</h3>
+                                            </div>
+
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Labour Rate ($/hour)
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.labourRate}
-                                                    onChange={(e) => setSettings({ ...settings, labourRate: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Consumables (%)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.consumablesPct}
-                                                    onChange={(e) => setSettings({ ...settings, consumablesPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Percentage of material cost</p>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Overhead (%)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.overheadPct}
-                                                    onChange={(e) => setSettings({ ...settings, overheadPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Percentage of cost base</p>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Engineering (%)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.engineeringPct}
-                                                    onChange={(e) => setSettings({ ...settings, engineeringPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Percentage of cost base</p>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Target Margin (%)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.targetMarginPct}
-                                                    onChange={(e) => setSettings({ ...settings, targetMarginPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Target profit margin</p>
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    GST (%)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.gstPct}
-                                                    onChange={(e) => setSettings({ ...settings, gstPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.labourRate}
+                                                        onChange={(e) => setSettings({ ...settings, labourRate: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                </div>
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Rounding Increment ($)
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    value={settings.roundingIncrement}
-                                                    onChange={(e) => setSettings({ ...settings, roundingIncrement: parseInt(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Round sell price to nearest</p>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        value={settings.roundingIncrement}
+                                                        onChange={(e) => setSettings({ ...settings, roundingIncrement: parseInt(e.target.value) || 0 })}
+                                                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    GST (%)
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.gstPct}
+                                                        onChange={(e) => setSettings({ ...settings, gstPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Target Margin (%)
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.targetMarginPct}
+                                                        onChange={(e) => setSettings({ ...settings, targetMarginPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Consumables (%)
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.consumablesPct}
+                                                        onChange={(e) => setSettings({ ...settings, consumablesPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">of material cost</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Overhead (%)
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.overheadPct}
+                                                        onChange={(e) => setSettings({ ...settings, overheadPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">of cost base</p>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Engineering (%)
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.engineeringPct}
+                                                        onChange={(e) => setSettings({ ...settings, engineeringPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">of cost base</p>
                                             </div>
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Min Margin Alert (%)
                                                 </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={settings.minMarginAlertPct}
-                                                    onChange={(e) => setSettings({ ...settings, minMarginAlertPct: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
-                                                />
-                                                <p className="text-xs text-gray-500 mt-1">Alert when margin falls below</p>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={settings.minMarginAlertPct}
+                                                        onChange={(e) => setSettings({ ...settings, minMarginAlertPct: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-4 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">%</span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="border-t border-gray-200 pt-6 mt-6">
+                                        <div className="border-t border-gray-200 pt-6">
                                             <h3 className="text-sm font-semibold text-gray-900 mb-4">Company Information</h3>
                                             <div className="space-y-4">
                                                 <div>
@@ -300,23 +335,25 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
 
-                                        <button
-                                            onClick={handleSaveSettings}
-                                            disabled={saving}
-                                            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                        >
-                                            {saving ? (
-                                                <>
-                                                    <Loader2 className="animate-spin" size={18} />
-                                                    Saving...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Save size={18} />
-                                                    Save Settings
-                                                </>
-                                            )}
-                                        </button>
+                                        <div className="pt-2">
+                                            <button
+                                                onClick={handleSaveSettings}
+                                                disabled={saving}
+                                                className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                            >
+                                                {saving ? (
+                                                    <>
+                                                        <Loader2 className="animate-spin" size={18} />
+                                                        Saving...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Save size={18} />
+                                                        Save Settings
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -326,7 +363,7 @@ export default function SettingsPage() {
                         {activeTab === 'admin' && (
                             <AdminToolsSection />
                         )}
-                    </div>
+                    </main>
                 </div>
             </div>
         </div >
