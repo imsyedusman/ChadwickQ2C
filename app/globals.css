@@ -39,3 +39,27 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@layer base {
+
+  input,
+  textarea,
+  select {
+    color: var(--foreground);
+    /* Ensure high contrast for user entered text */
+    @apply text-gray-900;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    /* Darker placeholder for better visibility */
+    @apply text-gray-500;
+  }
+
+  /* Specific fix for disabled inputs to remain readable */
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    @apply text-gray-600 bg-gray-100;
+  }
+}

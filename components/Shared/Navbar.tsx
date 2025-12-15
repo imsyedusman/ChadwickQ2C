@@ -1,7 +1,18 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 
 export default function Navbar() {
+    const pathname = usePathname();
+
+    // Check if we are in the settings section
+    const isSettings = pathname?.startsWith('/settings');
+    // Dashboard is active if we are at root or not in settings (and not in other future top-level pages if added)
+    const isDashboard = pathname === '/' || pathname?.startsWith('/quote') || (!isSettings && pathname !== '/');
+
     return (
         <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -21,13 +32,23 @@ export default function Navbar() {
                         <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
                             <Link
                                 href="/"
-                                className="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                                className={cn(
+                                    "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors",
+                                    isDashboard
+                                        ? "border-blue-500 text-gray-900"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                )}
                             >
                                 Dashboard
                             </Link>
                             <Link
                                 href="/settings"
-                                className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+                                className={cn(
+                                    "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors",
+                                    isSettings
+                                        ? "border-blue-500 text-gray-900"
+                                        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                )}
                             >
                                 Settings
                             </Link>

@@ -35,6 +35,7 @@ export interface Item {
     unitPrice: number;
     labourHours: number;
     notes: string | null;
+    isDefault?: boolean;
 }
 
 export interface Board {

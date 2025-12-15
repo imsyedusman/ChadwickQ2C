@@ -365,23 +365,6 @@ export default function SettingsPage() {
                                         </div>
                                     </Link>
 
-                                    {/* Catalog Integrity */}
-                                    <Link href="/admin/integrity">
-                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
-                                            <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                    <AlertOctagon size={24} className="text-blue-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <h3 className="font-semibold text-gray-900 mb-1">Catalog Integrity</h3>
-                                                    <p className="text-sm text-gray-600">
-                                                        Check for missing codes, duplicates, and data issues.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-
                                     {/* Manage Templates */}
                                     <Link href="/admin/templates">
                                         <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
@@ -399,17 +382,34 @@ export default function SettingsPage() {
                                         </div>
                                     </Link>
 
+                                    {/* Catalog Integrity */}
+                                    <Link href="/admin/integrity">
+                                        <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                                    <AlertOctagon size={24} className="text-amber-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-gray-900 mb-1">Catalog Integrity</h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        Validate catalog consistency and identify risks.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+
                                     {/* Backup & Restore */}
                                     <Link href="/admin/backup">
-                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
+                                        <div className="p-6 bg-white border-2 border-amber-200 rounded-lg hover:border-amber-500 hover:shadow-md transition-all cursor-pointer group">
                                             <div className="flex items-start gap-4">
-                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                    <HardDrive size={24} className="text-blue-600" />
+                                                <div className="p-3 bg-amber-50 rounded-lg group-hover:bg-amber-100 transition-colors">
+                                                    <HardDrive size={24} className="text-amber-600" />
                                                 </div>
                                                 <div className="flex-1">
                                                     <h3 className="font-semibold text-gray-900 mb-1">Backup & Restore</h3>
                                                     <p className="text-sm text-gray-600">
-                                                        Export/Import full system backups (Catalog & Quotes)
+                                                        Create system checkpoints or restore from file. Use with caution.
                                                     </p>
                                                 </div>
                                             </div>

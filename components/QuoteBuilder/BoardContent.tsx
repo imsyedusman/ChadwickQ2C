@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2 } from 'lucide-react';
+import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
@@ -47,23 +47,49 @@ export default function BoardContent() {
     };
 
     const renderItemRow = (item: Item) => (
-        <div key={item.id} className="px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm">
+        <div
+            key={item.id}
+            className={cn(
+                "px-4 py-2 flex items-center gap-4 hover:bg-gray-50 group transition-colors text-sm",
+                item.isDefault && "bg-gray-50/50"
+            )}
+        >
             {/* Item Details */}
             <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
-                    {item.description || item.name}
+                <div className="flex items-center gap-2 mb-0.5">
+                    <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
+                        {item.description || item.name}
+                    </div>
+                    {item.isDefault && (
+                        <div className="flex items-center gap-1">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20" title="This item is automatically calculated based on board configuration">
+                                <Lock size={8} className="text-amber-700" />
+                                System-calculated
+                            </span>
+                        </div>
+                    )}
                 </div>
-                <div className="text-[10px] text-gray-500 truncate">
+                <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
                     <span className="font-medium">{item.name}</span>
                     {item.subcategory ? ` • ${item.subcategory}` : ''}
                 </div>
             </div>
 
             {/* Quantity Control */}
-            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded px-1 h-6">
+            <div
+                className={cn(
+                    "flex items-center gap-1 border rounded px-1 h-6",
+                    item.isDefault ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
+                )}
+                title={item.isDefault ? "Quantity is calculated automatically based on board configuration" : undefined}
+            >
                 <button
                     onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                    className="text-gray-400 hover:text-red-600 transition-colors"
+                    className={cn(
+                        "transition-colors",
+                        item.isDefault ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
+                    )}
+                    disabled={!!item.isDefault}
                 >
                     <Minus size={12} />
                 </button>
@@ -72,6 +98,7 @@ export default function BoardContent() {
                     defaultValue={item.quantity}
                     key={`qty-${item.id}-${item.quantity}`}
                     onBlur={(e) => {
+                        if (item.isDefault) return;
                         // On blur, validate and update
                         const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                         if (isNaN(val) || val < 0) {
@@ -88,11 +115,19 @@ export default function BoardContent() {
                     }}
                     step="0.01"
                     min="0"
-                    className="w-12 text-center text-xs font-medium text-gray-700 bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    readOnly={!!item.isDefault}
+                    className={cn(
+                        "w-12 text-center text-xs font-medium bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+                        item.isDefault ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
+                    )}
                 />
                 <button
                     onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                    className="text-gray-400 hover:text-blue-600 transition-colors"
+                    className={cn(
+                        "transition-colors",
+                        item.isDefault ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
+                    )}
+                    disabled={!!item.isDefault}
                 >
                     <Plus size={12} />
                 </button>
@@ -101,15 +136,27 @@ export default function BoardContent() {
             {/* Price & Total */}
             <div className="text-right w-20">
                 <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
-                <div className="text-[10px] text-gray-400">{formatCurrency(item.unitPrice)} ea</div>
+                <div
+                    className="text-[10px] text-gray-400 cursor-help"
+                    title={item.isDefault ? "Price is managed by system logic or catalog defaults" : "Unit Price"}
+                >
+                    {formatCurrency(item.unitPrice)} ea
+                </div>
             </div>
 
             {/* Actions */}
             <button
                 onClick={() => removeItem(item.id)}
-                className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                className={cn(
+                    "transition-colors",
+                    item.isDefault
+                        ? "text-gray-200 cursor-not-allowed"
+                        : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                )}
+                disabled={!!item.isDefault}
+                title={item.isDefault ? "System-calculated items cannot be manually removed" : "Remove item"}
             >
-                <Trash2 size={14} />
+                {item.isDefault ? <Lock size={14} /> : <Trash2 size={14} />}
             </button>
         </div>
     );
