@@ -166,8 +166,34 @@ export default function BoardContent() {
                     <h3 className="font-bold text-gray-800">{selectedBoard.name}</h3>
                     <p className="text-xs text-gray-500">{items.length} items selected</p>
                 </div>
-                <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    {selectedBoard.description || selectedBoard.name}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={async () => {
+                            if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
+
+                            try {
+                                const res = await fetch(`/api/boards/${selectedBoard.id}/refresh-catalog`, { method: 'POST' });
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    alert(data.message);
+                                    window.location.reload(); // Simple reload to see changes
+                                } else {
+                                    const err = await res.json();
+                                    alert(err.error || 'Failed to refresh');
+                                }
+                            } catch (e) {
+                                alert('Network error');
+                            }
+                        }}
+                        className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1"
+                        title="Update item prices and descriptions from the latest catalog"
+                    >
+                        <Edit2 size={12} />
+                        Refresh Prices
+                    </button>
+                    <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                        {selectedBoard.description || selectedBoard.name}
+                    </div>
                 </div>
             </div>
 

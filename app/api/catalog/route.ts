@@ -107,13 +107,13 @@ export async function GET(request: Request) {
         }
 
         // 3. Subcategory Filter (Exact match for drill-down)
-        // If subcategory is provided, we want items that START with this path or match exactly
-        // This allows selecting "Main Bars" to see "Main Bars > Custom" items
-        whereClause.AND.push({
-            subcategory: {
-                startsWith: subcategory
-            }
-        });
+        if (subcategory) {
+            whereClause.AND.push({
+                subcategory: {
+                    startsWith: subcategory
+                }
+            });
+        }
 
         // 4. Brand Filter (Explicitly for Export or Filtering)
         if (brand) {

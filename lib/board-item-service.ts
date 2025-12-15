@@ -602,8 +602,37 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
         if (existingItem) {
             // Update logic
-            const newUnitPrice = targetPrice !== undefined ? targetPrice : existingItem.unitPrice;
-            const newLabour = targetLabour !== undefined ? targetLabour : existingItem.labourHours;
+
+            // AUTO-MANAGED PRICING LOGIC (Update)
+            const FORMULA_ITEMS = [
+                '1B-BASE',
+                '1B-SS-2B', '1B-SS-NO4',
+                '1B-600MM', '1B-800MM',
+                '1A-50KA', '1A-COLOUR',
+                BUSBAR_INSULATION_ITEM,
+                'MISC-SITE-RECONNECTION'
+            ];
+            const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
+
+            let newUnitPrice = existingItem.unitPrice;
+            let newLabour = existingItem.labourHours;
+
+            if (isFormulaItem) {
+                // Formula items: Explicitly use our calculated target price
+                newUnitPrice = targetPrice !== undefined ? targetPrice : existingItem.unitPrice;
+                newLabour = targetLabour !== undefined ? targetLabour : existingItem.labourHours;
+            } else {
+                // Catalog-managed defaults (e.g. 1A-TIERS, MISC-HARDWARE)
+                // Prefer catalog price if available
+                if (catalogItem) {
+                    newUnitPrice = catalogItem.unitPrice;
+                    newLabour = catalogItem.labourHours;
+                } else {
+                    newUnitPrice = targetPrice !== undefined ? targetPrice : existingItem.unitPrice;
+                    newLabour = targetLabour !== undefined ? targetLabour : existingItem.labourHours;
+                }
+            }
+
             const newQty = targetQty; // We enforce quantity for auto-items
 
             // Only update if changes needed
@@ -624,6 +653,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 });
             }
         } else {
+
             // Create new
             // Catalog item might be undefined for dynamic items!
             const catItem = catalogItem || {
@@ -634,8 +664,41 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 labourHours: 0
             };
 
-            const unitPrice = targetPrice !== undefined ? targetPrice : catItem.unitPrice;
-            const labourHours = targetLabour !== undefined ? targetLabour : catItem.labourHours;
+            // AUTO-MANAGED PRICING LOGIC
+            // 1. Formula items: computed targetPrice always wins
+            // 2. Catalog-managed defaults: catalog price wins (if available)
+            // 3. Fallback: use targetPrice (if provided, e.g. calculated) or 0
+
+            // Define Formula Items (Price is computed, don't use catalog price)
+            const FORMULA_ITEMS = [
+                '1B-BASE',
+                '1B-SS-2B', '1B-SS-NO4',
+                '1B-600MM', '1B-800MM',
+                '1A-50KA', '1A-COLOUR',
+                BUSBAR_INSULATION_ITEM,
+                'MISC-SITE-RECONNECTION'
+            ];
+
+            const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
+
+            let finalUnitPrice = 0;
+            let finalLabourHours = 0;
+
+            if (isFormulaItem) {
+                // Formula items: Explicitly use our calculated target price
+                finalUnitPrice = targetPrice !== undefined ? targetPrice : 0;
+                finalLabourHours = targetLabour !== undefined ? targetLabour : 0;
+            } else {
+                // Catalog-managed defaults (e.g. 1A-TIERS, MISC-HARDWARE)
+                // Prefer catalog price if available, otherwise targetPrice
+                if (catalogItem) {
+                    finalUnitPrice = catalogItem.unitPrice;
+                    finalLabourHours = catalogItem.labourHours;
+                } else {
+                    finalUnitPrice = targetPrice !== undefined ? targetPrice : 0;
+                    finalLabourHours = targetLabour !== undefined ? targetLabour : 0;
+                }
+            }
 
             await prisma.item.create({
                 data: {
@@ -644,10 +707,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     subcategory: catItem.subcategory,
                     name: catalogItem?.partNumber || partNumber,
                     description: catItem.description,
-                    unitPrice: unitPrice,
-                    labourHours: labourHours,
+                    unitPrice: finalUnitPrice,
+                    labourHours: finalLabourHours,
                     quantity: targetQty,
-                    cost: unitPrice * targetQty,
+                    cost: finalUnitPrice * targetQty,
                     isDefault: true
                 }
             });

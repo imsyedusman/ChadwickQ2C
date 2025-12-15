@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import CatalogManager from '@/components/Catalog/CatalogManager';
-import { Database, DollarSign, Save, Loader2, Package, ToggleLeft, Wrench, FileText, HardDrive } from 'lucide-react';
+import { Database, DollarSign, Save, Loader2, Package, ToggleLeft, Wrench, FileText, HardDrive, AlertOctagon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -342,6 +342,40 @@ export default function SettingsPage() {
                                                     <h3 className="font-semibold text-gray-900 mb-1">Manage Basic Items</h3>
                                                     <p className="text-sm text-gray-600">
                                                         Edit, update, and manage your internal Basic items catalog (includes auto-add toggle)
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+
+                                    {/* Manage Busbars */}
+                                    <Link href="/admin/busbars">
+                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                                    <ToggleLeft size={24} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-gray-900 mb-1">Manage Busbar Items</h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        Edit copper, labour, and busbar components pricing.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Link>
+
+                                    {/* Catalog Integrity */}
+                                    <Link href="/admin/integrity">
+                                        <div className="p-6 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all cursor-pointer group">
+                                            <div className="flex items-start gap-4">
+                                                <div className="p-3 bg-blue-50 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                                    <AlertOctagon size={24} className="text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className="font-semibold text-gray-900 mb-1">Catalog Integrity</h3>
+                                                    <p className="text-sm text-gray-600">
+                                                        Check for missing codes, duplicates, and data issues.
                                                     </p>
                                                 </div>
                                             </div>
