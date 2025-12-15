@@ -48,9 +48,8 @@ export async function GET(
         }
 
         if (!templatePath) {
-            return NextResponse.json({
-                error: 'No default export template found. Please upload a template in Admin Tools.'
-            }, { status: 400 });
+            // Fallback to system default
+            templatePath = '/templates/tender-default.docx';
         }
 
         // Calculate effective settings

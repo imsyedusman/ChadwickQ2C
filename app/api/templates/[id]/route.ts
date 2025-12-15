@@ -11,6 +11,11 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
+
+        if (id === 'system-default') {
+            return NextResponse.json({ error: "Cannot delete system default template" }, { status: 403 });
+        }
+
         const template = await prisma.template.findUnique({
             where: { id },
         });
@@ -46,11 +51,16 @@ export async function PUT(
         const body = await request.json();
 
         if (body.isDefault) {
-            // Unset other defaults
+            // Unset all defaults first
             await prisma.template.updateMany({
                 where: { id: { not: id } },
                 data: { isDefault: false },
             });
+
+            // If it's system default, we just needed to unset others (logic in GET handles the rest)
+            if (id === 'system-default') {
+                return NextResponse.json({ success: true, isDefault: true });
+            }
 
             // Set this one as default
             const updated = await prisma.template.update({

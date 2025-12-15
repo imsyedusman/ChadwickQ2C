@@ -10,13 +10,24 @@ export async function GET(request: NextRequest) {
         const searchParams = request.nextUrl.searchParams;
         const isDefault = searchParams.get("default") === "true";
 
+        const systemDefault = {
+            id: 'system-default',
+            name: 'Default (System)',
+            filename: 'tender-default.docx',
+            originalName: 'Estimating Standard Tender To Print - v3.docx',
+            size: 0,
+            isDefault: false,
+            createdAt: new Date(0).toISOString(), // Oldest
+        };
+
         if (isDefault) {
             const template = await prisma.template.findFirst({
                 where: { isDefault: true },
             });
 
             if (!template) {
-                return NextResponse.json({ error: "No default template found" }, { status: 404 });
+                // Return system default if no custom default is set
+                return NextResponse.json({ ...systemDefault, isDefault: true });
             }
             return NextResponse.json(template);
         }
@@ -24,7 +35,14 @@ export async function GET(request: NextRequest) {
         const templates = await prisma.template.findMany({
             orderBy: { createdAt: "desc" },
         });
-        return NextResponse.json(templates);
+
+        // Check if any DB template is default
+        const hasDbDefault = templates.some(t => t.isDefault);
+
+        // Append system default (it is default only if no DB template is default)
+        const allTemplates = [...templates, { ...systemDefault, isDefault: !hasDbDefault }];
+
+        return NextResponse.json(allTemplates);
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch templates" }, { status: 500 });
     }

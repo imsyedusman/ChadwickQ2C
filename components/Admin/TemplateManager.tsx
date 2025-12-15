@@ -165,7 +165,14 @@ export default function TemplateManager() {
                                 <tr key={template.id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-4 py-3 font-medium text-gray-900 flex items-center gap-2">
                                         <FileText size={16} className="text-blue-500" />
-                                        {template.originalName}
+                                        {template.id === 'system-default' ? (
+                                            <div>
+                                                <span className="font-bold text-gray-800">Default (System)</span>
+                                                <span className="block text-xs text-gray-400 font-normal">{template.originalName}</span>
+                                            </div>
+                                        ) : (
+                                            template.originalName
+                                        )}
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">
                                         {new Date(template.createdAt).toLocaleDateString()}
@@ -186,13 +193,15 @@ export default function TemplateManager() {
                                                 Make Default
                                             </button>
                                         )}
-                                        <button
-                                            onClick={() => handleDelete(template.id)}
-                                            className="text-gray-400 hover:text-red-600 transition-colors"
-                                            title="Delete"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        {template.id !== 'system-default' && (
+                                            <button
+                                                onClick={() => handleDelete(template.id)}
+                                                className="text-gray-400 hover:text-red-600 transition-colors"
+                                                title="Delete"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

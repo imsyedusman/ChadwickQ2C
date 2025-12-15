@@ -17,8 +17,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
         }
 
-        // Construct path to public/templates
-        const filePath = join(process.cwd(), "public", "templates", filename);
+        let filePath: string;
+        if (filename === 'tender-default.docx') {
+            // Serve system default template from root templates folder
+            filePath = join(process.cwd(), "templates", "tender-default.docx");
+        } else {
+            // Serve uploaded templates from public/templates
+            filePath = join(process.cwd(), "public", "templates", filename);
+        }
 
         if (!existsSync(filePath)) {
             console.error(`Template not found at: ${filePath}`);
