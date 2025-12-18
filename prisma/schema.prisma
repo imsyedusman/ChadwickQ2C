@@ -74,6 +74,7 @@ model Item {
   
   notes       String?
   isDefault   Boolean  @default(false) // Was this auto-added?
+  isSheetmetal Boolean @default(false) // Counts towards sheetmetal total?
   
   order       Int      @default(0)
   
@@ -95,6 +96,7 @@ model CatalogItem {
   defaultQuantity Int      @default(1)
   notes           String?  // Vendor catalog: auto-add logic rules
   meterType       String?  // Direct, CT, NMI, Special
+  isSheetmetal    Boolean  @default(false)
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

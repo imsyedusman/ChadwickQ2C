@@ -18,7 +18,8 @@ export default function CostingView() {
         totalCost,
         profit,
         sellPrice,
-        sellPriceRounded
+        sellPriceRounded,
+        sheetmetalUplift
     } = totals;
 
     return (
@@ -49,8 +50,14 @@ export default function CostingView() {
                     <div className="space-y-1.5 text-xs">
                         <div className="flex justify-between text-gray-600">
                             <span>Materials</span>
-                            <span className="font-medium">{formatCurrency(materialCost, 0)}</span>
+                            <span className="font-medium">{formatCurrency(materialCost - sheetmetalUplift, 0)}</span>
                         </div>
+                        {sheetmetalUplift > 0 && (
+                            <div className="flex justify-between text-gray-500 text-[11px] pl-3">
+                                <span>+ Sheetmetal Uplift (4%)</span>
+                                <span>{formatCurrency(sheetmetalUplift, 0)}</span>
+                            </div>
+                        )}
                         {consumablesCost > 0 && (
                             <div className="flex justify-between text-gray-500 text-[11px] pl-3">
                                 <span>+ Consumables</span>

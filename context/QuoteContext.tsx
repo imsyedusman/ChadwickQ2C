@@ -36,7 +36,10 @@ export interface Item {
     labourHours: number;
     notes: string | null;
     isDefault?: boolean;
+    isSheetmetal?: boolean;
 }
+
+// ...
 
 export interface Board {
     id: string;
@@ -73,6 +76,8 @@ interface QuoteContextType {
         profit: number;
         sellPrice: number;
         sellPriceRounded: number;
+        sheetmetalSubtotal: number;
+        sheetmetalUplift: number;
     };
     grandTotals: {
         materialCost: number;
@@ -88,6 +93,8 @@ interface QuoteContextType {
         sellPriceRounded: number;
         gst: number;
         finalSellPrice: number;
+        sheetmetalSubtotal: number;
+        sheetmetalUplift: number;
     };
     selectedBoardId: string | null;
     setSelectedBoardId: (id: string | null) => void;
@@ -271,32 +278,60 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const calculateTotals = () => {
-        // Helper to calculate costs for a list of items
-        const calculateForItems = (items: Item[]) => {
-            let materialCost = 0;
-            let labourHours = 0;
+        if (!settings) return {
+            boardTotals: {
+                materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+                costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
+                sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+            },
+            grandTotals: {
+                materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+                costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
+                sellPrice: 0, sellPriceRounded: 0, gst: 0, finalSellPrice: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+            }
+        };
 
-            items.forEach(item => {
-                materialCost += (item.unitPrice || 0) * (item.quantity || 0);
-                labourHours += (item.labourHours || 0) * (item.quantity || 0);
-            });
+        const calculateForItems = (items: Item[], applySheetmetalUplift: boolean) => {
+            // 1. Base Costs
+            const baseMaterialCost = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+            const labourHours = items.reduce((sum, item) => sum + (item.labourHours * item.quantity), 0);
 
-            // 1. Labour Cost
-            const labourCost = labourHours * effectiveSettings.labourRate;
+            // Sheetmetal Logic
+            const sheetmetalSubtotal = items.reduce((sum, item) => {
+                if (item.isSheetmetal) {
+                    return sum + (item.unitPrice * item.quantity);
+                }
+                return sum;
+            }, 0);
 
-            // 2. Consumables Cost (percentage of material cost)
+            const sheetmetalUplift = applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0;
+
+            // Total Material = Base + Uplift
+            const materialCost = baseMaterialCost + sheetmetalUplift;
+
+            // 2. Labour Cost
+            const labourRate = effectiveSettings.labourRate || 0; // fallback
+            const labourCost = labourHours * labourRate;
+
+            // 3. Consumables
             const consumablesCost = materialCost * effectiveSettings.consumablesPct;
 
-            // 3. Cost Base = Material + Labour + Consumables
+            // 4. Cost Base (Prime Cost)
             const costBase = materialCost + labourCost + consumablesCost;
 
-            // 4. Overhead Cost (percentage of cost base)
+            // 5. Overheads
             const overheadAmount = costBase * effectiveSettings.overheadPct;
 
-            // 5. Engineering Cost (percentage of cost base)
+            // 6. Engineering
+            // Engineering is pct of (CostBase + Overhead) or just CostBase?
+            // Usually applied on top. Based on previous code:
+            // const totalCost = costBase + overheadAmount + engineeringCost;
+            // It seems engineering was calculated relative to something.
+            // Looking at previous session: engineeringCost = costBase * effectiveSettings.engineeringPct ?
+            // Let's assume on Cost Base for now.
             const engineeringCost = costBase * effectiveSettings.engineeringPct;
 
-            // 6. Total Cost = Cost Base + Overhead + Engineering
+            // Total Cost
             const totalCost = costBase + overheadAmount + engineeringCost;
 
             // 7. Sell Price = Total Cost / (1 - Target Margin)
@@ -321,17 +356,63 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 profit,
                 sellPrice,
                 sellPriceRounded,
+                sheetmetalSubtotal,
+                sheetmetalUplift
             };
         };
 
         // 1. Selected Board Totals
         const selectedBoard = boards.find(b => b.id === selectedBoardId);
-        // Fallback for totals calculation if selected ID is invalid/stale (though main UI handles this via render checks)
-        const boardTotals = calculateForItems(selectedBoard?.items || []);
 
-        // 2. Grand Totals (All Boards)
-        const allItems = boards.flatMap(b => b.items || []);
-        const grandTotalBase = calculateForItems(allItems);
+        // Safety check for config parsing
+        let selectedBoardConfig: any = {};
+        if (selectedBoard && selectedBoard.config) {
+            try {
+                selectedBoardConfig = typeof selectedBoard.config === 'string' ? JSON.parse(selectedBoard.config) : selectedBoard.config;
+            } catch (e) {
+                console.error("Failed to parse selected board config", e);
+            }
+        }
+
+        const isCustom = selectedBoardConfig?.enclosureType === 'Custom';
+
+        const boardTotals = calculateForItems(selectedBoard?.items || [], isCustom);
+
+        // 2. Grand Totals (Sum of all boards)
+        // Previous logic flattened items. New logic must sum board totals to respect per-board uplift rules.
+        const boardResults = boards.map(board => {
+            let config: any = {};
+            if (board.config) {
+                try {
+                    config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                } catch (e) {
+                    // ignore corrupted config
+                }
+            }
+            const isBoardCustom = config?.enclosureType === 'Custom';
+            return calculateForItems(board.items || [], isBoardCustom);
+        });
+
+        // Sum up all fields
+        const grandTotalBase = boardResults.reduce((acc, curr) => ({
+            materialCost: acc.materialCost + curr.materialCost,
+            labourHours: acc.labourHours + curr.labourHours,
+            labourCost: acc.labourCost + curr.labourCost,
+            consumablesCost: acc.consumablesCost + curr.consumablesCost,
+            costBase: acc.costBase + curr.costBase,
+            overheadAmount: acc.overheadAmount + curr.overheadAmount,
+            engineeringCost: acc.engineeringCost + curr.engineeringCost,
+            totalCost: acc.totalCost + curr.totalCost,
+            profit: acc.profit + curr.profit,
+            sellPrice: acc.sellPrice + curr.sellPrice,
+            sellPriceRounded: acc.sellPriceRounded + curr.sellPriceRounded,
+            sheetmetalSubtotal: acc.sheetmetalSubtotal + curr.sheetmetalSubtotal,
+            sheetmetalUplift: acc.sheetmetalUplift + curr.sheetmetalUplift
+        }), {
+            materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+            costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
+            sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+        });
 
         // Use rounded price for GST calculation
         const gst = grandTotalBase.sellPriceRounded * effectiveSettings.gstPct;

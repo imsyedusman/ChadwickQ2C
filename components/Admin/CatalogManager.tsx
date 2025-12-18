@@ -14,6 +14,7 @@ interface CatalogItem {
     labourHours: number;
     defaultQuantity: number;
     isAutoAdd: boolean;
+    isSheetmetal: boolean;
     notes: string;
     category: string;
 }
@@ -40,6 +41,7 @@ export default function CatalogManager({ category, title, description }: Catalog
         subcategory: 'Miscellaneous',
         defaultQuantity: 1,
         isAutoAdd: false,
+        isSheetmetal: false,
         unitPrice: 0,
         labourHours: 0
     });
@@ -153,6 +155,7 @@ export default function CatalogManager({ category, title, description }: Catalog
                     subcategory: 'Miscellaneous',
                     defaultQuantity: 1,
                     isAutoAdd: false,
+                    isSheetmetal: false,
                     unitPrice: 0,
                     labourHours: 0
                 });
@@ -185,6 +188,29 @@ export default function CatalogManager({ category, title, description }: Catalog
             }
         } catch (error) {
             setItems(prev => prev.map(i => i.id === item.id ? { ...i, isAutoAdd: !newVal } : i));
+            toast.error('Network error');
+        }
+    };
+
+    const toggleSheetmetal = async (item: CatalogItem) => {
+        // Optimistic update
+        const newVal = !item.isSheetmetal;
+        setItems(prev => prev.map(i => i.id === item.id ? { ...i, isSheetmetal: newVal } : i));
+
+        try {
+            const res = await fetch(`/api/catalog/${item.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isSheetmetal: newVal })
+            });
+
+            if (!res.ok) {
+                // Revert
+                setItems(prev => prev.map(i => i.id === item.id ? { ...i, isSheetmetal: !newVal } : i));
+                toast.error('Failed to update status');
+            }
+        } catch (error) {
+            setItems(prev => prev.map(i => i.id === item.id ? { ...i, isSheetmetal: !newVal } : i));
             toast.error('Network error');
         }
     };
@@ -296,6 +322,26 @@ export default function CatalogManager({ category, title, description }: Catalog
                                 className="px-3 py-2 border border-blue-200 rounded text-sm w-full"
                             />
                         </div>
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 text-sm text-blue-800">
+                                <input
+                                    type="checkbox"
+                                    checked={createForm.isAutoAdd || false}
+                                    onChange={(e) => setCreateForm({ ...createForm, isAutoAdd: e.target.checked })}
+                                    className="w-4 h-4 text-blue-600 rounded"
+                                />
+                                Auto-Add
+                            </label>
+                            <label className="flex items-center gap-2 text-sm text-blue-800">
+                                <input
+                                    type="checkbox"
+                                    checked={createForm.isSheetmetal || false}
+                                    onChange={(e) => setCreateForm({ ...createForm, isSheetmetal: e.target.checked })}
+                                    className="w-4 h-4 text-blue-600 rounded"
+                                />
+                                Sheetmetal
+                            </label>
+                        </div>
                     </div>
                     <div className="flex justify-end gap-3">
                         <button
@@ -338,7 +384,8 @@ export default function CatalogManager({ category, title, description }: Catalog
                                         <th className="px-4 py-3 text-right font-medium w-24">Price</th>
                                         <th className="px-4 py-3 text-right font-medium w-24">Labour (h)</th>
                                         <th className="px-4 py-3 text-center font-medium w-20">Def. Qty</th>
-                                        <th className="px-4 py-3 text-center font-medium w-24">Auto-Add</th>
+                                        <th className="px-4 py-3 text-center font-medium w-16">Auto</th>
+                                        <th className="px-4 py-3 text-center font-medium w-16">Sheet</th>
                                         <th className="px-4 py-3 text-center font-medium w-24">Actions</th>
                                     </tr>
                                 </thead>
@@ -407,6 +454,16 @@ export default function CatalogManager({ category, title, description }: Catalog
                                                             />
                                                         </div>
                                                     </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <div className="flex justify-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={editForm.isSheetmetal || false}
+                                                                onChange={(e) => setEditForm({ ...editForm, isSheetmetal: e.target.checked })}
+                                                                className="w-4 h-4 text-blue-600 rounded"
+                                                            />
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <button
@@ -441,11 +498,29 @@ export default function CatalogManager({ category, title, description }: Catalog
                                                                 "relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
                                                                 item.isAutoAdd ? "bg-blue-600" : "bg-gray-200"
                                                             )}
+                                                            title="Toggle Auto-Add"
                                                         >
                                                             <span
                                                                 className={cn(
                                                                     "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
                                                                     item.isAutoAdd ? "translate-x-4" : "translate-x-1"
+                                                                )}
+                                                            />
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <button
+                                                            onClick={() => toggleSheetmetal(item)}
+                                                            className={cn(
+                                                                "relative inline-flex h-4 w-8 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                                                                item.isSheetmetal ? "bg-blue-600" : "bg-gray-200"
+                                                            )}
+                                                            title="Toggle Sheetmetal Inclusion"
+                                                        >
+                                                            <span
+                                                                className={cn(
+                                                                    "inline-block h-3 w-3 transform rounded-full bg-white transition-transform",
+                                                                    item.isSheetmetal ? "translate-x-4" : "translate-x-1"
                                                                 )}
                                                             />
                                                         </button>

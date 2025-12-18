@@ -30,7 +30,10 @@ interface CatalogItem {
     description: string;
     unitPrice: number;
     labourHours: number;
+    isSheetmetal?: boolean;
 }
+
+
 
 const CT_BASE_ITEMS = [
     'CT-COMPARTMENTS',
@@ -639,7 +642,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             if (existingItem.quantity !== newQty ||
                 (Math.abs(existingItem.unitPrice - newUnitPrice) > 0.01) ||
                 (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
-                (forcedCategory && existingItem.category !== forcedCategory)) {
+                (forcedCategory && existingItem.category !== forcedCategory) ||
+                (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false))) {
 
                 await prisma.item.update({
                     where: { id: existingItem.id },
@@ -648,7 +652,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         unitPrice: newUnitPrice,
                         labourHours: newLabour,
                         cost: newUnitPrice * newQty,
-                        category: forcedCategory || existingItem.category // Enforce basics/busbar if needed
+                        category: forcedCategory || existingItem.category, // Enforce basics/busbar if needed
+                        isSheetmetal: catalogItem?.isSheetmetal || false
                     }
                 });
             }
@@ -711,7 +716,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     labourHours: finalLabourHours,
                     quantity: targetQty,
                     cost: finalUnitPrice * targetQty,
-                    isDefault: true
+                    isDefault: true,
+                    isSheetmetal: catalogItem?.isSheetmetal || false
                 }
             });
         }

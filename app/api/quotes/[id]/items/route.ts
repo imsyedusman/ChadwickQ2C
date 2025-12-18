@@ -14,6 +14,14 @@ export async function POST(
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        // Lookup catalog item to check isSheetmetal (if not explicit in future)
+        // We do this efficiently - only if needed or generic. 
+        // For accurate pricing logic, we trust the catalog source of truth.
+        const catalogItem = await prisma.catalogItem.findFirst({
+            where: { partNumber: name }
+        });
+        const isSheetmetal = catalogItem?.isSheetmetal || false;
+
         // Check if an item with the same identifying characteristics already exists
         // Match by: category, subcategory, name, and description (unique identifier for an item)
         const existingItem = await prisma.item.findFirst({
@@ -34,6 +42,7 @@ export async function POST(
                 data: {
                     quantity: newQuantity,
                     cost: newQuantity * existingItem.unitPrice,
+                    isSheetmetal: isSheetmetal // Update flag in case it changed in catalog
                 },
             });
 
@@ -56,6 +65,7 @@ export async function POST(
                 cost,
                 notes,
                 isDefault: isDefault || false,
+                isSheetmetal: isSheetmetal
             },
         });
 
