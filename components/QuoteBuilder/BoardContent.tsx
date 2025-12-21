@@ -5,6 +5,7 @@ import { useQuote, Item } from '@/context/QuoteContext';
 import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
+import BoardSummary from './BoardSummary';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -259,6 +260,7 @@ export default function BoardContent() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <BoardSummary />
                 {items.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
                         <p>No items added yet.</p>

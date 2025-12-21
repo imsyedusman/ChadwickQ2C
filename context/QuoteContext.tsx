@@ -78,6 +78,7 @@ interface QuoteContextType {
         sellPriceRounded: number;
         sheetmetalSubtotal: number;
         sheetmetalUplift: number;
+        cubicSubtotal: number;
     };
     grandTotals: {
         materialCost: number;
@@ -95,6 +96,7 @@ interface QuoteContextType {
         finalSellPrice: number;
         sheetmetalSubtotal: number;
         sheetmetalUplift: number;
+        cubicSubtotal: number;
     };
     selectedBoardId: string | null;
     setSelectedBoardId: (id: string | null) => void;
@@ -282,12 +284,12 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             boardTotals: {
                 materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
                 costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-                sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+                sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
             },
             grandTotals: {
                 materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
                 costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-                sellPrice: 0, sellPriceRounded: 0, gst: 0, finalSellPrice: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+                sellPrice: 0, sellPriceRounded: 0, gst: 0, finalSellPrice: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
             }
         };
 
@@ -299,6 +301,15 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             // Sheetmetal Logic
             const sheetmetalSubtotal = items.reduce((sum, item) => {
                 if (item.isSheetmetal) {
+                    return sum + (item.unitPrice * item.quantity);
+                }
+                return sum;
+            }, 0);
+
+            // Cubic Logic
+            const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
+            const cubicSubtotal = items.reduce((sum, item) => {
+                if (item.subcategory === CUBIC_SUBCATEGORY) {
                     return sum + (item.unitPrice * item.quantity);
                 }
                 return sum;
@@ -323,12 +334,6 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             const overheadAmount = costBase * effectiveSettings.overheadPct;
 
             // 6. Engineering
-            // Engineering is pct of (CostBase + Overhead) or just CostBase?
-            // Usually applied on top. Based on previous code:
-            // const totalCost = costBase + overheadAmount + engineeringCost;
-            // It seems engineering was calculated relative to something.
-            // Looking at previous session: engineeringCost = costBase * effectiveSettings.engineeringPct ?
-            // Let's assume on Cost Base for now.
             const engineeringCost = costBase * effectiveSettings.engineeringPct;
 
             // Total Cost
@@ -357,14 +362,14 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 sellPrice,
                 sellPriceRounded,
                 sheetmetalSubtotal,
-                sheetmetalUplift
+                sheetmetalUplift,
+                cubicSubtotal
             };
         };
 
         // 1. Selected Board Totals
         const selectedBoard = boards.find(b => b.id === selectedBoardId);
 
-        // Safety check for config parsing
         let selectedBoardConfig: any = {};
         if (selectedBoard && selectedBoard.config) {
             try {
@@ -379,15 +384,12 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         const boardTotals = calculateForItems(selectedBoard?.items || [], isCustom);
 
         // 2. Grand Totals (Sum of all boards)
-        // Previous logic flattened items. New logic must sum board totals to respect per-board uplift rules.
         const boardResults = boards.map(board => {
             let config: any = {};
             if (board.config) {
                 try {
                     config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
-                } catch (e) {
-                    // ignore corrupted config
-                }
+                } catch (e) { /* ignore */ }
             }
             const isBoardCustom = config?.enclosureType === 'Custom';
             return calculateForItems(board.items || [], isBoardCustom);
@@ -407,11 +409,12 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             sellPrice: acc.sellPrice + curr.sellPrice,
             sellPriceRounded: acc.sellPriceRounded + curr.sellPriceRounded,
             sheetmetalSubtotal: acc.sheetmetalSubtotal + curr.sheetmetalSubtotal,
-            sheetmetalUplift: acc.sheetmetalUplift + curr.sheetmetalUplift
+            sheetmetalUplift: acc.sheetmetalUplift + curr.sheetmetalUplift,
+            cubicSubtotal: acc.cubicSubtotal + curr.cubicSubtotal
         }), {
             materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
             costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-            sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0
+            sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
         });
 
         // Use rounded price for GST calculation
