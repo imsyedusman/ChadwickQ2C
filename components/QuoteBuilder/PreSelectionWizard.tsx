@@ -115,7 +115,9 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
         isOver50kA: 'No',
         isNonStandardColour: 'No',
         boardWidth: undefined,
-        shippingSections: 1
+        shippingSections: 1,
+        cableZones: 'No',
+        cableZoneCount: 0
     });
 
     const [validationError, setValidationError] = useState<string | null>(null);
@@ -163,7 +165,9 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     isOver50kA: 'No',
                     isNonStandardColour: 'No',
                     boardWidth: undefined,
-                    shippingSections: 1
+                    shippingSections: 1,
+                    cableZones: 'No',
+                    cableZoneCount: 0
                 });
             }
         }
@@ -269,6 +273,9 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
             return !!config.type && !!config.name && !!config.location && !!config.enclosureType && !!config.material;
         }
         if (step === 2) {
+            if (config.cableZones === 'Yes' && (!config.cableZoneCount || config.cableZoneCount < 1)) {
+                return false;
+            }
             return true; // Construction fields are optional/numeric
         }
         return true;
@@ -485,6 +492,36 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             </div>
                         </div>
                     )}
+                </div>
+
+                {/* Cable Zones (Added 2025-12-23) */}
+                <div className="mt-6 border-t border-gray-100 pt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Cable Zones?</label>
+                            <select
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.cableZones || 'No'}
+                                onChange={e => setConfig({ ...config, cableZones: e.target.value })}
+                            >
+                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                        </div>
+
+                        {config.cableZones === 'Yes' && (
+                            <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Number of Cable Zones</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                    value={config.cableZoneCount || ''}
+                                    onChange={e => setConfig({ ...config, cableZoneCount: parseInt(e.target.value) || 0 })}
+                                    placeholder="Number of zones..."
+                                />
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Cubic Options */}

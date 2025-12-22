@@ -20,6 +20,8 @@ export interface BoardConfig {
     insulationLevel?: 'none' | 'air' | 'fully';
     boardWidth?: number; // Metres
     shippingSections?: number; // Integer, min 1
+    cableZones?: string; // 'Yes' | 'No'
+    cableZoneCount?: number;
     [key: string]: any;
 }
 
@@ -150,7 +152,8 @@ const SHEET_METAL_BASE_ITEMS = [
     '1B-BASE',
     '1B-DOORS',
     '1B-600MM',
-    '1B-800MM'
+    '1B-800MM',
+    'MISC-CABLE-TRAY'
 ];
 
 const CUBIC_OPTIONS_ITEMS = [
@@ -267,6 +270,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             addTarget('1B-800MM', tierCount, 1000);
         }
         // 400mm falls through, no target added (so it will be removed if present)
+    }
+
+    // New 2025-12-23: Cable Zones
+    // Rule: If Cable Zones = Yes, add MISC-CABLE-TRAY * Count
+    if (config.cableZones === 'Yes' && (config.cableZoneCount || 0) > 0) {
+        addTarget('MISC-CABLE-TRAY', config.cableZoneCount || 1);
     }
 
     // --- METERING LOGIC ---
@@ -624,7 +633,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B-SS-2B', '1B-SS-NO4',
         ...CUBIC_OPTIONS_ITEMS,
         BUSBAR_INSULATION_ITEM,
-        'MISC-SITE-RECONNECTION'
+        'MISC-SITE-RECONNECTION',
+        'MISC-CABLE-TRAY'
     ];
 
     // Also add Busbars/Labour patterns to removal check
