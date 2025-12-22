@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "npx prisma migrate deploy && next start",
+    "start": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/deploy.ts && next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
     "db:deploy": "prisma migrate deploy",
