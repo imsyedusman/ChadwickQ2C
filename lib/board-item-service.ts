@@ -269,10 +269,48 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         // 400mm falls through, no target added (so it will be removed if present)
     }
 
-    // D. CT Metering
+    // --- METERING LOGIC ---
+    // Refactored 2025-12-22 to enforce strict mutual exclusivity (CT > WC)
+
+    // 1. Determine METERING MODE
+    // CT Mode applies if:
+    // a) Explicitly selected (ctMetering = 'Yes')
+    // b) Current Rating > 100A (Implies SACT)
+    // c) NOTE: We parse currentRating to handle '400A' or '400' or empty
+    const amps = parseInt((config.currentRating || '0').replace(/[^0-9]/g, '')) || 0;
+    const isCtMode = (config.ctMetering === 'Yes') || (amps > 100);
+
+    // WC Mode applies if:
+    // a) Explicitly selected (wholeCurrentMetering = 'Yes')
+    // b) AND NOT in CT Mode (Mutual Exclusivity)
+    const isWcMode = (config.wholeCurrentMetering === 'Yes') && !isCtMode;
+
+    const meterPanelSelected = config.meterPanel === 'Yes';
     const ctQty = config.ctQuantity || 1;
-    if (config.ctMetering === 'Yes') {
-        CT_BASE_ITEMS.forEach(pn => addTarget(pn, ctQty));
+
+    // 2. APPLY LOGIC
+
+    // D. CT Metering (SACT)
+    if (isCtMode) {
+        // Add CT Base Items
+        CT_BASE_ITEMS.forEach(pn => {
+            // Special handling: CT-PANEL
+            // Rule: "Must use the $80 CT meter panel".
+            // Typically CT-PANEL is in CT_BASE_ITEMS? Yes.
+            // But if meterPanelSelected is FALSE, do we suppress it?
+            // The prompt says "Must use the $80 CT meter panel" for SACT.
+            // Usually SACT *implies* a meter panel.
+            // But old logic was: if ctMetering='Yes', add CT_BASE_ITEMS (which includes CT-PANEL).
+            // AND if meterPanel='Yes', add METER_PANEL_ITEMS (which added 100A-PANEL!).
+            // So: We should add CT-PANEL if isCtMode is true OR meterPanel is selected?
+            // "When SACT is selected... Must use the $80 CT meter panel"
+            // "If User checks 'Meter Panel', it should add the CORRECT panel"
+            // Let's assume CT items (chamber/wiring) always needed for CT.
+            // Panel itself might be optional? But prompt says "Must use $80 CT meter panel".
+            // I will add CT_BASE_ITEMS always for CT Mode.
+            addTarget(pn, ctQty);
+        });
+
         if (config.ctType) addTarget(`CT-${config.ctType}-TYPE`, ctQty);
 
         if (config.currentRating && config.enclosureType) {
@@ -283,27 +321,58 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const labour = getLabourPartNumber(config.currentRating);
             if (labour) addTarget(labour, ctQty);
         }
+
+        // Logic Check: Did we add CT-PANEL?
+        // CT_BASE_ITEMS = ['CT-COMPARTMENTS', 'CT-PANEL', 'CT-TEST-BLOCK', 'CT-WIRING']
+        // Yes, it is added.
+
+        // Wait, if user UNCHECKED "Meter Panel" but has CT... do they still get a panel?
+        // Prompt: "Must use the $80 CT meter panel".
+        // It seems bundled. I will leave it as is.
     }
 
-    // E. Meter Panel
-    if (config.meterPanel === 'Yes') {
-        METER_PANEL_ITEMS.forEach(pn => addTarget(pn, ctQty));
-    }
-
-    // F. Whole Current
-    if (config.wholeCurrentMetering === 'Yes') {
+    // E. Whole Current Metering
+    if (isWcMode) {
         const wcQty = config.wcQuantity || 1;
+
+        // Add 100A Meter Panel?
+        // Rule: "Must use the $60 100A meter panel"
+        // Prompt says: "Whole Current -> $60 panel".
+        // Was it conditional on "Meter Panel" existing?
+        // Old logic: "if wholeCurrentMetering='Yes' -> Add fuse, link, mcb... but NOT panel explicitly in this block?"
+        // Old logic expected METER_PANEL_ITEMS (Section E) to add it if 'meterPanel'='Yes'.
+        // NEW LOGIC: We should add it if isWcMode is TRUE.
+        // But what if user didn't check "Meter Panel"?
+        // Usually "Whole Current Metering" implies the kit.
+        // I will add 100A-PANEL here.
+        addTarget('100A-PANEL', wcQty);
+
         if (config.wcType === '100A wiring 3-phase') {
             addTarget('100A-FUSE', wcQty * 3);
-            addTarget('100A-PANEL', wcQty);
             addTarget('100A-NEUTRAL-LINK', wcQty);
             addTarget('100A-MCB-3PH', wcQty);
         } else if (config.wcType === '100A wiring 1-phase') {
             addTarget('100A-FUSE', wcQty);
-            addTarget('100A-PANEL', wcQty);
             addTarget('100A-NEUTRAL-LINK', wcQty);
             addTarget('100A-MCB-1PH', wcQty);
         }
+    }
+
+    // F. "Meter Panel" Checkbox (Legacy/Helper)
+    // If the user selected "Meter Panel" = Yes, but NEITHER CT nor WC is strictly active?
+    // (e.g. they just want a panel, no metering logic?)
+    // Or if they are in a mode, ensuring checking that box doesn't break things.
+    // If isCtMode, we already added CT-PANEL.
+    // If isWcMode, we already added 100A-PANEL.
+    // So this Flag is mostly redundant OR used to force a panel if one wasn't added?
+    // For safety: If meterPanelSelected is YES, and we haven't added a panel yet...
+    // default to 100A-PANEL? Or CT-PANEL?
+    // Probably 100A-PANEL is the default "Meter Panel".
+    // But be careful not to add it if isCtMode!
+
+    if (meterPanelSelected && !isCtMode && !isWcMode) {
+        // Standalone Meter Panel usage (rare?). Default to 100A-PANEL.
+        addTarget('100A-PANEL', ctQty);
     }
 
     // G. Site Reconnection (Auto-Add)
