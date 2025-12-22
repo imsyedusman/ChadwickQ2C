@@ -14,7 +14,13 @@ async function runVerification() {
     if (existingQuote) {
         quoteId = existingQuote.id;
     } else {
-        const q = await prisma.quote.create({ data: { number: 'TEST-Q', version: 1, name: 'TEST' } });
+        const q = await prisma.quote.create({
+            data: {
+                quoteNumber: 'TEST-Q',
+                projectRef: 'TEST',
+                status: 'DRAFT'
+            }
+        });
         quoteId = q.id;
     }
 
@@ -22,10 +28,13 @@ async function runVerification() {
         data: {
             quoteId: quoteId,
             name: 'VERIFY-METERING',
-            placement: 'Indoor',
-            installation: 'Wall mount',
-            sensorOrientation: 'Bottom',
-            fieldWiringOrientation: 'Bottom'
+            type: 'Main Switchboard',
+            config: JSON.stringify({
+                placement: 'Indoor',
+                installation: 'Wall mount',
+                sensorOrientation: 'Bottom',
+                fieldWiringOrientation: 'Bottom'
+            })
         }
     });
 
