@@ -5,14 +5,18 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx prisma migrate deploy && next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
+    "db:deploy": "prisma migrate deploy",
     "db:seed:busbars": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/import-busbars.ts",
     "db:seed:vendor": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/import-vendor-catalog.ts",
     "db:export": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/export-catalog.ts",
     "db:import": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/import-catalog.ts",
     "db:push": "prisma db push"
+  },
+  "prisma": {
+    "seed": "npx ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
