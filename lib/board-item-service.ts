@@ -410,6 +410,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         targetItemPartNumbers.add('1A-COMPARTMENTS');
     }
 
+    // Ensure SS Items are targeted before fetch so we get their Catalog Description
+    if (config.enclosureType === 'Custom' && config.material === 'Powder 316 Stainless Steel') {
+        targetItemPartNumbers.add('1B-SS-2B');
+    } else if (config.enclosureType === 'Custom' && config.material === '316 Stainless Steel Natural Finish') {
+        targetItemPartNumbers.add('1B-SS-NO4');
+    }
+
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     // Fetch catalog info for all targets
