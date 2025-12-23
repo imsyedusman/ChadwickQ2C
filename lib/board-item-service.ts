@@ -152,8 +152,7 @@ const SHEET_METAL_BASE_ITEMS = [
     '1B-BASE',
     '1B-DOORS',
     '1B-600MM',
-    '1B-800MM',
-    'MISC-CABLE-TRAY'
+    '1B-800MM'
 ];
 
 const CUBIC_OPTIONS_ITEMS = [
@@ -402,9 +401,27 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
 
-    // --- 3. STAINLESS UPLIFT CALCULATION ---
+
+    // --- 3. FETCH CATALOG DATA (MOVED UP) ---
+    // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
+
+    // Ensure 1A-COMPARTMENTS is targeted for Cubic before fetch
+    if (config.enclosureType === 'Cubic') {
+        targetItemPartNumbers.add('1A-COMPARTMENTS');
+    }
+
+    const targetPartNumbersArray = Array.from(targetItemPartNumbers);
+
+    // Fetch catalog info for all targets
+    const catalogItems = await prisma.catalogItem.findMany({
+        where: { partNumber: { in: targetPartNumbersArray } }
+    });
+    const catalogMap = new Map<string, CatalogItem>();
+    catalogItems.forEach((i: any) => { if (i.partNumber) catalogMap.set(i.partNumber, i); });
+
+
+    // --- 4. STAINLESS UPLIFT CALCULATION ---
     // Zero-Tier Check: If tierCount == 0, we don't do uplift (Misc/Base/Tiers are gone).
-    // Technically compartments/doors might exist, but usually Custom board implies tiers.
     // Requirement: "If tiers go to 0... Stainless uplift should be removed"
 
     if (tierCount > 0 && config.enclosureType === 'Custom' &&
@@ -414,30 +431,33 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         let S = 0;
 
         for (const itemPn of SHEET_METAL_BASE_ITEMS) {
-            // Priority:
-            // 1. Is it a target we just defined with a custom price? (e.g. 1B-BASE)
-            // 2. Is it in existingItems (manual or previously synced)?
-            // 3. (Catalog lookup is hard here without fetching, but we assume these items exist if they matter)
-
-            let itemCost = 0;
-            const targetPrice = customPricing.get(itemPn);
+            // Determine Qty
             const targetQty = itemQuantities.get(itemPn);
             const existing = existingItems.find(i => i.name === itemPn);
 
-            if (targetPrice !== undefined && targetQty !== undefined) {
-                // We are setting this price specifically (e.g. 1B-BASE)
-                itemCost = targetPrice * targetQty;
+            // Priority for Qty: Target > Existing > 0
+            const qty = targetQty !== undefined ? targetQty : (existing?.quantity || 0);
+
+            if (qty <= 0) continue;
+
+            // Determine Unit Price
+            // Priority: Custom Target Price > Existing Price > Catalog Price > 0
+            let unitPrice = 0;
+
+            if (customPricing.has(itemPn)) {
+                unitPrice = customPricing.get(itemPn)!;
             } else if (existing) {
-                // Use existing item cost (respect manual edits)
-                // If item IS in our target list (e.g. 1B-TIERS-400), we expect to use the TARGET Qty * Existing Price
-                // UNLESS we have a target Price.
-
-                const qtyToUse = targetItemPartNumbers.has(itemPn) && itemQuantities.has(itemPn)
-                    ? itemQuantities.get(itemPn)!
-                    : existing.quantity;
-
-                itemCost = existing.unitPrice * qtyToUse;
+                unitPrice = existing.unitPrice;
+            } else {
+                // Determine form catalog
+                const catParams = catalogMap.get(itemPn);
+                unitPrice = catParams?.unitPrice || 0;
             }
+
+            const itemCost = qty * unitPrice;
+
+            console.log(`[SS Uplift] Item: ${itemPn}, Qty: ${qty}, Price: ${unitPrice}, Cost: ${itemCost}`);
+
             S += itemCost;
         }
 
@@ -446,27 +466,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const upliftCost = S * factor;
         const upliftItemName = config.material === 'Powder 316 Stainless Steel' ? '1B-SS-2B' : '1B-SS-NO4';
 
-        console.log(`Stainless Uplift: S=${S}, Factor=${factor}, Item=${upliftItemName}, Cost=${upliftCost}`);
+        console.log(`Stainless Uplift: TotalBase=${S}, Factor=${factor}, Item=${upliftItemName}, Uplift=${upliftCost}`);
 
         addTarget(upliftItemName, 1, upliftCost);
     }
 
-
-    // --- 3.5 PREPARE CATALOG MAP (Needed for Busbar Logic & DB Ops) ---
-    // We need to look up 1A-COMPARTMENTS price for calculation even if it's not a target yet (though it should be)
-    if (config.enclosureType === 'Cubic') {
-        targetItemPartNumbers.add('1A-COMPARTMENTS');
-    }
-    const targetPartNumbersArray = Array.from(targetItemPartNumbers);
-
-    // Fetch catalog info for all targets (to get descriptions, defaults, and prices for non-customized items)
-    const catalogItems = await prisma.catalogItem.findMany({
-        where: { partNumber: { in: targetPartNumbersArray } }
-    });
-    const catalogMap = new Map<string, CatalogItem>();
-    catalogItems.forEach((i: any) => { if (i.partNumber) catalogMap.set(i.partNumber, i); });
-
-    // --- 3.6 CUBIC OPTIONS LOGIC (Post-Catalog Fetch) ---
+    // --- 5. CUBIC OPTIONS LOGIC (Post-Catalog Fetch) ---
     // We need the catalog unit price for 1A-COMPARTMENTS to calculate 50kA cost
     if (config.enclosureType === 'Cubic' && (config.totalCompartments || 0) > 0) {
         const totalCompartments = config.totalCompartments || 0;
