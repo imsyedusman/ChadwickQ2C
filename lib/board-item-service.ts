@@ -225,7 +225,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             addTarget('1A-TIERS', tierCount);
         } else {
             // Default to Custom logic
-            addTarget('1B-TIERS-400', tierCount);
+            // Dynamic Pricing for 1B-TIERS-400
+            // Rule: 1 Tier = $1800, >1 Tier = $1400 each
+            const tierPrice = tierCount === 1 ? 1800 : 1400;
+            addTarget('1B-TIERS-400', tierCount, tierPrice);
         }
     }
 
@@ -692,7 +695,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-                'MISC-SITE-RECONNECTION'
+                'MISC-SITE-RECONNECTION',
+                '1B-TIERS-400'
             ];
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
 
@@ -760,7 +764,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-                'MISC-SITE-RECONNECTION'
+                'MISC-SITE-RECONNECTION',
+                '1B-TIERS-400'
             ];
 
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
