@@ -394,7 +394,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // console.log(`[Site Reconnection Check] Width: ${boardWidth}, Sections: ${shippingSections}`); // noisy log removed
 
-    if (boardWidth > 4 && shippingSections > 1) {
+    if (boardWidth > 4) {
         const reconnectionUnits = Math.floor((shippingSections + 1) / 2);
         if (reconnectionUnits > 0) {
             addTarget('MISC-SITE-RECONNECTION', reconnectionUnits);
@@ -707,7 +707,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-                'MISC-SITE-RECONNECTION',
+
                 '1B-TIERS-400'
             ];
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
@@ -776,7 +776,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-                'MISC-SITE-RECONNECTION',
+
                 '1B-TIERS-400'
             ];
 
