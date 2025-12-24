@@ -16,6 +16,7 @@ function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
+    const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
 
     if (loading) {
         return (
@@ -174,25 +175,11 @@ function QuoteBuilderContent() {
                         </button>
                     )}
 
-                    {/* Panel 2: Board Content & Item Selection (Vertically Resizable) */}
+                    {/* Panel 2: Board Content (Full Height) */}
                     <Panel defaultSize={60} minSize={40}>
-                        <PanelGroup direction="vertical">
-                            {/* Top: Selected Items */}
-                            <Panel defaultSize={45} minSize={20} maxSize={80}>
-                                <div className="h-full border-b border-gray-200 overflow-hidden">
-                                    <BoardContent />
-                                </div>
-                            </Panel>
-
-                            <PanelResizeHandle className="h-1 bg-gray-200 hover:bg-blue-500 transition-colors" />
-
-                            {/* Bottom: Catalog */}
-                            <Panel defaultSize={55} minSize={20}>
-                                <div className="h-full overflow-hidden flex flex-col">
-                                    <ItemSelection />
-                                </div>
-                            </Panel>
-                        </PanelGroup>
+                        <div className="h-full bg-white flex flex-col">
+                            <BoardContent onAddItems={() => setIsItemDrawerOpen(true)} />
+                        </div>
                     </Panel>
 
                     <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-500 transition-colors relative group">
@@ -232,7 +219,25 @@ function QuoteBuilderContent() {
                     )}
                 </PanelGroup>
             </div>
-        </div>
+
+            {/* Item Selection Drawer */}
+            {
+                isItemDrawerOpen && (
+                    <div className="fixed inset-0 z-50 flex justify-end">
+                        {/* Backdrop */}
+                        <div
+                            className="fixed inset-0 bg-black/20 backdrop-blur-sm transition-opacity"
+                            onClick={() => setIsItemDrawerOpen(false)}
+                        />
+
+                        {/* Slide-over Panel */}
+                        <div className="relative w-full max-w-xl bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
+                            <ItemSelection onClose={() => setIsItemDrawerOpen(false)} />
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
 

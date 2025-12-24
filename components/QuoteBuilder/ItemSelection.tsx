@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2 } from 'lucide-react';
+import { Search, Plus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X } from 'lucide-react';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,11 @@ interface CatalogItem {
     meterType?: string | null;
 }
 
-export default function ItemSelection() {
+interface ItemSelectionProps {
+    onClose?: () => void;
+}
+
+export default function ItemSelection({ onClose }: ItemSelectionProps) {
     const { addItemToBoard, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
 
@@ -326,7 +330,14 @@ export default function ItemSelection() {
             {/* Header & Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 pt-4 pb-0 shadow-sm z-10">
                 <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800">Item Selection</h2>
+                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                        {onClose && (
+                            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full mr-1 transition-colors">
+                                <X size={20} className="text-gray-500" />
+                            </button>
+                        )}
+                        Item Selection
+                    </h2>
                     <div className="relative w-64">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                         <input

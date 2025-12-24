@@ -11,7 +11,11 @@ import BoardSummary from './BoardSummary';
 // Using singular form to match database schema
 const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
 
-export default function BoardContent() {
+interface BoardContentProps {
+    onAddItems?: () => void;
+}
+
+export default function BoardContent({ onAddItems }: BoardContentProps) {
     const { boards, selectedBoardId, updateItem, removeItem } = useQuote();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
@@ -229,6 +233,15 @@ export default function BoardContent() {
                     <p className="text-xs text-gray-500">{items.length} items selected</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    {onAddItems && (
+                        <button
+                            onClick={onAddItems}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all"
+                        >
+                            <Plus size={16} />
+                            Add Items
+                        </button>
+                    )}
                     <button
                         onClick={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
