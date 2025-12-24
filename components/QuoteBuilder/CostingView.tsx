@@ -26,7 +26,7 @@ export default function CostingView() {
     const marginPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
     return (
-        <div className="flex flex-col h-full bg-gray-50/50">
+        <div className="flex flex-col">
             {/* Sticky Financials Hero Card */}
             <FinancialsHeroCard
                 title="Board Financials"
