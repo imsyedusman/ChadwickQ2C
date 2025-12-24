@@ -26,34 +26,34 @@ async function runTests() {
     console.log(`Created Test Board: ${board.id}`);
 
     try {
-        // Test 1: Width 3.5m (<=4), Sections 1 => No Item
-        console.log('\nTest 1: Width 3.5m, Sections 1 (Expect 0)');
-        await syncBoardItems(board.id, createConfig(3.5, 1));
+        // Test 1: Width 3500mm (<=4000), Sections 1 => No Item
+        console.log('\nTest 1: Width 3500mm, Sections 1 (Expect 0)');
+        await syncBoardItems(board.id, createConfig(3500, 1));
         await checkItem(board.id, 0);
 
-        // Test 2: Width 4.5m (>4), Sections 1 => No Item
-        console.log('\nTest 2: Width 4.5m, Sections 1 (Expect 0)');
-        await syncBoardItems(board.id, createConfig(4.5, 1));
-        await checkItem(board.id, 0);
-
-        // Test 3: Width 4.5m, Sections 2 => Reconnection = TRUNC((2+1)/2) = 1
-        console.log('\nTest 3: Width 4.5m, Sections 2 (Expect 1)');
-        await syncBoardItems(board.id, createConfig(4.5, 2));
+        // Test 2: Width 4500mm (>4000), Sections 1 => Reconnection = TRUNC((1+1)/2) = 1
+        console.log('\nTest 2: Width 4500mm, Sections 1 (Expect 1)');
+        await syncBoardItems(board.id, createConfig(4500, 1));
         await checkItem(board.id, 1);
 
-        // Test 4: Width 4.5m, Sections 3 => Reconnection = TRUNC((3+1)/2) = 2
-        console.log('\nTest 4: Width 4.5m, Sections 3 (Expect 2)');
-        await syncBoardItems(board.id, createConfig(4.5, 3));
+        // Test 3: Width 4500mm, Sections 2 => Reconnection = TRUNC((2+1)/2) = 1
+        console.log('\nTest 3: Width 4500mm, Sections 2 (Expect 1)');
+        await syncBoardItems(board.id, createConfig(4500, 2));
+        await checkItem(board.id, 1);
+
+        // Test 4: Width 4500mm, Sections 3 => Reconnection = TRUNC((3+1)/2) = 2
+        console.log('\nTest 4: Width 4500mm, Sections 3 (Expect 2)');
+        await syncBoardItems(board.id, createConfig(4500, 3));
         await checkItem(board.id, 2);
 
-        // Test 5: Width 4.5m, Sections 5 => Reconnection = TRUNC((5+1)/2) = 3
-        console.log('\nTest 5: Width 4.5m, Sections 5 (Expect 3)');
-        await syncBoardItems(board.id, createConfig(4.5, 5));
+        // Test 5: Width 4500mm, Sections 5 => Reconnection = TRUNC((5+1)/2) = 3
+        console.log('\nTest 5: Width 4500mm, Sections 5 (Expect 3)');
+        await syncBoardItems(board.id, createConfig(4500, 5));
         await checkItem(board.id, 3);
 
-        // Test 6: Revert to Width 3.9m => Item Removed
-        console.log('\nTest 6: Width 3.9m, Sections 5 (Expect 0 - Removed)');
-        await syncBoardItems(board.id, createConfig(3.9, 5));
+        // Test 6: Revert to Width 3900mm => Item Removed
+        console.log('\nTest 6: Width 3900mm, Sections 5 (Expect 0 - Removed)');
+        await syncBoardItems(board.id, createConfig(3900, 5));
         await checkItem(board.id, 0);
 
     } catch (e) {

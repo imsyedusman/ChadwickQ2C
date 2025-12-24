@@ -459,15 +459,14 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Shipping & Dimensions</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Board Width (Metres)</label>
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Board Width (mm)</label>
                             <input
                                 type="number"
-                                step="0.1"
                                 min="0"
                                 className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
                                 value={config.boardWidth || ''}
                                 onChange={e => setConfig({ ...config, boardWidth: parseFloat(e.target.value) || undefined })}
-                                placeholder="e.g. 3.2"
+                                placeholder="e.g. 3800"
                             />
                         </div>
                         <div className="space-y-1">
@@ -482,8 +481,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </div>
                     </div>
 
-                    {/* Warning if Width > 4m */}
-                    {(config.boardWidth || 0) > 4.0 && (
+                    {/* Warning if Width > 4000mm */}
+                    {(config.boardWidth || 0) > 4000 && (
                         <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md flex items-start gap-3">
                             <AlertCircle size={18} className="text-orange-600 shrink-0 mt-0.5" />
                             <div className="text-xs text-orange-800">

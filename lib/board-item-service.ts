@@ -18,7 +18,7 @@ export interface BoardConfig {
     baseRequired?: string;
     location?: string;
     insulationLevel?: 'none' | 'air' | 'fully';
-    boardWidth?: number; // Metres
+    boardWidth?: number; // Millimetres
     shippingSections?: number; // Integer, min 1
     cableZones?: string; // 'Yes' | 'No'
     cableZoneCount?: number;
@@ -394,7 +394,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // console.log(`[Site Reconnection Check] Width: ${boardWidth}, Sections: ${shippingSections}`); // noisy log removed
 
-    if (boardWidth > 4) {
+    if (boardWidth > 4000) {
         const reconnectionUnits = Math.floor((shippingSections + 1) / 2);
         if (reconnectionUnits > 0) {
             addTarget('MISC-SITE-RECONNECTION', reconnectionUnits);
