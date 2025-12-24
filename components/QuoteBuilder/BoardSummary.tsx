@@ -29,20 +29,14 @@ export default function BoardSummary() {
         const quotedPrice = totalSheetmetal + totals.sheetmetalUplift;
 
         return (
-            <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-sm shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                    <Info size={16} className="text-blue-700" />
-                    <h4 className="font-semibold text-blue-900">Custom Board Summary</h4>
-                </div>
-                <div className="space-y-1">
-                    <div className="flex justify-between">
-                        <span className="text-blue-800">Total Sheetmetal (Base):</span>
-                        <span className="font-medium text-blue-900">{formatCurrency(totalSheetmetal)}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-blue-200/50 pt-1 mt-1">
-                        <span className="text-blue-800 font-medium">Quoted Sheetmetal Price (+4%):</span>
-                        <span className="font-bold text-blue-900">{formatCurrency(quotedPrice)}</span>
-                    </div>
+            <div className="bg-white border-b border-gray-200 shadow-sm -mt-4 -mx-4 mb-4 px-4 py-2 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-blue-900 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    <Info size={14} className="text-blue-700 shrink-0" />
+                    <span>Sheetmetal Summary</span>
+                    <span className="text-gray-300 mx-1">|</span>
+                    <span className="text-gray-600 font-normal">Sheetmetal Base: <span className="font-semibold text-gray-900">{formatCurrency(totalSheetmetal)}</span></span>
+                    <span className="text-gray-300 mx-1">|</span>
+                    <span className="text-blue-700 font-semibold">Quoted Sheetmetal (includes +4%): {formatCurrency(quotedPrice)}</span>
                 </div>
             </div>
         );
@@ -53,22 +47,13 @@ export default function BoardSummary() {
         const totalCubic = totals.cubicSubtotal;
 
         return (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-md p-3 mb-4 text-sm shadow-sm">
-                <div className="flex items-center gap-2 mb-2">
-                    <Info size={16} className="text-indigo-700" />
-                    <h4 className="font-semibold text-indigo-900">Cubic Board Summary</h4>
+            <div className="bg-white border-b border-gray-200 shadow-sm -mt-4 -mx-4 mb-4 px-4 py-2 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-indigo-900 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    <Info size={14} className="text-indigo-700 shrink-0" />
+                    <span>Cubic Summary</span>
+                    <span className="text-gray-300 mx-1">|</span>
+                    <span className="text-gray-600 font-normal">Cubic Enclosure Base: <span className="font-semibold text-indigo-900">{formatCurrency(totalCubic)}</span></span>
                 </div>
-                <div className="space-y-1">
-                    <div className="flex justify-between">
-                        <span className="text-indigo-800">Total Cubic (Base):</span>
-                        <span className="font-medium text-indigo-900">{formatCurrency(totalCubic)}</span>
-                    </div>
-                </div>
-                {totalCubic === 0 && (
-                    <div className="text-[10px] text-indigo-600/70 mt-1 italic">
-                        No cubic enclosure items detected.
-                    </div>
-                )}
             </div>
         );
     }

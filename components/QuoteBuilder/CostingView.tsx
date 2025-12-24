@@ -5,7 +5,7 @@ import { TrendingUp } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 export default function CostingView() {
-    const { totals, settings } = useQuote();
+    const { totals, settings, boards, selectedBoardId } = useQuote();
 
     const {
         materialCost,
@@ -45,6 +45,40 @@ export default function CostingView() {
                             <div className="text-lg font-bold text-gray-900">{formatCurrency(labourCost, 0)}</div>
                         </div>
                     </div>
+
+                    {/* Sheetmetal Breakdown (Custom/Outdoor Boards Only) */}
+                    {(() => {
+                        // Parse config safely to determine enclosure type
+                        const selectedBoard = boards.find(b => b.id === selectedBoardId);
+                        let config: any = {};
+                        if (selectedBoard?.config) {
+                            try {
+                                config = typeof selectedBoard.config === 'string' ? JSON.parse(selectedBoard.config) : selectedBoard.config;
+                            } catch (e) {
+                                // Ignore parsing error
+                            }
+                        }
+
+                        if (config?.enclosureType === 'Custom') {
+                            const totalSheetmetal = totals.sheetmetalSubtotal;
+                            const quotedPrice = totalSheetmetal + totals.sheetmetalUplift;
+
+                            return (
+                                <div className="bg-blue-50 border border-blue-100 rounded p-2.5 text-xs">
+                                    <div className="text-blue-900 font-semibold mb-1.5 border-b border-blue-200 pb-1">Sheetmetal</div>
+                                    <div className="flex justify-between text-blue-800 mb-1">
+                                        <span>Total Sheetmetal (Base)</span>
+                                        <span>{formatCurrency(totalSheetmetal)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-blue-900 font-medium">
+                                        <span>Quoted Sheetmetal (+4%)</span>
+                                        <span>{formatCurrency(quotedPrice)}</span>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
 
                     {/* Cost Breakdown */}
                     <div className="space-y-1.5 text-xs">
