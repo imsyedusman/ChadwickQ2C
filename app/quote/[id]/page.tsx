@@ -197,11 +197,13 @@ function QuoteBuilderContent() {
                         <Panel defaultSize={20} minSize={15} maxSize={30}>
                             <div className="h-full bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 overflow-y-auto">
                                 <QuoteCostingOverrides />
-                                <div className="flex-1">
-                                    <CostingView />
-                                </div>
-                                <div className="p-4 border-t border-gray-200 bg-gray-50">
-                                    <GrandTotalView />
+                                <div className="flex flex-col h-full border-l border-gray-200 bg-gray-50/50 shadow-inner">
+                                    <div className="flex-1 overflow-y-auto">
+                                        <CostingView />
+                                    </div>
+                                    <div className="p-4 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                                        <GrandTotalView />
+                                    </div>
                                 </div>
                             </div>
                         </Panel>

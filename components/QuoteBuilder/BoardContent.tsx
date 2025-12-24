@@ -260,10 +260,10 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 alert('Network error');
                             }
                         }}
-                        className="text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded transition-colors flex items-center gap-1"
+                        className="text-[10px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
                         title="Update item prices and descriptions from the latest catalog"
                     >
-                        <Edit2 size={12} />
+                        <Edit2 size={10} />
                         Refresh Prices
                     </button>
                     <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">

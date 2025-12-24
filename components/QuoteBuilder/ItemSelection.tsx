@@ -329,48 +329,53 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header & Tabs */}
             <div className="bg-white border-b border-gray-200 px-6 pt-4 pb-0 shadow-sm z-10">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                        {onClose && (
-                            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full mr-1 transition-colors">
-                                <X size={20} className="text-gray-500" />
-                            </button>
-                        )}
-                        Item Selection
-                    </h2>
-                    <div className="relative w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Search items..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg text-sm transition-all outline-none text-gray-900 placeholder:text-gray-500"
-                        />
-                    </div>
-                </div>
-
-                {/* Master Category Tabs */}
-                <div className="flex space-x-6">
-                    {[
-                        { value: 'Basics', label: 'Basics', icon: Package },
-                        { value: 'Switchboard', label: 'Switchgears', icon: Zap },
-                        { value: 'Busbar', label: 'Busbars', icon: Layers }
-                    ].map((cat) => (
-                        <button
-                            key={cat.value}
-                            onClick={() => setActiveCategory(cat.value as any)}
-                            className={cn(
-                                "pb-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
-                                activeCategory === cat.value
-                                    ? "border-blue-600 text-blue-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                <div className="flex flex-col gap-4 mb-4">
+                    {/* Top Row: Title & Search */}
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2 whitespace-nowrap shrink-0">
+                            {onClose && (
+                                <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full mr-1 transition-colors">
+                                    <X size={20} className="text-gray-500" />
+                                </button>
                             )}
-                        >
-                            <cat.icon size={18} />
-                            {cat.label}
-                        </button>
-                    ))}
+                            Item Selection
+                        </h2>
+
+                        {/* Search Bar - Prominent & Full Width */}
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                type="text"
+                                placeholder="Search items..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg text-sm transition-all outline-none text-gray-900 placeholder:text-gray-500"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Master Category Tabs - Compact */}
+                    <div className="flex space-x-1 bg-gray-100/50 p-1 rounded-lg">
+                        {[
+                            { value: 'Basics', label: 'Basics', icon: Package },
+                            { value: 'Switchboard', label: 'Switchgears', icon: Zap },
+                            { value: 'Busbar', label: 'Busbars', icon: Layers }
+                        ].map((cat) => (
+                            <button
+                                key={cat.value}
+                                onClick={() => setActiveCategory(cat.value as any)}
+                                className={cn(
+                                    "flex-1 py-1.5 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-2",
+                                    activeCategory === cat.value
+                                        ? "bg-white text-blue-600 shadow-sm ring-1 ring-gray-200"
+                                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-200/50"
+                                )}
+                            >
+                                <cat.icon size={14} />
+                                {cat.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -384,34 +389,30 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
                     {(activeCategory === 'Switchboard' || activeCategory === 'Busbar') && (
                         <>
                             {!selectedL1 && (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 gap-2">
                                     {l1Options.map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setSelectedL1(cat)}
-                                            className="p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-3 group"
+                                            className="px-3 py-2 bg-white border border-gray-200 rounded-md hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-2 group"
                                         >
-                                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                                <Folder size={20} />
-                                            </div>
-                                            <span className="font-medium text-gray-900">{cat}</span>
+                                            <Folder size={16} className="text-blue-500 shrink-0" />
+                                            <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
                                         </button>
                                     ))}
                                 </div>
                             )}
 
                             {selectedL1 && !selectedL2 && l2Options.length > 0 && (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-2 gap-2">
                                     {l2Options.map(cat => (
                                         <button
                                             key={cat}
                                             onClick={() => setSelectedL2(cat)}
-                                            className="p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-3 group"
+                                            className="px-3 py-2 bg-white border border-gray-200 rounded-md hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-2 group"
                                         >
-                                            <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md group-hover:bg-blue-100 transition-colors">
-                                                <Folder size={16} />
-                                            </div>
-                                            <span className="text-sm font-medium text-gray-900">{cat}</span>
+                                            <Folder size={14} className="text-blue-500 shrink-0" />
+                                            <span className="text-xs font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -435,17 +436,15 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
 
                     {/* Basics: 1-level hierarchy (subcategory only) */}
                     {activeCategory === 'Basics' && !selectedL1 && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-2">
                             {l1Options.map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setSelectedL1(cat)}
-                                    className="p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-3 group"
+                                    className="px-3 py-2 bg-white border border-gray-200 rounded-md hover:border-blue-400 hover:shadow-sm transition-all text-left flex items-center gap-2 group"
                                 >
-                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                        <Folder size={20} />
-                                    </div>
-                                    <span className="font-medium text-gray-900">{cat}</span>
+                                    <Folder size={16} className="text-blue-500 shrink-0" />
+                                    <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
                                 </button>
                             ))}
                         </div>
@@ -556,51 +555,50 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
                         {(isPowerMeterSelection ? filteredItems : items).map((item) => (
                             <div
                                 key={item.id}
-                                className="group bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center gap-4"
+                                className="group bg-white px-3 py-2 rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer flex items-center gap-3"
                                 onClick={() => handleAddItem(item)}
                             >
-                                <div className="flex-1 min-w-0">
-                                    {/* Description (Primary - Bold) */}
-                                    <div className="font-bold text-gray-900 mb-1" title={item.description}>
+                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                    {/* Description (Primary - Bold, Compact) */}
+                                    <div className="font-bold text-sm text-gray-900 truncate" title={item.description}>
                                         {item.description}
                                     </div>
 
-                                    {/* Part Number & Brand (Secondary) */}
-                                    <div className="flex flex-wrap items-center gap-2">
+                                    {/* Meta Line: Part Number • Brand • Subcat */}
+                                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 truncate">
                                         {item.partNumber && (
-                                            <span className="text-sm text-gray-600">
-                                                {item.partNumber}
-                                            </span>
+                                            <span className="font-medium text-gray-600">{item.partNumber}</span>
                                         )}
+                                        {item.partNumber && (item.brand || item.subcategory) && <span>•</span>}
+
                                         {item.brand && (
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
-                                                {item.brand}
+                                            <span>{item.brand}</span>
+                                        )}
+                                        {item.brand && item.subcategory && <span>•</span>}
+
+                                        {item.subcategory && (
+                                            <span className="text-gray-400 truncate max-w-[150px]">
+                                                {item.subcategory.split(' > ').pop()}
                                             </span>
                                         )}
                                     </div>
-
-                                    {/* Breadcrumb hint in item card */}
-                                    {item.subcategory && (
-                                        <p className="text-[10px] text-gray-400 mt-1 truncate">
-                                            {item.subcategory.replace(/ > /g, ' › ')}
-                                        </p>
-                                    )}
                                 </div>
 
-                                <div className="text-right shrink-0">
-                                    <div className="font-bold text-gray-900">${item.unitPrice.toFixed(2)}</div>
-                                    <div className="text-xs text-gray-500">{item.labourHours}h</div>
+                                {/* Right Side: Price & Action */}
+                                <div className="text-right shrink-0 flex flex-col justify-center items-end min-w-[60px]">
+                                    <div className="font-bold text-sm text-gray-900">${item.unitPrice.toFixed(2)}</div>
+                                    <div className="text-[10px] text-gray-400">{item.labourHours}h</div>
                                 </div>
 
                                 <button
-                                    className="p-2 text-blue-600 bg-blue-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-blue-100"
+                                    className="p-1.5 text-blue-600 bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-blue-100 hover:text-blue-700"
                                     title="Add to Board"
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         handleAddItem(item);
                                     }}
                                 >
-                                    <Plus size={18} />
+                                    <Plus size={16} />
                                 </button>
                             </div>
                         ))}
