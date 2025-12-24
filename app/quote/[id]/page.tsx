@@ -195,13 +195,12 @@ function QuoteBuilderContent() {
                     {/* Panel 3: Costing View (Collapsible) */}
                     {!rightCollapsed && (
                         <Panel defaultSize={20} minSize={15} maxSize={30}>
-                            <div className="h-full bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 overflow-y-auto">
+                            <div className="h-full bg-gray-50 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 border-l border-gray-200">
                                 <QuoteCostingOverrides />
-                                <div className="flex flex-col h-full border-l border-gray-200 bg-gray-50/50 shadow-inner">
-                                    <div className="flex-1 overflow-y-auto">
-                                        <CostingView />
-                                    </div>
-                                    <div className="p-4 border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                                {/* Scrollable Container */}
+                                <div className="flex-1 overflow-y-auto">
+                                    <CostingView />
+                                    <div className="border-t-4 border-gray-200">
                                         <GrandTotalView />
                                     </div>
                                 </div>
