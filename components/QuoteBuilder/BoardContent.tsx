@@ -11,6 +11,63 @@ import BoardSummary from './BoardSummary';
 // Using singular form to match database schema
 const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
 
+const CATEGORY_LABELS: Record<string, string> = {
+    'Basics': 'Basics',
+    'Switchboard': 'Switchgears',
+    'Busbar': 'Busbars'
+};
+
+// Strict Order for Basics items (Part Numbers only)
+const BASICS_STRICT_ORDER = [
+    '1A-TIERS',
+    '1A-COMPARTMENTS',
+    '1A-50KA',
+    '1A-COLOUR',
+    '1B-TIERS-400',
+    '1B-COMPARTMENTS',
+    '1B-BASE',
+    '1B-DOORS',
+    '1B-600MM',
+    '1B-800MM',
+    '1B-SS-2B',
+    '1B-SS-NO4',
+    '1B-ABLOY',
+    '1B-DUAL-LOCK',
+    '1B-QUOTED',
+    '1B1-CLEAT-SMALL-1',
+    '1B1-CLEAT-SMALL-2',
+    '1B1-CLEAT-LARGE-2',
+    '1B1-CLEAT-LARGE-3',
+    'CT-COMPARTMENTS',
+    'CT-S-TYPE',
+    'CT-T-TYPE',
+    'CT-W-TYPE',
+    'CT-U-TYPE',
+    'CT-TEST-BLOCK',
+    'CT-PANEL',
+    'CT-WIRING',
+    'CT-CTC400',
+    '100A-PANEL',
+    '100A-FUSE',
+    '100A-WIRING-1PH',
+    '100A-WIRING-3PH',
+    '100A-NEUTRAL-LINK',
+    '100A-MCB-1PH',
+    '100A-MCB-3PH',
+    '100A-CHASSIS-18',
+    '100A-CHASSIS-24',
+    '100A-CHASSIS-30',
+    'MISC-CABLE-TRAY',
+    'MISC-LABELS',
+    'MISC-HARDWARE',
+    'MISC-DELIVERY-HIAB',
+    'MISC-DELIVERY-UTE',
+    'MISC-SITE-RECONNECTION',
+    'MISC-TEST-TIERS',
+    'MISC-MISC'
+];
+
+
 interface BoardContentProps {
     onAddItems?: () => void;
 }
@@ -88,8 +145,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         )}
                     </div>
                     <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
+                        {/* Only show item name (Part Number). Subcategory path removed as requested. */}
                         <span className="font-medium">{item.name}</span>
-                        {item.subcategory ? ` • ${item.subcategory}` : ''}
                     </div>
                 </div>
 
@@ -180,8 +237,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         )
     };
 
-    const renderSwitchboardsContent = (items: Item[]) => {
-        // Group Switchboards items by subcategory (Power Meters, Fuses, Circuit Breakers, etc.)
+    const renderCategoryWithSubsections = (items: Item[], isBasics: boolean) => {
+        // Group items by subcategory
         const groupedBySubcat = items.reduce((acc, item) => {
             const subcat = item.subcategory || 'Other';
             if (!acc[subcat]) acc[subcat] = [];
@@ -189,13 +246,50 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             return acc;
         }, {} as Record<string, Item[]>);
 
-        const subcatKeys = Object.keys(groupedBySubcat).sort();
+        let subcatKeys = Object.keys(groupedBySubcat);
+
+        if (isBasics) {
+            // Sort keys by the position of their first item in the BASICS_STRICT_ORDER
+            subcatKeys.sort((a, b) => {
+                const getFirstIndex = (subcat: string) => {
+                    const items = groupedBySubcat[subcat];
+                    // Find the lowest index of any item in this subcat according to strict order
+                    let minIndex = Infinity;
+                    for (const item of items) {
+                        const index = BASICS_STRICT_ORDER.indexOf(item.name); // Using name as PartNumber
+                        if (index !== -1 && index < minIndex) {
+                            minIndex = index;
+                        }
+                    }
+                    return minIndex === Infinity ? 99999 : minIndex;
+                };
+
+                return getFirstIndex(a) - getFirstIndex(b);
+            });
+
+            // Also sort items within each subcategory for Basics
+            subcatKeys.forEach(key => {
+                groupedBySubcat[key].sort((a, b) => {
+                    const indexA = BASICS_STRICT_ORDER.indexOf(a.name); // Using name as PartNumber
+                    const indexB = BASICS_STRICT_ORDER.indexOf(b.name);
+
+                    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                    if (indexA !== -1) return -1;
+                    if (indexB !== -1) return 1;
+                    return 0; // maintain stable order for knowns
+                });
+            });
+
+        } else {
+            // Default sort for Switchboards (Alphabetical)
+            subcatKeys.sort();
+        }
 
         return (
             <div className="divide-y divide-gray-100">
                 {subcatKeys.map(subcat => {
                     const subcatItems = groupedBySubcat[subcat];
-                    const subcatKey = `Switchboard-${subcat}`;
+                    const subcatKey = `${isBasics ? 'Basics' : 'Switchboard'}-${subcat}`;
                     const isSubcatCollapsed = collapsedSections[subcatKey];
 
                     return (
@@ -296,7 +390,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 >
                                     <div className="flex items-center gap-2 font-semibold text-sm text-gray-700">
                                         {isMasterCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                                        {masterCat}
+                                        {CATEGORY_LABELS[masterCat] || masterCat}
                                         <span className="text-xs font-normal text-gray-500">({categoryItems.length})</span>
                                     </div>
                                 </button>
@@ -304,11 +398,12 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 {/* Master category content */}
                                 {!isMasterCollapsed && (
                                     <>
-                                        {masterCat === 'Switchboard' ? (
-                                            // For Switchboard, render sub-collapsibles by subcategory
-                                            renderSwitchboardsContent(categoryItems)
+                                        {masterCat === 'Switchboard' || masterCat === 'Basics' ? (
+                                            // For Switchboard AND Basics, render sub-collapsibles by subcategory
+                                            // Also apply strict sorting ONLY to Basics
+                                            renderCategoryWithSubsections(categoryItems, masterCat === 'Basics')
                                         ) : (
-                                            // For Basics and Busbars, render items directly
+                                            // For Busbars, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
                                                 {categoryItems.map(renderItemRow)}
                                             </div>
