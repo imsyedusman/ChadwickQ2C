@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Settings } from 'lucide-react';
+import { Plus, Trash2, Settings, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PreSelectionWizard from './PreSelectionWizard';
 import { BoardConfig } from '@/lib/board-item-service';
@@ -93,6 +93,30 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
         }
     };
 
+    const getBoardStatus = (board: Board) => {
+        const itemCount = board.items?.length || 0;
+
+        // Gray: Empty
+        if (itemCount === 0) return 'gray';
+
+        // Orange: Known Warnings
+        // 1. Width > 4m
+        const config = typeof board.config === 'string' ? JSON.parse(board.config) : (board.config || {});
+        if ((config.boardWidth || 0) > 4000) return 'orange';
+
+        // Green: Good
+        return 'green';
+    };
+
+    const getBoardSubtotal = (board: Board) => {
+        if (!board.items) return 0;
+        return board.items.reduce((sum, item) => {
+            // Use cost if available, otherwise calc from unitPrice/qty
+            const cost = item.cost !== undefined ? item.cost : (item.unitPrice * item.quantity);
+            return sum + (cost || 0);
+        }, 0);
+    };
+
     return (
         <div className="flex flex-col h-full">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
@@ -110,43 +134,73 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {boards.map((board) => (
-                    <div
-                        key={board.id}
-                        onClick={() => onSelectBoard(board.id)}
-                        className={cn(
-                            "group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all",
-                            selectedBoardId === board.id
-                                ? "bg-blue-50 border-blue-200 text-blue-700 shadow-sm ring-1 ring-blue-200"
-                                : "hover:bg-gray-100 text-gray-700 border border-transparent"
-                        )}
-                    >
-                        <div className="flex flex-col truncate">
-                            <span className="font-medium truncate">{board.name}</span>
-                            <span className="text-xs opacity-70">{board.type || 'Generic'}</span>
-                        </div>
+                {boards.map((board) => {
+                    const status = getBoardStatus(board);
+                    const subtotal = getBoardSubtotal(board);
+                    const isSelected = selectedBoardId === board.id;
 
-                        <div className={cn(
-                            "flex items-center gap-1 opacity-0 transition-opacity",
-                            selectedBoardId === board.id ? "opacity-100" : "group-hover:opacity-100"
-                        )}>
-                            <button
-                                onClick={(e) => handleEditBoard(e, board)}
-                                className="p-1.5 hover:bg-blue-100 hover:text-blue-600 rounded-md"
-                                title="Edit Configuration"
-                            >
-                                <Settings size={14} />
-                            </button>
-                            <button
-                                onClick={(e) => handleDeleteBoard(e, board.id)}
-                                className="p-1.5 hover:bg-red-100 hover:text-red-600 rounded-md"
-                                title="Delete Board"
-                            >
-                                <Trash2 size={14} />
-                            </button>
+                    return (
+                        <div
+                            key={board.id}
+                            onClick={() => onSelectBoard(board.id)}
+                            className={cn(
+                                "group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border-l-4",
+                                isSelected
+                                    ? "bg-blue-50 border-blue-500 text-blue-900 shadow-sm"
+                                    : "hover:bg-gray-100 border-transparent text-gray-700"
+                            )}
+                        >
+                            <div className="flex flex-col min-w-0 flex-1 mr-2">
+                                <div className="flex items-center gap-2">
+                                    {/* Status Dot */}
+                                    <div
+                                        className={cn(
+                                            "w-2 h-2 rounded-full shrink-0",
+                                            status === 'green' && "bg-green-500",
+                                            status === 'orange' && "bg-orange-500",
+                                            status === 'gray' && "bg-gray-300"
+                                        )}
+                                        title={status === 'orange' ? "Has Warnings" : (status === 'gray' ? "Empty" : "Ready")}
+                                    />
+                                    <span className={cn("font-medium truncate", isSelected ? "text-blue-900" : "text-gray-900")}>
+                                        {board.name}
+                                    </span>
+                                </div>
+                                <div className="pl-4 flex flex-col">
+                                    <span className="text-xs opacity-70 truncate">{board.type || 'Generic'}</span>
+                                    <span className={cn("text-xs font-medium mt-0.5", isSelected ? "text-blue-700" : "text-gray-500")}>
+                                        {new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(subtotal)}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className={cn(
+                                "flex items-center gap-1 opacity-0 transition-opacity shrink-0",
+                                isSelected ? "opacity-100" : "group-hover:opacity-100"
+                            )}>
+                                {status === 'orange' && (
+                                    <span className="text-orange-500 mr-1" title="Warnings present">
+                                        <AlertCircle size={14} />
+                                    </span>
+                                )}
+                                <button
+                                    onClick={(e) => handleEditBoard(e, board)}
+                                    className="p-1.5 hover:bg-blue-100 hover:text-blue-600 rounded-md"
+                                    title="Edit Configuration"
+                                >
+                                    <Settings size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => handleDeleteBoard(e, board.id)}
+                                    className="p-1.5 hover:bg-red-100 hover:text-red-600 rounded-md"
+                                    title="Delete Board"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 {boards.length === 0 && (
                     <div className="text-center py-8 text-xs text-gray-400 italic">
