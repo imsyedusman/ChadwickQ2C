@@ -238,7 +238,8 @@ function QuoteBuilderContent() {
                         />
 
                         {/* Slide-over Panel */}
-                        <div className="relative w-1/2 bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
+                        {/* WIDTH ADJUSTMENT: Change w-[60%] to w-1/2 or other values to adjust drawer width */}
+                        <div className="relative w-[60%] bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
                             <ItemSelection onClose={() => setIsItemDrawerOpen(false)} />
                         </div>
                     </div>

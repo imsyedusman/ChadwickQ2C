@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X } from 'lucide-react';
+import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X } from 'lucide-react';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
@@ -22,8 +22,152 @@ interface ItemSelectionProps {
     onClose?: () => void;
 }
 
+interface ItemRowProps {
+    item: CatalogItem;
+    existingQty?: number;
+    onAdd: (item: CatalogItem, qty: number) => void;
+}
+
+function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
+    // If it exists on board, start with that qty. Otherwise default to 1.
+    // However, if we want "control surface" feel, we might want to default to 0 if not selected?
+    // User requirement: "If the item is not on the board → show default quantity (e.g. 1)"
+    const initialQty = existingQty > 0 ? existingQty : 1;
+
+    const [qty, setQty] = useState(initialQty);
+    const autoManaged = isAutoManaged(item.partNumber);
+
+    // Sync state if existingQty changes (live update from board)
+    useEffect(() => {
+        if (existingQty > 0) {
+            setQty(existingQty);
+        }
+    }, [existingQty]);
+
+    return (
+        <div
+            className={cn(
+                "group bg-white px-6 py-5 rounded-md border transition-all flex items-center gap-6",
+                existingQty > 0 ? "border-blue-200 bg-blue-50/10 shadow-sm" : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+            )}
+        >
+            {/* Item Details */}
+            <div className="flex-1 min-w-0 flex flex-col gap-1">
+                {/* Description - FONT SIZE ADJUSTMENT */}
+                <div className="font-bold text-lg text-gray-900 truncate" title={item.description}>
+                    {item.description}
+                </div>
+
+                {/* Meta Line */}
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 truncate">
+                    {item.partNumber && (
+                        <span className="font-medium text-gray-600">{item.partNumber}</span>
+                    )}
+                    {item.partNumber && (item.brand || item.subcategory) && <span>•</span>}
+
+                    {item.brand && (
+                        <span>{item.brand}</span>
+                    )}
+                    {item.brand && item.subcategory && <span>•</span>}
+
+                    {item.subcategory && (
+                        <span className="text-gray-400 truncate max-w-[200px]">
+                            {item.subcategory.split(' > ').pop()}
+                        </span>
+                    )}
+
+                    {/* Existing Badge */}
+                    {existingQty > 0 && (
+                        <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            {existingQty} on board
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Right Side: Logic */}
+            <div className="flex items-center gap-4 shrink-0">
+                {/* Quantity Selector */}
+                <div className="flex items-center gap-0 bg-white border border-gray-300 rounded overflow-hidden h-9 shadow-sm">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setQty(Math.max(1, qty - 1)); }}
+                        disabled={autoManaged}
+                        className={cn(
+                            "w-9 h-full flex items-center justify-center transition-colors border-r border-gray-200 active:bg-gray-100",
+                            autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+                        )}
+                    >
+                        <Minus size={16} />
+                    </button>
+                    <input
+                        type="number"
+                        min="1"
+                        value={qty}
+                        readOnly={!!autoManaged}
+                        onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setQty(isNaN(val) || val < 1 ? 1 : val);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn(
+                            "w-14 h-full text-center text-base font-semibold focus:outline-none focus:ring-inset focus:ring-1 focus:ring-blue-500 bg-transparent flex items-center justify-center p-0",
+                            autoManaged ? "text-gray-400 bg-gray-50" : "text-gray-900"
+                        )}
+                    />
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setQty(qty + 1); }}
+                        disabled={autoManaged}
+                        className={cn(
+                            "w-9 h-full flex items-center justify-center transition-colors border-l border-gray-200 active:bg-gray-100",
+                            autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
+                        )}
+                    >
+                        <Plus size={16} />
+                    </button>
+                </div>
+
+                {/* Price */}
+                <div className="text-right min-w-[80px]">
+                    <div className="font-bold text-lg text-gray-900">${(item.unitPrice * qty).toFixed(2)}</div>
+                    {qty > 1 && (
+                        <div className="text-xs text-gray-400">${item.unitPrice.toFixed(2)} ea</div>
+                    )}
+                </div>
+
+                {/* Add/Update Button */}
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onAdd(item, qty);
+                    }}
+                    className={cn(
+                        "h-9 px-4 rounded-lg font-semibold text-sm transition-all shadow-sm flex items-center gap-2 min-w-[80px] justify-center",
+                        autoManaged
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            : existingQty > 0
+                                ? "bg-white border border-blue-600 text-blue-600 hover:bg-blue-50"
+                                : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:transform active:scale-95"
+                    )}
+                    disabled={!!autoManaged}
+                >
+                    {existingQty > 0 ? (
+                        <>
+                            <span>Update</span>
+                        </>
+                    ) : (
+                        <>
+                            <Plus size={18} />
+                            <span>Add</span>
+                        </>
+                    )}
+                </button>
+            </div>
+        </div>
+    );
+}
+
 export default function ItemSelection({ onClose }: ItemSelectionProps) {
-    const { addItemToBoard, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
+    const { addItemToBoard, updateItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
 
     // Stable Tab Keys
@@ -255,21 +399,33 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
         }
     };
 
-    const handleAddItem = (item: CatalogItem) => {
+    const handleAddItem = (item: CatalogItem, qty: number) => {
         if (!selectedBoardId) {
             alert('Please select a board first');
             return;
         }
 
-        addItemToBoard(selectedBoardId, {
-            category: item.category || activeCategory,  // Use item's actual category for vendor items
-            subcategory: item.subcategory,
-            name: item.partNumber || item.description,  // Use description if partNumber is empty
-            description: item.description,
-            unitPrice: item.unitPrice,
-            labourHours: item.labourHours,
-            quantity: 1
-        });
+        const selectedBoard = boards.find(b => b.id === selectedBoardId);
+        // Find existing based on Part Number (name in Item)
+        // If Part Number is empty, fallback to Description (less reliable but fallback)
+        const key = item.partNumber || item.description;
+        const existingItem = selectedBoard?.items.find(i => i.name === key);
+
+        if (existingItem) {
+            // Update mode: Set exact quantity
+            updateItem(existingItem.id, { quantity: qty });
+        } else {
+            // Add mode
+            addItemToBoard(selectedBoardId, {
+                category: item.category || activeCategory,
+                subcategory: item.subcategory,
+                name: item.partNumber || item.description,
+                description: item.description,
+                unitPrice: item.unitPrice,
+                labourHours: item.labourHours,
+                quantity: qty
+            });
+        }
     };
 
     // Breadcrumb / Back Navigation
@@ -552,56 +708,22 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
                             </div>
                         )}
 
-                        {(isPowerMeterSelection ? filteredItems : items).map((item) => (
-                            <div
-                                key={item.id}
-                                className="group bg-white px-5 py-4 rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer flex items-center gap-4"
-                                onClick={() => handleAddItem(item)}
-                            >
-                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                    {/* Description (Primary - Bold, Compact) */}
-                                    <div className="font-bold text-base text-gray-900 truncate" title={item.description}>
-                                        {item.description}
-                                    </div>
+                        {(isPowerMeterSelection ? filteredItems : items).map((item) => {
+                            const selectedBoard = boards.find(b => b.id === selectedBoardId);
+                            // Lookup logic: Match Part Number (name)
+                            const key = item.partNumber || item.description;
+                            const existingItem = selectedBoard?.items.find(i => i.name === key);
+                            const existingQty = existingItem ? existingItem.quantity : 0;
 
-                                    {/* Meta Line: Part Number • Brand • Subcat */}
-                                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500 truncate">
-                                        {item.partNumber && (
-                                            <span className="font-medium text-gray-600">{item.partNumber}</span>
-                                        )}
-                                        {item.partNumber && (item.brand || item.subcategory) && <span>•</span>}
-
-                                        {item.brand && (
-                                            <span>{item.brand}</span>
-                                        )}
-                                        {item.brand && item.subcategory && <span>•</span>}
-
-                                        {item.subcategory && (
-                                            <span className="text-gray-400 truncate max-w-[150px]">
-                                                {item.subcategory.split(' > ').pop()}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Right Side: Price & Action */}
-                                <div className="text-right shrink-0 flex flex-col justify-center items-end min-w-[60px]">
-                                    <div className="font-bold text-base text-gray-900">${item.unitPrice.toFixed(2)}</div>
-                                    <div className="text-[10px] text-gray-400">{item.labourHours}h</div>
-                                </div>
-
-                                <button
-                                    className="p-1.5 text-blue-600 bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hover:bg-blue-100 hover:text-blue-700"
-                                    title="Add to Board"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleAddItem(item);
-                                    }}
-                                >
-                                    <Plus size={16} />
-                                </button>
-                            </div>
-                        ))}
+                            return (
+                                <ItemRow
+                                    key={item.id}
+                                    item={item}
+                                    existingQty={existingQty}
+                                    onAdd={handleAddItem}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </div>
