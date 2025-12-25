@@ -69,7 +69,7 @@ const BASICS_STRICT_ORDER = [
 
 
 interface BoardContentProps {
-    onAddItems?: () => void;
+    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar') => void;
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
@@ -329,7 +329,18 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 <div className="flex items-center gap-2">
                     {onAddItems && (
                         <button
-                            onClick={onAddItems}
+                            onClick={() => {
+                                // Determine likely category based on what is expanded
+                                let likelyCategory: 'Basics' | 'Switchboard' | 'Busbar' | undefined = undefined;
+
+                                // Priority: Basics > Switchboard > Busbar
+                                // collapseSections[key] === false (or undefined) means Expanded
+                                if (!collapsedSections['Basics']) likelyCategory = 'Basics';
+                                else if (!collapsedSections['Switchboard']) likelyCategory = 'Switchboard';
+                                else if (!collapsedSections['Busbar']) likelyCategory = 'Busbar';
+
+                                onAddItems?.(likelyCategory);
+                            }}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-lg flex items-center gap-2 shadow-sm transition-all"
                         >
                             <Plus size={16} />

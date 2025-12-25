@@ -129,9 +129,14 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
                 {/* Price */}
                 <div className="text-right min-w-[80px]">
                     <div className="font-bold text-lg text-gray-900">${(item.unitPrice * qty).toFixed(2)}</div>
-                    {qty > 1 && (
-                        <div className="text-xs text-gray-400">${item.unitPrice.toFixed(2)} ea</div>
-                    )}
+                    <div className="flex flex-col items-end gap-0.5 mt-1">
+                        {qty > 1 && (
+                            <div className="text-xs text-gray-400 font-medium">${item.unitPrice.toFixed(2)} ea</div>
+                        )}
+                        <div className="text-xs text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
+                            {item.labourHours}h
+                        </div>
+                    </div>
                 </div>
 
                 {/* Add/Update Button */}
@@ -166,9 +171,18 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
     );
 }
 
-export default function ItemSelection({ onClose }: ItemSelectionProps) {
+interface ItemSelectionProps {
+    onClose?: () => void;
+    initialCategory?: 'Basics' | 'Switchboard' | 'Busbar';
+}
+
+export default function ItemSelection({ onClose, initialCategory }: ItemSelectionProps) {
     const { addItemToBoard, updateItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
-    const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>('Switchboard');
+    // Prioritize passed initialCategory, then default to Switchboard. 
+    // State restoration (Lines 50+) will only run if initialCategory is NOT provided, to respect user context.
+    const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>(
+        initialCategory || 'Switchboard'
+    );
 
     // Stable Tab Keys
     const TAB_KEYS = {
@@ -190,8 +204,11 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
         updateUiState('lastActiveTab', TAB_KEYS[cat]);
     };
 
-    // Initial State Restoration
+    // Initial State Restoration - ONLY if no specific context was passed
     useEffect(() => {
+        // If initialCategory was passed (e.g. from BoardContent), don't override it with last used tab.
+        if (initialCategory) return;
+
         try {
             const savedState = localStorage.getItem(`chadwick_ui_state_${quoteId}`);
             if (savedState) {
@@ -206,7 +223,7 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
         } catch (e) {
             console.error("Failed to restore tab state", e);
         }
-    }, [quoteId]);
+    }, [quoteId, initialCategory]);
 
     const [items, setItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(false);
@@ -222,10 +239,7 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
     const [meterBrandFilter, setMeterBrandFilter] = useState<string>('All');
     const [meterTypeFilter, setMeterTypeFilter] = useState<string>('All');
 
-    // Initial Load: Get the Category Tree
-    useEffect(() => {
-        fetchCategoryTree('Switchboard');
-    }, []);
+    // Initial Load: Removed explicit redundant fetch since activeCategory change (or initial render) triggers the effect below.
 
     // Derive Options from `allSubcategories`
     const { l1Options, l2Options, l3Options, isPowerMeterSelection } = useMemo(() => {

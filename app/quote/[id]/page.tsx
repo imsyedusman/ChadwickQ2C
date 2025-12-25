@@ -18,6 +18,7 @@ function QuoteBuilderContent() {
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
+    const [drawerCategory, setDrawerCategory] = useState<'Basics' | 'Switchboard' | 'Busbar' | undefined>(undefined);
 
     // Load persisted preferences on mount
     useEffect(() => {
@@ -193,7 +194,10 @@ function QuoteBuilderContent() {
 
                 {/* Panel 2: Board Content (Center) */}
                 <div className="h-full min-h-0 bg-white flex flex-col min-w-0">
-                    <BoardContent onAddItems={() => setIsItemDrawerOpen(true)} />
+                    <BoardContent onAddItems={(cat) => {
+                        setDrawerCategory(cat);
+                        setIsItemDrawerOpen(true);
+                    }} />
                 </div>
 
                 {/* Panel 3: Costing View (Collapsible) */}
@@ -240,7 +244,7 @@ function QuoteBuilderContent() {
                         {/* Slide-over Panel */}
                         {/* WIDTH ADJUSTMENT: Change w-[60%] to w-1/2 or other values to adjust drawer width */}
                         <div className="relative w-[60%] bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
-                            <ItemSelection onClose={() => setIsItemDrawerOpen(false)} />
+                            <ItemSelection onClose={() => setIsItemDrawerOpen(false)} initialCategory={drawerCategory} />
                         </div>
                     </div>
                 )
