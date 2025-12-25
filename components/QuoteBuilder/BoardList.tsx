@@ -25,7 +25,7 @@ interface BoardListProps {
 }
 
 export default function BoardList({ boards, selectedBoardId, onSelectBoard, quoteId, onUpdate, collapsed = false }: BoardListProps & { collapsed?: boolean }) {
-    const { addBoard } = useQuote();
+    const { addBoard, allBoardTotals } = useQuote();
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [editingBoard, setEditingBoard] = useState<Board | null>(null);
 
@@ -108,14 +108,7 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
         return 'green';
     };
 
-    const getBoardSubtotal = (board: Board) => {
-        if (!board.items) return 0;
-        return board.items.reduce((sum, item) => {
-            // Use cost if available, otherwise calc from unitPrice/qty
-            const cost = item.cost !== undefined ? item.cost : (item.unitPrice * item.quantity);
-            return sum + (cost || 0);
-        }, 0);
-    };
+
 
     // Helper to get initials from board name
     const getInitials = (name: string) => {
@@ -163,7 +156,8 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 {boards.map((board) => {
                     const status = getBoardStatus(board);
-                    const subtotal = getBoardSubtotal(board);
+                    // Use calculated totals if available
+                    const boardTotal = allBoardTotals ? allBoardTotals[board.id] : undefined;
                     const isSelected = selectedBoardId === board.id;
 
                     if (collapsed) {
@@ -222,7 +216,7 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                                 <div className="pl-4 flex flex-col">
                                     <span className="text-xs opacity-70 truncate">{board.type || 'Generic'}</span>
                                     <span className={cn("text-xs font-medium mt-0.5", isSelected ? "text-blue-700" : "text-gray-500")}>
-                                        {new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(subtotal)}
+                                        Sell: {new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 }).format(boardTotal?.sellPriceRounded || 0)} (ex GST)
                                     </span>
                                 </div>
                             </div>

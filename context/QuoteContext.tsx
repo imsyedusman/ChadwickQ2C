@@ -50,6 +50,23 @@ export interface Board {
     items: Item[];
 }
 
+export interface BoardTotals {
+    materialCost: number;
+    labourHours: number;
+    labourCost: number;
+    consumablesCost: number;
+    costBase: number;
+    overheadAmount: number;
+    engineeringCost: number;
+    totalCost: number;
+    profit: number;
+    sellPrice: number;
+    sellPriceRounded: number;
+    sheetmetalSubtotal: number;
+    sheetmetalUplift: number;
+    cubicSubtotal: number;
+}
+
 interface QuoteContextType {
     quoteId: string;
     quoteNumber: string;
@@ -64,22 +81,8 @@ interface QuoteContextType {
     effectiveSettings: QuoteSettings; // Merged settings (Global + Overrides)
     loading: boolean;
     saving: boolean;
-    totals: {
-        materialCost: number;
-        labourHours: number;
-        labourCost: number;
-        consumablesCost: number;
-        costBase: number;
-        overheadAmount: number;
-        engineeringCost: number;
-        totalCost: number;
-        profit: number;
-        sellPrice: number;
-        sellPriceRounded: number;
-        sheetmetalSubtotal: number;
-        sheetmetalUplift: number;
-        cubicSubtotal: number;
-    };
+    totals: BoardTotals;
+    allBoardTotals: Record<string, BoardTotals>;
     grandTotals: {
         materialCost: number;
         labourHours: number;
@@ -280,20 +283,22 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const calculateTotals = () => {
+        const emptyTotals: BoardTotals = {
+            materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+            costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
+            sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
+        };
+
         if (!settings) return {
-            boardTotals: {
-                materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
-                costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-                sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
-            },
+            boardTotals: emptyTotals,
+            allBoardTotals: {},
             grandTotals: {
-                materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
-                costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-                sellPrice: 0, sellPriceRounded: 0, gst: 0, finalSellPrice: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
+                ...emptyTotals,
+                gst: 0, finalSellPrice: 0
             }
         };
 
-        const calculateForItems = (items: Item[], applySheetmetalUplift: boolean) => {
+        const calculateForItems = (items: Item[], applySheetmetalUplift: boolean): BoardTotals => {
             // 1. Base Costs
             const baseMaterialCost = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
             const labourHours = items.reduce((sum, item) => sum + (item.labourHours * item.quantity), 0);
@@ -381,9 +386,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
         const isCustom = selectedBoardConfig?.enclosureType === 'Custom';
 
-        const boardTotals = calculateForItems(selectedBoard?.items || [], isCustom);
-
-        // 2. Grand Totals (Sum of all boards)
+        // 1. Map all boards to their totals
+        const allBoardTotals: Record<string, BoardTotals> = {};
         const boardResults = boards.map(board => {
             let config: any = {};
             if (board.config) {
@@ -392,8 +396,15 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 } catch (e) { /* ignore */ }
             }
             const isBoardCustom = config?.enclosureType === 'Custom';
-            return calculateForItems(board.items || [], isBoardCustom);
+            const totals = calculateForItems(board.items || [], isBoardCustom);
+            allBoardTotals[board.id] = totals;
+            return totals;
         });
+
+        // 2. Selected Board Totals (retrieve from map)
+        const boardTotals = selectedBoardId && allBoardTotals[selectedBoardId]
+            ? allBoardTotals[selectedBoardId]
+            : emptyTotals;
 
         // Sum up all fields
         const grandTotalBase = boardResults.reduce((acc, curr) => ({
@@ -427,10 +438,10 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             finalSellPrice
         };
 
-        return { boardTotals, grandTotals };
+        return { boardTotals, allBoardTotals, grandTotals };
     };
 
-    const { boardTotals, grandTotals } = calculateTotals();
+    const { boardTotals, allBoardTotals, grandTotals } = calculateTotals();
 
     const addBoard = async (boardData: { name: string; type: string; config?: any }) => {
         try {
@@ -603,6 +614,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 loading,
                 saving,
                 totals: boardTotals,
+                allBoardTotals,
                 grandTotals,
                 selectedBoardId,
                 setSelectedBoardId,
