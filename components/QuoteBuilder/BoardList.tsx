@@ -102,7 +102,7 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
         // Orange: Known Warnings
         // 1. Width > 4m
         const config = typeof board.config === 'string' ? JSON.parse(board.config) : (board.config || {});
-        if ((config.boardWidth || 0) > 4000) return 'orange';
+        if ((config.boardWidth || 0) > 4000 && (config.shippingSections || 1) <= 1) return 'orange';
 
         // Green: Good
         return 'green';
