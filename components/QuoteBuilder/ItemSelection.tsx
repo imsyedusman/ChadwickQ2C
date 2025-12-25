@@ -555,12 +555,12 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
                         {(isPowerMeterSelection ? filteredItems : items).map((item) => (
                             <div
                                 key={item.id}
-                                className="group bg-white px-3 py-2 rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer flex items-center gap-3"
+                                className="group bg-white px-5 py-4 rounded-md border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer flex items-center gap-4"
                                 onClick={() => handleAddItem(item)}
                             >
                                 <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                     {/* Description (Primary - Bold, Compact) */}
-                                    <div className="font-bold text-sm text-gray-900 truncate" title={item.description}>
+                                    <div className="font-bold text-base text-gray-900 truncate" title={item.description}>
                                         {item.description}
                                     </div>
 
@@ -586,7 +586,7 @@ export default function ItemSelection({ onClose }: ItemSelectionProps) {
 
                                 {/* Right Side: Price & Action */}
                                 <div className="text-right shrink-0 flex flex-col justify-center items-end min-w-[60px]">
-                                    <div className="font-bold text-sm text-gray-900">${item.unitPrice.toFixed(2)}</div>
+                                    <div className="font-bold text-base text-gray-900">${item.unitPrice.toFixed(2)}</div>
                                     <div className="text-[10px] text-gray-400">{item.labourHours}h</div>
                                 </div>
 
