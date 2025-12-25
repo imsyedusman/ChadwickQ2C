@@ -13,12 +13,20 @@ export default function QuoteCostingOverrides() {
     // but for number inputs it's often better to have local state or just use onBlur/Enter.
     // Let's use onBlur for saving to avoid too many writes, but update local state on change.
 
-    const handleChange = (key: keyof typeof overrides, value: string) => {
-        const numValue = value === '' ? null : parseFloat(value);
+    const handleChange = (key: keyof typeof overrides, value: string, isPercentage: boolean = false) => {
+        if (value === '') {
+            updateOverrides({ [key]: null });
+            return;
+        }
+        let numValue = parseFloat(value);
+        if (isNaN(numValue)) return;
+
+        if (isPercentage) {
+            numValue = numValue / 100;
+        }
         updateOverrides({ [key]: numValue });
     };
 
-    // Helper to render an input field
     const renderInput = (
         label: string,
         overrideKey: keyof typeof overrides,
@@ -29,10 +37,18 @@ export default function QuoteCostingOverrides() {
         const currentValue = overrides[overrideKey];
         const isOverridden = currentValue !== null && currentValue !== undefined;
 
-        // Display value: if overridden, show it. If not, show empty (placeholder shows global).
-        // Wait, user wants to see global default if empty.
-        // Input value should be the override if it exists, else empty string.
-        const displayValue = isOverridden ? currentValue : '';
+        // For percentages:
+        // stored: 0.18 -> display: 18
+        // stored: 0.125 -> display: 12.5
+        const multiplier = isPercentage ? 100 : 1;
+
+        let displayValue: string | number = '';
+        if (isOverridden && currentValue !== null) {
+            // Fix float errors and parse back to number to remove trailing zeros
+            displayValue = parseFloat((currentValue * multiplier).toFixed(4));
+        }
+
+        const placeholderValue = parseFloat((globalValue * multiplier).toFixed(4));
 
         return (
             <div className="flex flex-col gap-1">
@@ -53,23 +69,25 @@ export default function QuoteCostingOverrides() {
                     <input
                         type="number"
                         step={step}
-                        value={displayValue ?? ''}
-                        onChange={(e) => handleChange(overrideKey, e.target.value)}
-                        placeholder={globalValue.toString()}
-                        className={`w-full text-sm border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${isOverridden
-                                ? 'border-blue-300 bg-blue-50 text-blue-900 font-medium'
-                                : 'border-gray-200 text-gray-900 placeholder:text-gray-400'
+                        min={isPercentage ? 0 : undefined}
+                        max={isPercentage ? 100 : undefined}
+                        value={displayValue}
+                        onChange={(e) => handleChange(overrideKey, e.target.value, isPercentage)}
+                        placeholder={placeholderValue.toString()}
+                        className={`w-full text-sm border rounded px-2 py-1.5 pr-7 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors ${isOverridden
+                            ? 'border-blue-300 bg-blue-50 text-blue-900 font-medium'
+                            : 'border-gray-200 text-gray-900 placeholder:text-gray-400'
                             }`}
                     />
                     {isPercentage && (
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-gray-600 font-medium pointer-events-none select-none">
                             %
                         </span>
                     )}
                 </div>
                 {!isOverridden && (
                     <div className="text-[10px] text-gray-400 text-right">
-                        Global: {globalValue}
+                        Global: {placeholderValue}{isPercentage ? '%' : ''}
                     </div>
                 )}
             </div>
