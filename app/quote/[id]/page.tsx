@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
+import { cn } from '@/lib/utils';
 import BoardList from '@/components/QuoteBuilder/BoardList';
 import ItemSelection from '@/components/QuoteBuilder/ItemSelection';
 import BoardContent from '@/components/QuoteBuilder/BoardContent';
@@ -11,12 +11,37 @@ import GrandTotalView from '@/components/QuoteBuilder/GrandTotalView';
 import QuoteCostingOverrides from '@/components/QuoteBuilder/QuoteCostingOverrides';
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
+
+    // Load persisted preferences on mount
+    useEffect(() => {
+        if (quoteId) {
+            try {
+                const prefs = localStorage.getItem(`quote_builder_prefs_${quoteId}`);
+                if (prefs) {
+                    const { left, right } = JSON.parse(prefs);
+                    setLeftCollapsed(left ?? false);
+                    setRightCollapsed(right ?? false);
+                }
+            } catch (e) {
+                console.warn("Failed to load layout preferences", e);
+            }
+        }
+    }, [quoteId]);
+
+    // Save preferences on change
+    useEffect(() => {
+        if (quoteId) {
+            const prefs = JSON.stringify({ left: leftCollapsed, right: rightCollapsed });
+            localStorage.setItem(`quote_builder_prefs_${quoteId}`, prefs);
+        }
+    }, [leftCollapsed, rightCollapsed, quoteId]);
 
     if (loading) {
         return (
@@ -135,90 +160,71 @@ function QuoteBuilderContent() {
                 </div>
             </div>
 
-            {/* Resizable 3-Panel Layout */}
-            <div className="flex-1 overflow-hidden">
-                <PanelGroup direction="horizontal">
-                    {/* Panel 1: Board List (Collapsible) */}
-                    {!leftCollapsed && (
+            {/* 3-Column CSS Grid Layout */}
+            <div
+                className="flex-1 overflow-hidden grid transition-[grid-template-columns] duration-300 ease-in-out"
+                style={{
+                    gridTemplateColumns: `${leftCollapsed ? '64px' : '320px'} minmax(0, 1fr) ${rightCollapsed ? '64px' : '360px'}`
+                }}
+            >
+                {/* Panel 1: Board List (Collapsible) */}
+                <div className="h-full min-h-0 border-r border-gray-200 bg-gray-50 flex flex-col relative group/panel overflow-hidden">
+                    <BoardList
+                        boards={boards as any}
+                        selectedBoardId={selectedBoardId}
+                        onSelectBoard={setSelectedBoardId}
+                        quoteId={quoteId}
+                        onUpdate={refreshQuote}
+                        collapsed={leftCollapsed}
+                    />
+
+                    {/* Collapse/Expand Toggle */}
+                    <button
+                        onClick={() => setLeftCollapsed(!leftCollapsed)}
+                        className={cn(
+                            "absolute top-3 z-50 h-8 w-8 flex items-center justify-center bg-white border border-gray-200 shadow-sm rounded-md text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all",
+                            leftCollapsed ? "left-1/2 -translate-x-1/2" : "right-3"
+                        )}
+                        title={leftCollapsed ? "Expand Board List" : "Collapse Board List"}
+                    >
+                        {leftCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    </button>
+                </div>
+
+                {/* Panel 2: Board Content (Center) */}
+                <div className="h-full min-h-0 bg-white flex flex-col min-w-0">
+                    <BoardContent onAddItems={() => setIsItemDrawerOpen(true)} />
+                </div>
+
+                {/* Panel 3: Costing View (Collapsible) */}
+                <div className="h-full min-h-0 bg-gray-50 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 border-l border-gray-200 relative group/panel overflow-hidden">
+                    {/* Collapse/Expand Toggle (Always Visible) */}
+                    <button
+                        onClick={() => setRightCollapsed(!rightCollapsed)}
+                        className={cn(
+                            "absolute top-3 z-50 h-8 w-8 flex items-center justify-center bg-white border border-gray-200 shadow-sm rounded-md text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all",
+                            rightCollapsed ? "left-1/2 -translate-x-1/2" : "left-3"
+                        )}
+                        title={rightCollapsed ? "Expand Summary" : "Collapse Summary"}
+                    >
+                        {rightCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+                    </button>
+
+                    {rightCollapsed ? (
+                        <SlimCostingRail />
+                    ) : (
                         <>
-                            <Panel defaultSize={20} minSize={15} maxSize={30}>
-                                <div className="h-full border-r border-gray-200 bg-gray-50 flex flex-col">
-                                    <BoardList
-                                        boards={boards as any}
-                                        selectedBoardId={selectedBoardId}
-                                        onSelectBoard={setSelectedBoardId}
-                                        quoteId={quoteId}
-                                        onUpdate={refreshQuote}
-                                    />
-                                </div>
-                            </Panel>
-                            <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-500 transition-colors relative group">
-                                <button
-                                    onClick={() => setLeftCollapsed(true)}
-                                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 bg-white border border-gray-300 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-50"
-                                    title="Collapse sidebar"
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                            </PanelResizeHandle>
-                        </>
-                    )}
-
-                    {/* Collapsed Left Sidebar Toggle */}
-                    {leftCollapsed && (
-                        <button
-                            onClick={() => setLeftCollapsed(false)}
-                            className="w-8 bg-gray-100 hover:bg-gray-200 border-r border-gray-300 flex items-center justify-center transition-colors"
-                            title="Expand sidebar"
-                        >
-                            <ChevronRight size={16} />
-                        </button>
-                    )}
-
-                    {/* Panel 2: Board Content (Full Height) */}
-                    <Panel defaultSize={60} minSize={40}>
-                        <div className="h-full bg-white flex flex-col">
-                            <BoardContent onAddItems={() => setIsItemDrawerOpen(true)} />
-                        </div>
-                    </Panel>
-
-                    <PanelResizeHandle className="w-1 bg-gray-200 hover:bg-blue-500 transition-colors relative group">
-                        <button
-                            onClick={() => setRightCollapsed(true)}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 bg-white border border-gray-300 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-gray-50"
-                            title="Collapse sidebar"
-                        >
-                            <ChevronRight size={14} />
-                        </button>
-                    </PanelResizeHandle>
-
-                    {/* Panel 3: Costing View (Collapsible) */}
-                    {!rightCollapsed && (
-                        <Panel defaultSize={20} minSize={15} maxSize={30}>
-                            <div className="h-full bg-gray-50 flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.1)] z-10 border-l border-gray-200">
-                                <QuoteCostingOverrides />
-                                {/* Scrollable Container */}
-                                <div className="flex-1 overflow-y-auto">
-                                    <CostingView />
-                                    <div className="border-t-4 border-gray-200">
-                                        <GrandTotalView />
-                                    </div>
+                            <QuoteCostingOverrides />
+                            {/* Scrollable Container */}
+                            <div className="flex-1 overflow-y-auto">
+                                <CostingView />
+                                <div className="border-t-4 border-gray-200">
+                                    <GrandTotalView />
                                 </div>
                             </div>
-                        </Panel>
+                        </>
                     )}
-
-                    {/* Collapsed Right Sidebar Toggle */}
-                    {rightCollapsed && (
-                        <button
-                            onClick={() => setRightCollapsed(false)}
-                            className="w-8 bg-gray-100 hover:bg-gray-200 border-l border-gray-300 flex items-center justify-center transition-colors"
-                            title="Expand sidebar"
-                        >
-                            <ChevronLeft size={16} />
-                        </button>
-                    )}
-                </PanelGroup>
+                </div>
             </div>
 
             {/* Item Selection Drawer */}

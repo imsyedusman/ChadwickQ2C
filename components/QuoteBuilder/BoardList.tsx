@@ -24,7 +24,7 @@ interface BoardListProps {
     onUpdate: () => void;
 }
 
-export default function BoardList({ boards, selectedBoardId, onSelectBoard, quoteId, onUpdate }: BoardListProps) {
+export default function BoardList({ boards, selectedBoardId, onSelectBoard, quoteId, onUpdate, collapsed = false }: BoardListProps & { collapsed?: boolean }) {
     const { addBoard } = useQuote();
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [editingBoard, setEditingBoard] = useState<Board | null>(null);
@@ -117,27 +117,80 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
         }, 0);
     };
 
-    return (
-        <div className="flex flex-col h-full">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                <h2 className="font-semibold text-gray-700">Switchboards</h2>
-                <button
-                    onClick={() => {
-                        setEditingBoard(null);
-                        setIsWizardOpen(true);
-                    }}
-                    className="p-1.5 hover:bg-gray-200 rounded-md text-gray-600 transition-colors"
-                    title="Add Board"
-                >
-                    <Plus size={18} />
-                </button>
-            </div>
+    // Helper to get initials from board name
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2);
+    };
 
+    return (
+        <div className="flex flex-col h-full w-full">
+            {/* Header */}
+            {!collapsed ? (
+                <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0 h-[60px] pr-14">
+                    <h2 className="font-semibold text-gray-700">Switchboards</h2>
+                    <button
+                        onClick={() => {
+                            setEditingBoard(null);
+                            setIsWizardOpen(true);
+                        }}
+                        className="p-1.5 hover:bg-gray-200 rounded-md text-gray-600 transition-colors"
+                        title="Add Board"
+                    >
+                        <Plus size={18} />
+                    </button>
+                </div>
+            ) : (
+                <div className="flex flex-col items-center py-3 border-b border-gray-200 bg-gray-50 shrink-0 h-[80px] justify-end pb-2">
+                    <button
+                        onClick={() => {
+                            setEditingBoard(null);
+                            setIsWizardOpen(true);
+                        }}
+                        className="p-1.5 hover:bg-blue-100 hover:text-blue-600 rounded-md text-gray-500 transition-colors"
+                        title="Add Board"
+                    >
+                        <Plus size={20} />
+                    </button>
+                </div>
+            )}
+
+            {/* List */}
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
                 {boards.map((board) => {
                     const status = getBoardStatus(board);
                     const subtotal = getBoardSubtotal(board);
                     const isSelected = selectedBoardId === board.id;
+
+                    if (collapsed) {
+                        return (
+                            <div
+                                key={board.id}
+                                onClick={() => onSelectBoard(board.id)}
+                                className={cn(
+                                    "group flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer transition-all relative w-full aspect-square",
+                                    isSelected
+                                        ? "bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-500"
+                                        : "hover:bg-gray-100 text-gray-700 hover:shadow-sm"
+                                )}
+                                title={board.name} // Native Tooltip
+                            >
+                                <span className="font-bold text-xs">{getInitials(board.name)}</span>
+                                <div
+                                    className={cn(
+                                        "w-1.5 h-1.5 rounded-full mt-1",
+                                        status === 'green' && "bg-green-500",
+                                        status === 'orange' && "bg-orange-500",
+                                        status === 'gray' && "bg-gray-300"
+                                    )}
+                                />
+                            </div>
+                        );
+                    }
 
                     return (
                         <div
@@ -204,7 +257,7 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
 
                 {boards.length === 0 && (
                     <div className="text-center py-8 text-xs text-gray-400 italic">
-                        No boards yet. Click + to add one.
+                        {!collapsed ? "No boards yet. Click + to add one." : ""}
                     </div>
                 )}
             </div>
