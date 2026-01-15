@@ -244,9 +244,16 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
             return !!config.type && !!config.name && !!config.location && !!config.enclosureType && !!config.material;
         }
         if (step === 2) {
+            // Cable Zones
             if (config.cableZones === 'Yes' && (!config.cableZoneCount || config.cableZoneCount < 1)) {
                 return false;
             }
+
+            // Shipping Validation: If width > 4000mm, must have >1 shipping sections
+            if ((config.boardWidth || 0) > 4000 && (config.shippingSections || 1) < 2) {
+                return false;
+            }
+
             return true; // Construction fields are optional/numeric
         }
         return true;
@@ -452,13 +459,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </div>
                     </div>
 
-                    {/* Warning if Width > 4000mm */}
-                    {(config.boardWidth || 0) > 4000 && (
-                        <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md flex items-start gap-3">
-                            <AlertCircle size={18} className="text-orange-600 shrink-0 mt-0.5" />
-                            <div className="text-xs text-orange-800">
-                                <p className="font-bold mb-1">Board width exceeds 4m.</p>
-                                <p>This board may need to be delivered in multiple sections. If so, increase <strong>Shipping Sections</strong> to apply Site Reconnection automatically.</p>
+                    {/* Error if Width > 4000mm AND Shipping Sections is 1 */}
+                    {(config.boardWidth || 0) > 4000 && (config.shippingSections || 1) < 2 && (
+                        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md flex items-start gap-3 animate-in fade-in slide-in-from-top-1">
+                            <AlertCircle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                            <div className="text-xs text-red-800">
+                                <p className="font-bold mb-1">Invalid Configuration</p>
+                                <p>Board width exceeds 4m (4000mm). You <strong>must</strong> increase the <strong>Shipping Sections</strong> to at least 2.</p>
                             </div>
                         </div>
                     )}
@@ -806,7 +813,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         {step < 3 ? (
                             <button
                                 onClick={handleNext}
-                                className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-all flex items-center gap-2"
+                                disabled={!canProceed()}
+                                className={cn(
+                                    "px-6 py-2 text-sm font-bold text-white rounded-lg shadow-sm transition-all flex items-center gap-2",
+                                    canProceed()
+                                        ? "bg-blue-600 hover:bg-blue-700"
+                                        : "bg-gray-400 cursor-not-allowed opacity-70"
+                                )}
                             >
                                 Next Step <ArrowRight size={16} />
                             </button>
