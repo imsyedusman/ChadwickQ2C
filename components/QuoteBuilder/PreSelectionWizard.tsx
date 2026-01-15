@@ -82,43 +82,45 @@ const ALLOWED_CURRENTS: Record<string, string[]> = {
 const FORMS = ['1', '2b', '2bi', '3b', '3bih', '4a', '4b', '4aih'];
 const FAULT_RATINGS = ['25kA', '36kA', '50kA', '63kA', '70kA'];
 
+const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
+    type: '',
+    name: 'New Board', // Default placeholder
+    location: 'Indoor',
+    ipRating: '',
+    form: '',
+    faultRating: '',
+    enclosureType: '',
+    material: '',
+    currentRating: '',
+    spd: '',
+    ctMetering: 'No',
+    ctType: 'S',
+    ctQuantity: 1,
+    meterPanel: 'No',
+    wholeCurrentMetering: 'No',
+    wcType: '100A wiring 3-phase',
+    wcQuantity: 1,
+    drawingRef: 'No',
+    drawingRefNumber: '',
+    notes: '',
+    tierCount: 0,
+    baseRequired: 'No',
+    enclosureDepth: '400',
+    insulationLevel: 'air',
+    totalCompartments: 0,
+    isOver50kA: 'No',
+    isNonStandardColour: 'No',
+    boardWidth: undefined,
+    shippingSections: 1,
+    cableZones: 'No',
+    cableZoneCount: 0
+};
+
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
     const [step, setStep] = useState(1); // 1: Basics, 2: Construction, 3: Functional
 
     // Config State
-    const [config, setConfig] = useState<Partial<BoardConfig>>({
-        type: '',
-        name: '',
-        location: 'Indoor',
-        ipRating: '',
-        form: '',
-        faultRating: '',
-        enclosureType: '',
-        material: '',
-        currentRating: '',
-        spd: '',
-        ctMetering: 'No',
-        ctType: 'S',
-        ctQuantity: 1,
-        meterPanel: 'No',
-        wholeCurrentMetering: 'No',
-        wcType: '100A wiring 3-phase',
-        wcQuantity: 1,
-        drawingRef: 'No',
-        drawingRefNumber: '',
-        notes: '',
-        tierCount: 0,
-        baseRequired: 'No',
-        enclosureDepth: '400',
-        insulationLevel: 'air',
-        totalCompartments: 0,
-        isOver50kA: 'No',
-        isNonStandardColour: 'No',
-        boardWidth: undefined,
-        shippingSections: 1,
-        cableZones: 'No',
-        cableZoneCount: 0
-    });
+    const [config, setConfig] = useState<Partial<BoardConfig>>(DEFAULT_BOARD_CONFIG);
 
     const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -126,49 +128,18 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     useEffect(() => {
         if (isOpen) {
             setStep(1); // Always start at step 1 on open
-            if (initialConfig) {
+            if (initialConfig && Object.keys(initialConfig).length > 0) {
                 const newConfig = { ...initialConfig };
                 // Migration: legacy enclosureType cleanup
                 if (newConfig.enclosureType && !['Custom', 'Cubic'].includes(newConfig.enclosureType)) {
                     newConfig.material = newConfig.enclosureType;
                     newConfig.enclosureType = 'Custom';
                 }
-                setConfig(prev => ({ ...prev, ...newConfig }));
+                // Merge on top of defaults to ensure no missing fields
+                setConfig({ ...DEFAULT_BOARD_CONFIG, ...newConfig });
             } else {
-                // Reset defaults
-                setConfig({
-                    type: '',
-                    name: 'New Board', // Default placeholder
-                    location: 'Indoor',
-                    ipRating: '',
-                    form: '',
-                    faultRating: '',
-                    enclosureType: '',
-                    material: '',
-                    currentRating: '',
-                    spd: '',
-                    ctMetering: 'No',
-                    ctType: 'S',
-                    ctQuantity: 1,
-                    meterPanel: 'No',
-                    wholeCurrentMetering: 'No',
-                    wcType: '100A wiring 3-phase',
-                    wcQuantity: 1,
-                    drawingRef: 'No',
-                    drawingRefNumber: '',
-                    notes: '',
-                    tierCount: 0,
-                    baseRequired: 'No',
-                    enclosureDepth: '400',
-                    insulationLevel: 'air',
-                    totalCompartments: 0,
-                    isOver50kA: 'No',
-                    isNonStandardColour: 'No',
-                    boardWidth: undefined,
-                    shippingSections: 1,
-                    cableZones: 'No',
-                    cableZoneCount: 0
-                });
+                // Reset defaults completely
+                setConfig(DEFAULT_BOARD_CONFIG);
             }
         }
     }, [isOpen, initialConfig]);

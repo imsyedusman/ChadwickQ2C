@@ -257,12 +257,13 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
             </div>
 
             <PreSelectionWizard
+                key={editingBoard ? editingBoard.id : 'new-board'}
                 isOpen={isWizardOpen}
                 onClose={handleCloseWizard}
                 onConfirm={handleCreateBoard}
                 initialConfig={typeof editingBoard?.config === 'string'
                     ? JSON.parse(editingBoard.config)
-                    : (editingBoard?.config || {})}
+                    : (editingBoard?.config || undefined)}
             />
         </div>
     );
