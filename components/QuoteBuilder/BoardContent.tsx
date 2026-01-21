@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock } from 'lucide-react';
+import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import BoardSummary from './BoardSummary';
@@ -73,7 +73,7 @@ interface BoardContentProps {
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
-    const { boards, selectedBoardId, updateItem, removeItem } = useQuote();
+    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings } = useQuote();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
@@ -211,11 +211,21 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 {/* Price & Total (Lock if Formula-Priced - though price edit UI not fully exposed here anyway) */}
                 <div className="text-right w-20">
                     <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
-                    <div
-                        className="text-[10px] text-gray-400 cursor-help"
-                        title={formulaPriced ? "Price is formula-driven" : "Unit Price"}
-                    >
-                        {formatCurrency(item.unitPrice)} ea
+                    <div className="flex justify-end gap-1">
+                        <div
+                            className="text-[10px] text-gray-400 cursor-help"
+                            title={formulaPriced ? "Price is formula-driven" : "Unit Price"}
+                        >
+                            {formatCurrency(item.unitPrice)} ea
+                        </div>
+                        {item.labourHours > 0 && (
+                            <div
+                                className="text-gray-400 cursor-help flex items-center"
+                                title={`Material: ${formatCurrency(item.unitPrice)} ea\nLabor: ${item.quantity} x ${item.labourHours}hr = ${item.quantity * item.labourHours}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((item.unitPrice * item.quantity) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
+                            >
+                                <Clock size={12} />
+                            </div>
+                        )}
                     </div>
                 </div>
 
