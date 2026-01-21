@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
@@ -43,6 +44,13 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
             setQty(existingQty);
         }
     }, [existingQty]);
+
+    const handleManagedClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (autoManaged) {
+            toast.info("This item is automatically calculated based on your board setup. To add or change it, please go back to the 'Board Configuration' menu.");
+        }
+    };
 
     return (
         <div
@@ -88,10 +96,16 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
             {/* Right Side: Logic */}
             <div className="flex items-center gap-4 shrink-0">
                 {/* Quantity Selector */}
-                <div className="flex items-center gap-0 bg-white border border-gray-300 rounded overflow-hidden h-9 shadow-sm">
+                <div
+                    className="flex items-center gap-0 bg-white border border-gray-300 rounded overflow-hidden h-9 shadow-sm"
+                    onClick={autoManaged ? handleManagedClick : undefined}
+                >
                     <button
-                        onClick={(e) => { e.stopPropagation(); setQty(Math.max(1, qty - 1)); }}
-                        disabled={autoManaged}
+                        onClick={(e) => {
+                            if (autoManaged) { handleManagedClick(e); return; }
+                            e.stopPropagation();
+                            setQty(Math.max(1, qty - 1));
+                        }}
                         className={cn(
                             "w-9 h-full flex items-center justify-center transition-colors border-r border-gray-200 active:bg-gray-100",
                             autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
@@ -108,15 +122,22 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
                             const val = parseInt(e.target.value);
                             setQty(isNaN(val) || val < 1 ? 1 : val);
                         }}
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                            if (autoManaged) { handleManagedClick(e as any); return; }
+                            e.stopPropagation();
+                        }}
                         className={cn(
                             "w-14 h-full text-center text-base font-semibold focus:outline-none focus:ring-inset focus:ring-1 focus:ring-blue-500 bg-transparent flex items-center justify-center p-0",
-                            autoManaged ? "text-gray-400 bg-gray-50" : "text-gray-900"
+                            autoManaged ? "text-gray-400 bg-gray-50 cursor-pointer" : "text-gray-900" // cursor-pointer on input to encourage click for toast? Or not-allowed? User said click.
                         )}
+                        style={autoManaged ? { cursor: 'not-allowed' } : {}}
                     />
                     <button
-                        onClick={(e) => { e.stopPropagation(); setQty(qty + 1); }}
-                        disabled={autoManaged}
+                        onClick={(e) => {
+                            if (autoManaged) { handleManagedClick(e); return; }
+                            e.stopPropagation();
+                            setQty(qty + 1);
+                        }}
                         className={cn(
                             "w-9 h-full flex items-center justify-center transition-colors border-l border-gray-200 active:bg-gray-100",
                             autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
@@ -142,6 +163,7 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
                 {/* Add/Update Button */}
                 <button
                     onClick={(e) => {
+                        if (autoManaged) { handleManagedClick(e); return; }
                         e.stopPropagation();
                         onAdd(item, qty);
                     }}
@@ -153,7 +175,6 @@ function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
                                 ? "bg-white border border-blue-600 text-blue-600 hover:bg-blue-50"
                                 : "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md active:transform active:scale-95"
                     )}
-                    disabled={!!autoManaged}
                 >
                     {existingQty > 0 ? (
                         <>
@@ -380,7 +401,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                 const data = await res.json();
 
                 // Filter out system-managed basics that shouldn't be added manually
-                const filteredData = data.filter((i: any) => !isAutoManaged(i.partNumber));
+                const filteredData = data;
 
                 setItems(filteredData);
             }
