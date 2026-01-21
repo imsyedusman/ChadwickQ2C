@@ -244,6 +244,12 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
             return !!config.type && !!config.name && !!config.location && !!config.enclosureType && !!config.material;
         }
         if (step === 2) {
+            // New Step 2: Functional (Previously Step 3)
+            // No strict validation required for Functional step as per existing logic
+            return true;
+        }
+        if (step === 3) {
+            // New Step 3: Construction (Previously Step 2)
             // Cable Zones
             if (config.cableZones === 'Yes' && (!config.cableZoneCount || config.cableZoneCount < 1)) {
                 return false;
@@ -254,7 +260,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 return false;
             }
 
-            return true; // Construction fields are optional/numeric
+            return true;
         }
         return true;
     };
@@ -755,28 +761,37 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
                     {/* Progress Steps */}
                     <div className="flex items-center gap-2 text-sm font-medium">
-                        <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 1 ? "bg-blue-100 text-blue-700" : "text-gray-500")}>
+                        <button
+                            onClick={() => setStep(1)}
+                            className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 1 ? "bg-blue-100 text-blue-700" : "text-gray-500 hover:bg-gray-100")}
+                        >
                             <div className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-[10px] text-white font-bold">1</div>
                             Basics
-                        </div>
+                        </button>
                         <div className="h-px w-8 bg-gray-300"></div>
-                        <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 2 ? "bg-orange-100 text-orange-700" : "text-gray-500")}>
+                        <button
+                            onClick={() => { if (step === 1 && !canProceed()) return; setStep(2); }}
+                            className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 2 ? "bg-green-100 text-green-700" : "text-gray-500 hover:bg-gray-100")}
+                        >
                             <div className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-[10px] text-white font-bold">2</div>
-                            Construction
-                        </div>
-                        <div className="h-px w-8 bg-gray-300"></div>
-                        <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 3 ? "bg-green-100 text-green-700" : "text-gray-500")}>
-                            <div className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-[10px] text-white font-bold">3</div>
                             Functional
-                        </div>
+                        </button>
+                        <div className="h-px w-8 bg-gray-300"></div>
+                        <button
+                            onClick={() => { if ((step === 1 || step === 2) && !canProceed()) return; setStep(3); }}
+                            className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors", step === 3 ? "bg-orange-100 text-orange-700" : "text-gray-500 hover:bg-gray-100")}
+                        >
+                            <div className="w-5 h-5 rounded-full bg-current flex items-center justify-center text-[10px] text-white font-bold">3</div>
+                            Construction
+                        </button>
                     </div>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 overflow-y-auto flex-1">
                     {step === 1 && renderStep1()}
-                    {step === 2 && renderStep2()}
-                    {step === 3 && renderStep3()}
+                    {step === 2 && renderStep3()}
+                    {step === 3 && renderStep2()}
                 </div>
 
                 {/* Error Banner */}
