@@ -515,8 +515,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
         // 3. 1A-COLOUR (Non-standard Colour)
         if (config.isNonStandardColour === 'Yes') {
-            // Formula: Qty = compartments, Unit Price = 80 (Fixed)
-            addTarget('1A-COLOUR', totalCompartments, 80);
+            // Formula: Qty = compartments, Unit Price = 80, Labor = 0.1
+            addTarget('1A-COLOUR', totalCompartments, 80, 0.1);
         }
     }
 
@@ -743,10 +743,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const newQty = targetQty; // We enforce quantity for auto-items
 
             // Only update if changes needed
-            // Also force subcategory for 1A-50KA if updating
-            const is1A50KA = partNumber === '1A-50KA';
+            // Also force subcategory for 1A-50KA and 1A-COLOUR if updating
+            const isCubicExtra = ['1A-50KA', '1A-COLOUR'].includes(partNumber);
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
-            const forcedSubcategory = is1A50KA ? CUBIC_SUBCATEGORY : undefined;
+            const forcedSubcategory = isCubicExtra ? CUBIC_SUBCATEGORY : undefined;
 
             if (existingItem.quantity !== newQty ||
                 (Math.abs(existingItem.unitPrice - newUnitPrice) > 0.01) ||
@@ -797,10 +797,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             ];
 
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
-            const is1A50KA = partNumber === '1A-50KA';
+            const isCubicExtra = ['1A-50KA', '1A-COLOUR'].includes(partNumber);
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
 
-            const forcedSubcategory = is1A50KA ? CUBIC_SUBCATEGORY : undefined;
+            const forcedSubcategory = isCubicExtra ? CUBIC_SUBCATEGORY : undefined;
 
             let finalUnitPrice = 0;
             let finalLabourHours = 0;
