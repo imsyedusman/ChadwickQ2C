@@ -53,6 +53,8 @@ export default function BoardSummary() {
                     <span>Cubic Summary</span>
                     <span className="text-gray-300 mx-1">|</span>
                     <span className="text-gray-600 font-normal">Cubic Enclosure Base: <span className="font-semibold text-indigo-900">{formatCurrency(totalCubic)}</span></span>
+                    <span className="text-gray-300 mx-1">|</span>
+                    <span className="text-indigo-700 font-semibold">Quoted Cubic Enclosure (includes +4%): {formatCurrency(totalCubic * 1.04)}</span>
                 </div>
             </div>
         );

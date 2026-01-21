@@ -320,7 +320,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 return sum;
             }, 0);
 
-            const sheetmetalUplift = applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0;
+            const sheetmetalUplift = (applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0) + (cubicSubtotal * 0.04);
 
             // Total Material = Base + Uplift
             const materialCost = baseMaterialCost + sheetmetalUplift;

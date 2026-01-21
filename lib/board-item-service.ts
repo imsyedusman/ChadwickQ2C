@@ -417,6 +417,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         targetItemPartNumbers.add('1B-SS-NO4');
     }
 
+    // Ensure Cubic Options are targeted before fetch
+    if (config.enclosureType === 'Cubic') {
+        if (config.isOver50kA === 'Yes') targetItemPartNumbers.add('1A-50KA');
+        if (config.isNonStandardColour === 'Yes') targetItemPartNumbers.add('1A-COLOUR');
+    }
+
     const targetPartNumbersArray = Array.from(targetItemPartNumbers);
 
     // Fetch catalog info for all targets
@@ -502,7 +508,9 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const materialTotal = totalCompartments * compartmentUnitPrice;
             const cost50kA = materialTotal / 4;
             // Qty = 1, Unit Price = Cost
-            addTarget('1A-50KA', 1, cost50kA);
+            // Labor Logic: For every $250 in material, add 1 hour labor
+            const labour50kA = cost50kA / 250;
+            addTarget('1A-50KA', 1, cost50kA, labour50kA);
         }
 
         // 3. 1A-COLOUR (Non-standard Colour)
@@ -649,7 +657,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         ...CUBIC_OPTIONS_ITEMS,
         BUSBAR_INSULATION_ITEM,
         'MISC-SITE-RECONNECTION',
-        'MISC-CABLE-TRAY'
+        'MISC-CABLE-TRAY',
+        '1A-50KA'
     ];
 
     // Also add Busbars/Labour patterns to removal check
@@ -734,10 +743,16 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const newQty = targetQty; // We enforce quantity for auto-items
 
             // Only update if changes needed
+            // Also force subcategory for 1A-50KA if updating
+            const is1A50KA = partNumber === '1A-50KA';
+            const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
+            const forcedSubcategory = is1A50KA ? CUBIC_SUBCATEGORY : undefined;
+
             if (existingItem.quantity !== newQty ||
                 (Math.abs(existingItem.unitPrice - newUnitPrice) > 0.01) ||
                 (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
                 (forcedCategory && existingItem.category !== forcedCategory) ||
+                (forcedSubcategory && existingItem.subcategory !== forcedSubcategory) ||
                 (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false))) {
 
                 await prisma.item.update({
@@ -748,6 +763,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         labourHours: newLabour,
                         cost: newUnitPrice * newQty,
                         category: forcedCategory || existingItem.category, // Enforce basics/busbar if needed
+                        subcategory: forcedSubcategory || existingItem.subcategory,
                         isSheetmetal: catalogItem?.isSheetmetal || false
                     }
                 });
@@ -781,6 +797,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             ];
 
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
+            const is1A50KA = partNumber === '1A-50KA';
+            const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
+
+            const forcedSubcategory = is1A50KA ? CUBIC_SUBCATEGORY : undefined;
 
             let finalUnitPrice = 0;
             let finalLabourHours = 0;
@@ -805,7 +825,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 data: {
                     boardId,
                     category: forcedCategory || catItem.category || 'Basics',
-                    subcategory: catItem.subcategory,
+                    subcategory: forcedSubcategory || catItem.subcategory,
                     name: catalogItem?.partNumber || partNumber,
                     description: catItem.description,
                     unitPrice: finalUnitPrice,

@@ -73,7 +73,7 @@ export default function CostingView() {
                                 }
                             }
 
-                            if (config?.enclosureType === 'Custom' && totals.sheetmetalUplift > 0) {
+                            if (totals.sheetmetalUplift > 0) {
                                 return (
                                     <div className="flex justify-between text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded -mx-1.5">
                                         <span>+ Sheetmetal Uplift (4%)</span>
