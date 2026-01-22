@@ -22,6 +22,7 @@ export interface BoardConfig {
     shippingSections?: number; // Integer, min 1
     cableZones?: string; // 'Yes' | 'No'
     cableZoneCount?: number;
+    includesAcbs?: string; // 'Yes' | 'No'
     [key: string]: any;
 }
 
@@ -255,13 +256,16 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         addTarget('1B-BASE', tierCount, unitPrice);
     }
 
-    // New 2025-12-10: 1B-DOORS for Outdoor Custom boards
-    // Rule: Custom + Outdoor + Tiers > 0 -> Add 1B-DOORS (Qty = TierCount)
-    // Used for "Extra for Doors Over (Yes = 1)"
-    if (config.enclosureType === 'Custom' && config.location === 'Outdoor' && tierCount > 0) {
-        addTarget('1B-DOORS', tierCount);
+    // E. Custom Enclosure Extras (Doors & Depth)
+    // Applies to all Custom boards with tiers > 0
+    if (config.enclosureType === 'Custom' && tierCount > 0) {
 
-        // Enclosure Depth Logic (Added 2025-12-12)
+        // 1. Outdoor Doors (Strictly Outdoor)
+        if (config.location === 'Outdoor') {
+            addTarget('1B-DOORS', tierCount);
+        }
+
+        // 2. Depth Logic (All Custom Boards - Indoor & Outdoor)
         // Rule: If 600mm -> 1B-600MM @ $500/tier
         //       If 800mm -> 1B-800MM @ $1000/tier
         //       If 400mm (Standard) -> None
@@ -271,7 +275,6 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         } else if (depth === '800') {
             addTarget('1B-800MM', tierCount, 1000);
         }
-        // 400mm falls through, no target added (so it will be removed if present)
     }
 
     // New 2025-12-23: Cable Zones

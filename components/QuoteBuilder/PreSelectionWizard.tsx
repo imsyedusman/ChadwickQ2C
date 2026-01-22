@@ -113,7 +113,8 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     boardWidth: undefined,
     shippingSections: 1,
     cableZones: 'No',
-    cableZoneCount: 0
+    cableZoneCount: 0,
+    includesAcbs: 'No'
 };
 
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
@@ -235,6 +236,38 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
             }
         }
     }, [config.location, config.enclosureType]);
+
+    // NEW: Depth Automation Logic (Added 2026-01-22)
+    useEffect(() => {
+        // Only automate if we have a current rating.
+        // If user manually changes depth later, this effect might overwrite it if dependencies change.
+        // To allow manual override, we might strictly only run this when dependencies change, which is standard.
+        if (!config.currentRating) return;
+
+        const amps = parseInt(config.currentRating.replace(/[^0-9]/g, '')) || 0;
+        let newDepth = '400'; // Default Scenario A
+
+        if (amps <= 400) {
+            newDepth = '400';
+        } else if (amps > 400 && amps <= 1600) {
+            newDepth = '600'; // Scenario B
+        } else if (amps >= 1600 && config.includesAcbs === 'Yes') {
+            newDepth = '800'; // Scenario C
+        } else if (amps >= 1600) {
+            newDepth = '600'; // Fallback for high current but NO ACBs? Or should it be 800?
+            // "800mm Depth: ... AND the board Includes ACBs."
+            // Implies if NO ACBs, default to 600? Or 400?
+            // Usually high current needs depth. Let's assume 600 is safer max unless ACBs.
+            // Or maybe > 1600A always needs 600 at least.
+        }
+
+        // Only update if different to avoid loops
+        if (config.enclosureDepth !== newDepth) {
+            setConfig(prev => ({ ...prev, enclosureDepth: newDepth }));
+        }
+
+    }, [config.currentRating, config.includesAcbs]);
+
 
 
     // --- NAVIGATION ---
@@ -419,24 +452,22 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     </div>
                 </div>
 
-                {/* Enclosure Depth - Custom Outdoor Only */}
-                {config.enclosureType === 'Custom' && config.location === 'Outdoor' && (
-                    <div className="mt-6 border-t border-gray-100 pt-4">
-                        <div className="space-y-1 w-full md:w-1/2">
-                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Enclosure Depth</label>
-                            <select
-                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                value={config.enclosureDepth || '400'}
-                                onChange={e => setConfig({ ...config, enclosureDepth: e.target.value })}
-                            >
-                                <option value="400">400 mm (Standard)</option>
-                                <option value="600">600 mm</option>
-                                <option value="800">800 mm</option>
-                            </select>
-                            <p className="text-xs text-gray-500 mt-1">Deeper enclosures require additional material cost per tier.</p>
-                        </div>
+                {/* Enclosure Depth - NOW ALWAYS VISIBLE (Updated 2026-01-22) */}
+                <div className="mt-6 border-t border-gray-100 pt-4">
+                    <div className="space-y-1 w-full md:w-1/2">
+                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Enclosure Depth</label>
+                        <select
+                            className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                            value={config.enclosureDepth || '400'}
+                            onChange={e => setConfig({ ...config, enclosureDepth: e.target.value })}
+                        >
+                            <option value="400">400 mm (Standard)</option>
+                            <option value="600">600 mm</option>
+                            <option value="800">800 mm</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Automatically selected based on rating, but can be manually overridden. Deeper enclosures effect cost.</p>
                     </div>
-                )}
+                </div>
 
                 {/* Shipping & Reconnection Logic (Added 2025-12-15) */}
                 <div className="mt-6 border-t border-gray-100 pt-4">
@@ -607,6 +638,16 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
                             value={config.spd}
                             onChange={e => setConfig({ ...config, spd: e.target.value })}
+                        >
+                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Includes ACBs?</label>
+                        <select
+                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                            value={config.includesAcbs || 'No'}
+                            onChange={e => setConfig({ ...config, includesAcbs: e.target.value })}
                         >
                             {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
                         </select>
