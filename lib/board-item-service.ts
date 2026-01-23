@@ -162,6 +162,13 @@ const CUBIC_OPTIONS_ITEMS = [
     '1A-COLOUR'
 ];
 
+function getCleatType(currentRating: number): string | null {
+    if (currentRating <= 400) return '1B1-CLEAT-SMALL-1';
+    if (currentRating <= 1000) return '1B1-CLEAT-SMALL-2';
+    if (currentRating <= 2000) return '1B1-CLEAT-LARGE-2';
+    return '1B1-CLEAT-LARGE-3';
+}
+
 export async function syncBoardItems(boardId: string, config: BoardConfig, options?: { forceTiers?: boolean }) {
     console.log(`Syncing items for board ${boardId} with config:`, JSON.stringify(config, null, 2));
 
@@ -284,81 +291,66 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // --- METERING LOGIC ---
-    // Refactored 2025-12-22 to enforce strict mutual exclusivity (CT > WC)
+    // Refactored 2026-01-23 to enforce strict CT Mode & Mutual Exclusivity
 
-    // 1. Determine METERING MODE
-    // CT Mode applies if:
-    // a) Explicitly selected (ctMetering = 'Yes')
-    // b) Current Rating > 100A (Implies SACT)
-    // c) NOTE: We parse currentRating to handle '400A' or '400' or empty
+    // 1. Centralize CT Mode Decision
+    // Rule: CT Mode = (ctMetering === "Yes") OR (currentRating > 100)
+    // Note: ctMetering check is strictly case-insensitive "yes". Blanks/Undefined/No are FALSE.
+
     const amps = parseInt((config.currentRating || '0').replace(/[^0-9]/g, '')) || 0;
-    const isCtMode = (config.ctMetering === 'Yes') || (amps > 100);
+    const ctMeteringStrict = (config.ctMetering || '').toLowerCase() === 'yes';
+    const isOver100A = amps > 100;
 
-    // WC Mode applies if:
-    // a) Explicitly selected (wholeCurrentMetering = 'Yes')
-    // b) AND NOT in CT Mode (Mutual Exclusivity)
-    const isWcMode = (config.wholeCurrentMetering === 'Yes') && !isCtMode;
+    const isCtMode = ctMeteringStrict || isOver100A;
 
-    const meterPanelSelected = config.meterPanel === 'Yes';
+    // DEBUG LOGGING
+    console.log('--- CT DEBUG ---');
+    console.log(`Config CT Metering: "${config.ctMetering}"`);
+    console.log(`Config Current Rating: "${config.currentRating}"`);
+    console.log(`Parsed Amps: ${amps}`);
+    console.log(`Is Over 100A: ${isOver100A}`);
+    console.log(`CT Strict (Yes?): ${ctMeteringStrict}`);
+    console.log(`FINAL CT MODE: ${isCtMode}`);
+    console.log('----------------');
+
     const ctQty = config.ctQuantity || 1;
+    const meterPanelSelected = config.meterPanel === 'Yes';
 
     // 2. APPLY LOGIC
 
     // D. CT Metering (SACT)
     if (isCtMode) {
-        // Add CT Base Items
-        CT_BASE_ITEMS.forEach(pn => {
-            // Special handling: CT-PANEL
-            // Rule: "Must use the $80 CT meter panel".
-            // Typically CT-PANEL is in CT_BASE_ITEMS? Yes.
-            // But if meterPanelSelected is FALSE, do we suppress it?
-            // The prompt says "Must use the $80 CT meter panel" for SACT.
-            // Usually SACT *implies* a meter panel.
-            // But old logic was: if ctMetering='Yes', add CT_BASE_ITEMS (which includes CT-PANEL).
-            // AND if meterPanel='Yes', add METER_PANEL_ITEMS (which added 100A-PANEL!).
-            // So: We should add CT-PANEL if isCtMode is true OR meterPanel is selected?
-            // "When SACT is selected... Must use the $80 CT meter panel"
-            // "If User checks 'Meter Panel', it should add the CORRECT panel"
-            // Let's assume CT items (chamber/wiring) always needed for CT.
-            // Panel itself might be optional? But prompt says "Must use $80 CT meter panel".
-            // I will add CT_BASE_ITEMS always for CT Mode.
-            addTarget(pn, ctQty);
-        });
+        // Add CT Base Items strictly
+        CT_BASE_ITEMS.forEach(pn => addTarget(pn, ctQty));
 
         if (config.ctType) addTarget(`CT-${config.ctType}-TYPE`, ctQty);
 
         if (config.currentRating && config.enclosureType) {
-            const busbar = getBusbarPartNumber(config.currentRating, config.enclosureType);
-            if (busbar) addTarget(busbar, ctQty);
+            const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
+            if (busbarPartNumber) {
+                // Fix 2026-01-23: Respect user-edited quantity for busbars.
+                // Auto-add with default 1 only if it doesn't exist.
+                // If it exists, use its current quantity to prevent sync from reverting edits.
+                const existingBusbar = existingItems.find(i => i.name === busbarPartNumber);
+                const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
+                addTarget(busbarPartNumber, busbarQty);
+            }
         }
         if (config.currentRating) {
             const labour = getLabourPartNumber(config.currentRating);
             if (labour) addTarget(labour, ctQty);
         }
-
-        // Logic Check: Did we add CT-PANEL?
-        // CT_BASE_ITEMS = ['CT-COMPARTMENTS', 'CT-PANEL', 'CT-TEST-BLOCK', 'CT-WIRING']
-        // Yes, it is added.
-
-        // Wait, if user UNCHECKED "Meter Panel" but has CT... do they still get a panel?
-        // Prompt: "Must use the $80 CT meter panel".
-        // It seems bundled. I will leave it as is.
     }
 
     // E. Whole Current Metering
-    if (isWcMode) {
+    // Only if NOT in CT Mode AND Amps <= 100 (Implicit by !isCtMode definition above)
+    // Wait, isCtMode definition covers amps > 100. So !isCtMode implies amps <= 100 AND ctMetering != Yes.
+    // So checking !isCtMode is sufficient for mutual exclusivity.
+
+    if (!isCtMode && config.wholeCurrentMetering === 'Yes') {
         const wcQty = config.wcQuantity || 1;
 
-        // Add 100A Meter Panel?
-        // Rule: "Must use the $60 100A meter panel"
-        // Prompt says: "Whole Current -> $60 panel".
-        // Was it conditional on "Meter Panel" existing?
-        // Old logic: "if wholeCurrentMetering='Yes' -> Add fuse, link, mcb... but NOT panel explicitly in this block?"
-        // Old logic expected METER_PANEL_ITEMS (Section E) to add it if 'meterPanel'='Yes'.
-        // NEW LOGIC: We should add it if isWcMode is TRUE.
-        // But what if user didn't check "Meter Panel"?
-        // Usually "Whole Current Metering" implies the kit.
-        // I will add 100A-PANEL here.
+        // Add 100A Meter Panel & Kit items
         addTarget('100A-PANEL', wcQty);
 
         if (config.wcType === '100A wiring 3-phase') {
@@ -372,21 +364,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
 
-    // F. "Meter Panel" Checkbox (Legacy/Helper)
-    // If the user selected "Meter Panel" = Yes, but NEITHER CT nor WC is strictly active?
-    // (e.g. they just want a panel, no metering logic?)
-    // Or if they are in a mode, ensuring checking that box doesn't break things.
-    // If isCtMode, we already added CT-PANEL.
-    // If isWcMode, we already added 100A-PANEL.
-    // So this Flag is mostly redundant OR used to force a panel if one wasn't added?
-    // For safety: If meterPanelSelected is YES, and we haven't added a panel yet...
-    // default to 100A-PANEL? Or CT-PANEL?
-    // Probably 100A-PANEL is the default "Meter Panel".
-    // But be careful not to add it if isCtMode!
-
-    if (meterPanelSelected && !isCtMode && !isWcMode) {
-        // Standalone Meter Panel usage (rare?). Default to 100A-PANEL.
-        addTarget('100A-PANEL', ctQty);
+    // F. "Meter Panel" Checkbox Legacy/Helper
+    // If user clicked "Meter Panel" but is NOT in CT mode (so didn't get CT-PANEL)
+    // AND didn't select WC Metering (so didn't get 100A-PANEL).
+    // This allows a standalone panel if explicitly requested.
+    if (meterPanelSelected && !isCtMode && config.wholeCurrentMetering !== 'Yes') {
+        addTarget('100A-PANEL', ctQty); // Default to smaller panel if no rating/mode implies otherwise
     }
 
     // G. Site Reconnection (Auto-Add)
@@ -394,8 +377,6 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // Only applies if Board Width > 4m AND Shipping Sections > 1
     const boardWidth = config.boardWidth || 0;
     const shippingSections = config.shippingSections || 1;
-
-    // console.log(`[Site Reconnection Check] Width: ${boardWidth}, Sections: ${shippingSections}`); // noisy log removed
 
     if (boardWidth > 4000) {
         const reconnectionUnits = Math.floor((shippingSections + 1) / 2);
@@ -405,7 +386,82 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
 
-    // --- 3. FETCH CATALOG DATA (MOVED UP) ---
+    // --- 2.5 IDENTIFY BUSBARS & CALCULATE CLEATS (Pre-Catalog Fetch) ---
+    // We need to identify busbars early to calculate auto-cleats, 
+    // so that the cleat Part Numbers are added to targets BEFORE we fetch the catalog.
+
+    // Identify Busbars on this board
+    const effectiveBusbarItems = new Map<string, { qty: number, price: number, labour: number, category: string }>();
+
+    // 1. Process Existing Items first
+    existingItems.forEach(item => {
+        if (item.name === BUSBAR_INSULATION_ITEM) return;
+        const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
+            (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
+        if (isBusbar) {
+            effectiveBusbarItems.set(item.name, {
+                qty: item.quantity,
+                price: item.unitPrice,
+                labour: item.labourHours,
+                category: item.category
+            });
+        }
+    });
+
+    // 2. Process Targets (Overrides existing)
+    targetItemPartNumbers.forEach(pn => {
+        if (pn === BUSBAR_INSULATION_ITEM) return;
+        const qty = itemQuantities.get(pn) || 0;
+        if (qty <= 0) {
+            effectiveBusbarItems.delete(pn);
+            return;
+        }
+
+        // Try to identify if target is busbar (basic heuristic + existing check)
+        let isBusbar = false;
+        let category = 'Basics';
+
+        const existing = existingItems.find(i => i.name === pn);
+        if (existing) category = existing.category;
+
+        if (category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) {
+            isBusbar = true;
+        }
+
+        if (isBusbar) {
+            const price = customPricing.get(pn) ?? (existing?.unitPrice || 0);
+            const labour = customLabour.get(pn) ?? (existing?.labourHours || 0);
+            effectiveBusbarItems.set(pn, { qty, price, labour, category });
+        }
+    });
+
+    // --- CLEAT LOGIC (Form 3B) ---
+    const form = (config.form || '').toLowerCase();
+    if (form === '3b') {
+        const cleatMap = new Map<string, number>();
+
+        effectiveBusbarItems.forEach((val, key) => {
+            // Extract rating from Part Number
+            const ratingMatch = key.match(/-(\d+)A/);
+            if (ratingMatch && ratingMatch[1]) {
+                const rating = parseInt(ratingMatch[1]);
+                const cleatType = getCleatType(rating);
+
+                if (cleatType) {
+                    const cleatQty = Math.ceil(val.qty * 2.5); // 1000/400 = 2.5
+                    const currentTotal = cleatMap.get(cleatType) || 0;
+                    cleatMap.set(cleatType, currentTotal + cleatQty);
+                }
+            }
+        });
+
+        // Add consolidated cleat targets (will be fetched in Step 3)
+        cleatMap.forEach((qty, partNumber) => {
+            addTarget(partNumber, qty);
+        });
+    }
+
+    // --- 3. FETCH CATALOG DATA ---
     // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
 
     // Ensure 1A-COMPARTMENTS is targeted for Cubic before fetch
@@ -536,83 +592,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const insulationFactor = insulationLevel === 'fully' ? 1.0 : (insulationLevel === 'air' ? 0.25 : 0);
 
     // Identify Busbars on this board
-    // We must look at the EFFECTIVE list of items (Existing items + New Targets).
-    // Note: We do NOT fetch the catalog for this. We use what is on the board.
-
-    const effectiveBusbarItems = new Map<string, { qty: number, price: number, labour: number, category: string }>();
-
-    // 1. Process Existing Items first
-    existingItems.forEach(item => {
-        // Skip if this item is being removed (it's not in targets and is managed/default)
-        // Actually, the removal logic happens later (Step 5A). We need to simulate it here.
-        // A simple heuristic: If it's a "Managed Item" (like auto-added tier items), it MIGHT be removed if not in targets.
-        // BUT Busbars are usually user-added or auto-added.
-        // Let's rely on: If it's in existing items, count it, UNLESS it's strictly a target that we know we are setting to 0 (unlikely for busbars).
-
-        // Critical: Don't count "Busbar Insulation" itself to avoid recursion/loops
-        if (item.name === BUSBAR_INSULATION_ITEM) return;
-
-        // Check isBusbar
-        // Rule: Category "Busbar" OR (Fallback) Name starts with BB-/BBC-
-        const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
-            (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
-
-        if (isBusbar) {
-            effectiveBusbarItems.set(item.name, {
-                qty: item.quantity,
-                price: item.unitPrice,
-                labour: item.labourHours,
-                category: item.category
-            });
-        }
-    });
-
-    // 2. Process Targets (Overrides existing)
-    targetItemPartNumbers.forEach(pn => {
-        if (pn === BUSBAR_INSULATION_ITEM) return;
-
-        const qty = itemQuantities.get(pn) || 0;
-
-        // If target logic set qty to 0, remove it from effective list
-        if (qty <= 0) {
-            effectiveBusbarItems.delete(pn);
-            return;
-        }
-
-        // Check if this target is a busbar
-        // We might not have category for a pure target if it's new.
-        // We can inspect the existing item (if any) or look at the name pattern.
-        // In this specific flow, targets are usually things `syncBoardItems` controls (Tiers, Misc, etc.)
-        // Busbars are rarely "Targets" unless we add auto-busbars later.
-        // IF we have auto-busbars, they will be here.
-
-        // For now, let's blindly check name pattern if we don't have category context,
-        // OR check if we have it in our set.
-        let isBusbar = false;
-        let category = 'Basics'; // Default for targets if unknown
-
-        // Try to find category from existing
-        const existing = existingItems.find(i => i.name === pn);
-        if (existing) category = existing.category;
-
-        if (category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) {
-            isBusbar = true;
-        }
-
-        if (isBusbar) {
-            // Price/Labour?
-            // If customPricing has it, use it. Else use existing. Price defaults to 0 if neither (will get fixed in DB step but for calc we use 0)
-            const price = customPricing.get(pn) ?? (existing?.unitPrice || 0);
-            const labour = customLabour.get(pn) ?? (existing?.labourHours || 0);
-
-            effectiveBusbarItems.set(pn, {
-                qty,
-                price,
-                labour,
-                category
-            });
-        }
-    });
+    // (Already done in Step 2.5 - reusing effectiveBusbarItems)
 
     // 3. Calculate Totals
     let totalBusbarMaterial = 0;
@@ -634,6 +614,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
         addTarget(BUSBAR_INSULATION_ITEM, 1, extraMaterial, extraLabour);
     }
+
+
 
     // --- 4.5 SITE RECONNECTION (MOVED UP) ---
     // See section 2.G below
@@ -661,7 +643,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         BUSBAR_INSULATION_ITEM,
         'MISC-SITE-RECONNECTION',
         'MISC-CABLE-TRAY',
-        '1A-50KA'
+        '1A-50KA',
+        '1B1-CLEAT-SMALL-1',
+        '1B1-CLEAT-SMALL-2',
+        '1B1-CLEAT-LARGE-2',
+        '1B1-CLEAT-LARGE-3'
     ];
 
     // Also add Busbars/Labour patterns to removal check
