@@ -49,6 +49,12 @@ export async function POST(
             return NextResponse.json(updatedItem);
         }
 
+        if (catalogItem) {
+            // Ensure we use the exact part number from catalog if available
+            // This satisfies "Item.partNumber = CatalogItem.partNumber"
+            // (assuming 'name' is the field for part number)
+        }
+
         // Item doesn't exist - create new item
         const cost = (unitPrice || 0) * (quantity || 1);
 
@@ -57,7 +63,7 @@ export async function POST(
                 boardId,
                 category: category || 'Switchboard',
                 subcategory,
-                name,
+                name: catalogItem?.partNumber || name, // Prefer Catalog PartNumber
                 description,
                 quantity: quantity || 1,
                 unitPrice: unitPrice || 0,
@@ -89,7 +95,9 @@ export async function POST(
         }
 
         // Hook: MCCB Accessory Automation
-        if (newItem.productFrame) {
+        // Trigger only if it has a frame AND is not likely an accessory itself
+        const isMccbAccessory = subcategory === 'MCCB Accessories';
+        if (newItem.productFrame && !isMccbAccessory) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.syncBoardAccessories(boardId);
         }

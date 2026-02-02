@@ -40,7 +40,7 @@ export class AutomationService {
             'NS630b-1600': 0
         };
 
-        const ACCESSORY_SKUS = new Set(
+        const ACCESSORY_SKUS = new Set<string>(
             Object.values(ACCESSORY_MAP).flatMap(g => [g.shield, g.handle])
         );
 
@@ -50,6 +50,7 @@ export class AutomationService {
             // 2. Has a productFrame
             // 3. Not an accessory SKU (double safety)
             // 4. Not in 'MCCB Accessories' subcategory (triple safety)
+            // 5. Explicit check to ensure we don't count accessories even if they have frames
             const isBreaker = !item.isSystemManaged
                 && item.productFrame
                 && !ACCESSORY_SKUS.has(item.name)
@@ -61,8 +62,10 @@ export class AutomationService {
         }
 
         // 3. Calculate Required Accessories
-        // Map: SKU -> { quantity: number, frame: string }
-        const requirements: Record<string, { quantity: number, frame: string }> = {};
+        // Map: Key (SKU + Frame) -> { quantity: number, frame: string, sku: string }
+        // We need unique keys because different frames might potentially share SKUs (though currently they don't seem to)
+        // But user requirement "4 system-managed accessory lines total (2 per frame)" implies separation by frame.
+        const requirements: Record<string, { quantity: number, frame: string, sku: string }> = {};
 
         for (const [frame, qty] of Object.entries(frameCounts)) {
             if (qty > 0) {
@@ -72,16 +75,17 @@ export class AutomationService {
                 // Terminal Shield = 2 * Breaker Qty
                 // Rotary Handle = 1 * Breaker Qty
 
-                // Helper to add req
-                const addReq = (sku: string, q: number) => {
-                    if (!requirements[sku]) {
-                        requirements[sku] = { quantity: 0, frame };
+                const addReq = (sku: string, q: number, frm: string) => {
+                    // Key must be unique combinaison of SKU + Frame
+                    const key = `${sku}::${frm}`;
+                    if (!requirements[key]) {
+                        requirements[key] = { quantity: 0, frame: frm, sku: sku };
                     }
-                    requirements[sku].quantity += q;
+                    requirements[key].quantity += q;
                 };
 
-                addReq(map.shield, qty * 2);
-                addReq(map.handle, qty);
+                addReq(map.shield, qty * 2, frame);
+                addReq(map.handle, qty, frame);
             }
         }
 
@@ -92,35 +96,48 @@ export class AutomationService {
         const systemItems = items.filter(i => i.isSystemManaged);
 
         // A. Update or Create Logic
-        for (const [sku, req] of Object.entries(requirements)) {
-            const existing = systemItems.find(i => i.name === sku); // Matching by Name/PartNumber
+        for (const req of Object.values(requirements)) {
+            // STRICT Match: Same Board (implicit), Same SKU, Same Frame
+            const matchingItems = systemItems.filter(i =>
+                i.name === req.sku &&
+                i.productFrame === req.frame
+            );
 
-            if (existing) {
+            const primaryItem = matchingItems[0];
+            const duplicates = matchingItems.slice(1);
+
+            // 1. Handle Duplicates: Delete them immediately
+            for (const dup of duplicates) {
+                await prisma.item.delete({ where: { id: dup.id } });
+                console.warn(`[Automation] Removed duplicate accessory ${dup.name} (${dup.productFrame})`);
+            }
+
+            if (primaryItem) {
                 // Update if quantity changed
-                if (existing.quantity !== req.quantity) {
+                if (primaryItem.quantity !== req.quantity) {
                     await prisma.item.update({
-                        where: { id: existing.id },
-                        data: { quantity: req.quantity, cost: existing.unitPrice * req.quantity }
+                        where: { id: primaryItem.id },
+                        data: { quantity: req.quantity, cost: primaryItem.unitPrice * req.quantity }
                     });
-                    console.log(`[Automation] Updated ${sku} to qty ${req.quantity}`);
+                    console.log(`[Automation] Updated ${req.sku} (${req.frame}) to qty ${req.quantity}`);
                 }
             } else {
                 // Create new
                 // Need to fetch details from CatalogItem first to get Price/Desc
                 const catalogItem = await prisma.catalogItem.findFirst({
-                    where: { partNumber: sku }
+                    where: { partNumber: req.sku }
                 });
 
                 if (catalogItem) {
                     await prisma.item.create({
                         data: {
                             boardId,
-                            category: 'Switchboard', // Defined in requirements
-                            subcategory: 'MCCB Accessories', // Defined in requirements
-                            name: sku,
+                            category: 'Switchboard',
+                            subcategory: 'MCCB Accessories',
+                            name: req.sku, // Store SKU in name
                             description: catalogItem.description,
                             unitPrice: catalogItem.unitPrice,
-                            labourHours: catalogItem.labourHours, // Use catalog hours
+                            labourHours: catalogItem.labourHours,
                             quantity: req.quantity,
                             cost: catalogItem.unitPrice * req.quantity,
                             isSystemManaged: true,
@@ -129,26 +146,34 @@ export class AutomationService {
                             notes: 'System Managed'
                         }
                     });
-                    console.log(`[Automation] Created ${sku} qty ${req.quantity}`);
+                    console.log(`[Automation] Created ${req.sku} (${req.frame}) qty ${req.quantity}`);
                 } else {
-                    console.warn(`[Automation] Missing catalog item for accessory SKU: ${sku}`);
-                    // Fallback create minimal item? No, safer to skip to avoid bad data.
+                    console.error(`[Automation] CRITICAL: Missing catalog item for accessory SKU: ${req.sku}. Check catalog data.`);
+                    // Do NOT create fake item - strict guardnail
                 }
             }
         }
 
         // B. Cleanup Logic
         // Delete any system-managed item that is NOT in our requirements list anymore
-        // (i.e. breaker count went to 0)
+        // (i.e. breaker count went to 0, or frame changed)
         for (const item of systemItems) {
-            // Check if this item's name (SKU) is in requirements
-            const isRequired = item.name in requirements;
+            // Check if this item matches any requirement
+            // Match Key = SKU + Frame
+            // If item has no productFrame, it might be legacy or broken. If we can't map it to a requirement, we delete it.
+
+            // We reconstruct the key that WOULD produce this item
+            const frame = item.productFrame || '';
+            const sku = item.name;
+            const key = `${sku}::${frame}`;
+
+            const isRequired = requirements[key];
 
             if (!isRequired) {
                 await prisma.item.delete({
                     where: { id: item.id }
                 });
-                console.log(`[Automation] Removed unused accessory ${item.name}`);
+                console.log(`[Automation] Removed unused accessory ${sku} (${frame || 'no-frame'})`);
             }
         }
     }
