@@ -37,6 +37,8 @@ export interface Item {
     notes: string | null;
     isDefault?: boolean;
     isSheetmetal?: boolean;
+    isSystemManaged?: boolean;
+    productFrame?: string | null;
 }
 
 // ...

@@ -65,7 +65,8 @@ export async function POST(
                 cost,
                 notes,
                 isDefault: isDefault || false,
-                isSheetmetal: isSheetmetal
+                isSheetmetal: isSheetmetal,
+                productFrame: catalogItem?.productFrame // Copy Frame ID from Catalog
             },
         });
 
@@ -85,6 +86,12 @@ export async function POST(
                 const { syncBoardItems } = await import('@/lib/board-item-service');
                 await syncBoardItems(boardId, config);
             }
+        }
+
+        // Hook: MCCB Accessory Automation
+        if (newItem.productFrame) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncBoardAccessories(boardId);
         }
 
         return NextResponse.json(newItem);

@@ -52,6 +52,20 @@ export async function PUT(
             }
         }
 
+        // Hook: MCCB Accessory Automation
+        // Use 'item' (pre-update) to check if it WAS a breaker, or check DB again?
+        // 'item' might lack productFrame if not selected. Let's fetch it or trust the flag.
+        // We need productFrame. We can fetch it or if we trust 'item' selection above.
+        // The selection above didn't select productFrame. Let's update the selection.
+        const freshItem = await prisma.item.findUnique({ where: { id: itemId }, select: { productFrame: true, boardId: true, isSystemManaged: true } });
+
+        // GUARD: Do NOT trigger sync if we are just updating a system-managed item (prevent loops)
+        if (freshItem?.productFrame && !freshItem.isSystemManaged && quantity !== undefined) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncBoardAccessories(freshItem.boardId);
+        }
+
+
         return NextResponse.json(updatedItem);
     } catch (error) {
         console.error('Failed to update item', error);
@@ -66,10 +80,10 @@ export async function DELETE(
     try {
         const { itemId } = await params;
 
-        // Get the item before deletion to check if it's a tier item
+        // Get the item before deletion to check if it's a tier item OR a breaker
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, category: true }
+            select: { name: true, boardId: true, category: true, productFrame: true }
         });
 
         await prisma.item.delete({
@@ -93,6 +107,13 @@ export async function DELETE(
                 await syncBoardItems(item.boardId, config);
             }
         }
+
+        // Hook: MCCB Accessory Automation (Post-Delete)
+        if (item?.productFrame) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncBoardAccessories(item.boardId);
+        }
+
 
         return NextResponse.json({ success: true });
     } catch (error) {

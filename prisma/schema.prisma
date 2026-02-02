@@ -80,6 +80,9 @@ model Item {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  isSystemManaged Boolean @default(false)
+  productFrame    String? // e.g. "NSX100-250", "NSX400-630"
 }
 
 model CatalogItem {
@@ -100,6 +103,8 @@ model CatalogItem {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  productFrame    String? // e.g. "NSX100-250"
 }
 
 

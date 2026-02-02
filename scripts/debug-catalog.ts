@@ -1,31 +1,26 @@
 
-import { PrismaClient } from '@prisma/client';
-
+const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('Checking Power Meter items in DB...');
-    const items = await prisma.catalogItem.findMany({
+    const items = await prisma.catalogItem.findMany({ take: 5 });
+
+    // Search for anything resembling 'NSX'
+    const nsxLike = await prisma.catalogItem.findMany({
         where: {
-            subcategory: {
-                contains: 'Power Meters'
-            }
+            OR: [
+                { partNumber: { contains: 'NSX', mode: 'insensitive' } },
+                { description: { contains: 'NSX', mode: 'insensitive' } },
+                { description: { contains: 'circuit breaker', mode: 'insensitive' } }
+            ]
         },
         take: 10
     });
 
-    console.log(`Found ${items.length} items.`);
-    items.forEach(item => {
-        console.log(`- [${item.partNumber}] ${item.brand}: ${item.description.substring(0, 30)}... | Type: ${item.meterType}`);
-    });
-
-    if (items.length === 0) {
-        console.log('No Power Meters found. Do you have any data?');
-        const allCount = await prisma.catalogItem.count();
-        console.log(`Total items in catalog: ${allCount}`);
-    }
+    const output = `Sample Items:\n${JSON.stringify(items, null, 2)}\n\nNSX Like Items:\n${JSON.stringify(nsxLike, null, 2)}`;
+    fs.writeFileSync('debug_output.txt', output);
+    console.log('Written to debug_output.txt');
 }
 
-main()
-    .catch(e => console.error(e))
-    .finally(async () => await prisma.$disconnect());
+main().finally(() => prisma.$disconnect());

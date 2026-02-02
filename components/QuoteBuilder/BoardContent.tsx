@@ -110,7 +110,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
     };
 
     const renderItemRow = (item: Item) => {
-        const autoManaged = isAutoManaged(item.name) || item.isDefault;
+        // Use database flag for system management, fallback to name-check only if necessary (or remove legacy check)
+        const autoManaged = item.isSystemManaged || isAutoManaged(item.name) || item.isDefault;
         const formulaPriced = isFormulaPriced(item.name);
 
         return (
