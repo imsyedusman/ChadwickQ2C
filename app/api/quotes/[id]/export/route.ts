@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Board, Item } from '@prisma/client';
 import { ExportService } from '@/lib/export-service';
 
 export async function GET(
@@ -119,7 +120,7 @@ export async function GET(
         };
 
         // Calculate board totals map
-        const boardTotalsMap = quote.boards.map(board => ({
+        const boardTotalsMap = quote.boards.map((board: any) => ({
             boardId: board.id,
             sellPriceRounded: calculateBoardTotal(board)
         }));
@@ -135,11 +136,11 @@ export async function GET(
         let totalEngineeringCost = 0;
         let totalCost = 0;
 
-        quote.boards.forEach(board => {
+        quote.boards.forEach((board: any) => {
             let materialCost = 0;
             let labourHours = 0;
 
-            board.items.forEach(item => {
+            board.items.forEach((item: any) => {
                 materialCost += (item.unitPrice || 0) * (item.quantity || 0);
                 labourHours += (item.labourHours || 0) * (item.quantity || 0);
             });

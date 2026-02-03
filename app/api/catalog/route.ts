@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { CatalogItem } from '@prisma/client';
 import * as XLSX from 'xlsx';
 
 export async function GET(request: Request) {
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
             });
 
             // Format for frontend
-            return NextResponse.json(stats.map(s => ({
+            return NextResponse.json(stats.map((s: { brand: string | null, _count: { id: number } }) => ({
                 brand: s.brand || 'Unknown / No Brand',
                 originalBrand: s.brand, // Keep original for deletion
                 count: s._count.id
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
             });
 
             // Return just the strings
-            return NextResponse.json(subcats.map(s => s.subcategory).filter(Boolean));
+            return NextResponse.json(subcats.map((s: { subcategory: string | null }) => s.subcategory).filter(Boolean));
         }
 
         // Standard Search with Filters
@@ -128,7 +129,7 @@ export async function GET(request: Request) {
 
         if (exportMode) {
             // Generate Excel
-            const worksheet = XLSX.utils.json_to_sheet(items.map(item => ({
+            const worksheet = XLSX.utils.json_to_sheet(items.map((item: CatalogItem) => ({
                 'Brand': item.brand,
                 'Part Number': item.partNumber,
                 'Description': item.description,

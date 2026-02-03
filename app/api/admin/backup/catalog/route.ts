@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET() {
     try {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
         }
 
         // Transaction to ensure atomicity
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             let deletedCount = 0;
 
             if (clearBeforeImport) {

@@ -1,6 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Item, CatalogItem } from '@prisma/client';
 
 import { isFormulaPriced } from '@/lib/system-definitions';
 
@@ -22,14 +23,14 @@ export async function POST(
         }
 
         const lockedStatuses = ['SENT', 'APPROVED', 'REJECTED'];
-        if (lockedStatuses.includes(board.quote.status)) {
+        if (board.quote.status && lockedStatuses.includes(board.quote.status)) {
             return NextResponse.json({ error: `Cannot refresh items. Quote is ${board.quote.status}.` }, { status: 403 });
         }
 
         // 3. Identify items to process
         // Skip formula items
         // We want to process CUSTOM/MANUAL items primarily, but we can also catch any drift in managed items that aren't formulaic (like hardware)
-        const itemsToProcess = board.items.filter(item => !isFormulaPriced(item.name));
+        const itemsToProcess = board.items.filter((item: Item) => !isFormulaPriced(item.name));
 
         if (itemsToProcess.length === 0) {
             return NextResponse.json({ message: 'No eligible items to refresh.', updatedCount: 0 });
@@ -46,7 +47,7 @@ export async function POST(
         const potentialPartNumbers = new Set<string>();
         const potentialDescriptions = new Set<string>(); // Heuristic backup
 
-        itemsToProcess.forEach(item => {
+        itemsToProcess.forEach((item: Item) => {
             potentialPartNumbers.add(item.name);
             // also maybe item.description? Catalog lookup is confusing if inconsistent.
             // Requirement: "Match by partNumber when present... fall back to matching by name when it equals the code"
@@ -70,13 +71,13 @@ export async function POST(
 
         // Pre-scan for duplicates in catalog
         const pnCounts = new Map<string, number>();
-        catalogCandidates.forEach(c => {
+        catalogCandidates.forEach((c: CatalogItem) => {
             if (c.partNumber) {
                 pnCounts.set(c.partNumber, (pnCounts.get(c.partNumber) || 0) + 1);
             }
         });
 
-        catalogCandidates.forEach(c => {
+        catalogCandidates.forEach((c: CatalogItem) => {
             if (c.partNumber) {
                 if (pnCounts.get(c.partNumber)! > 1) {
                     ambiguousPartNumbers.add(c.partNumber);
@@ -138,17 +139,17 @@ export async function POST(
 
         // Also sync Metadata for Formula Items (as per requirement)
         // "Formula-managed... keep computed PRICE/LABOUR, but sync metadata"
-        const formulaItemsOnBoard = board.items.filter(item => isFormulaPriced(item.name));
+        const formulaItemsOnBoard = board.items.filter((item: Item) => isFormulaPriced(item.name));
         let metaUpdatesCount = 0;
 
         // We need to fetch catalog for these too
-        const formulaPNs = formulaItemsOnBoard.map(i => i.name);
+        const formulaPNs = formulaItemsOnBoard.map((i: Item) => i.name);
         const formulaCatalogItems = await prisma.catalogItem.findMany({
             where: { partNumber: { in: formulaPNs } }
         });
 
         const formulaCatalogMap = new Map<string, typeof formulaCatalogItems[0]>();
-        formulaCatalogItems.forEach(c => {
+        formulaCatalogItems.forEach((c: CatalogItem) => {
             if (c.partNumber) formulaCatalogMap.set(c.partNumber, c);
         });
 

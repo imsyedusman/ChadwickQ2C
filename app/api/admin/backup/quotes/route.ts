@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export async function GET() {
     try {
@@ -42,7 +43,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid backup file format' }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             let createdCount = 0;
             let updatedCount = 0;
 

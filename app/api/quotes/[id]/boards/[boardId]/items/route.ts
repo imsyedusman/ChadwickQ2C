@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Item } from '@prisma/client';
 
 export async function GET(
     request: Request,
@@ -17,7 +18,7 @@ export async function GET(
 
         // Custom sort order
         const categoryOrder = { 'BASICS': 1, 'SWITCHBOARD': 2, 'BUSBAR': 3 };
-        const sortedItems = items.sort((a, b) => {
+        const sortedItems = items.sort((a: Item, b: Item) => {
             const catA = categoryOrder[a.category as keyof typeof categoryOrder] || 99;
             const catB = categoryOrder[b.category as keyof typeof categoryOrder] || 99;
             return catA - catB;

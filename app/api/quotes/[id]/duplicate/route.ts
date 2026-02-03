@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { Board, Item } from '@prisma/client';
 
 export async function POST(
     request: Request,
@@ -57,14 +58,14 @@ export async function POST(
                 globalDiscount: originalQuote.globalDiscount,
                 globalContingency: originalQuote.globalContingency,
                 boards: {
-                    create: originalQuote.boards.map(board => ({
+                    create: originalQuote.boards.map((board: Board & { items: Item[] }) => ({
                         name: board.name,
                         type: board.type,
                         order: board.order,
                         isOptional: board.isOptional,
                         config: board.config,
                         items: {
-                            create: board.items.map(item => ({
+                            create: board.items.map((item: Item) => ({
                                 category: item.category,
                                 subcategory: item.subcategory,
                                 name: item.name,

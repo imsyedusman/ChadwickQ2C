@@ -1,5 +1,6 @@
 
-import prisma from './prisma';
+import prisma from '@/lib/prisma';
+import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
 
 export interface BoardConfig {
     ctMetering: string;
@@ -186,8 +187,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     if (!options?.forceTiers) {
         // We are NOT forced by wizard config. Prioritize Manual Edit.
-        const cubicTierItem = existingItems.find(i => i.name === '1A-TIERS');
-        const customTierItem = existingItems.find(i => i.name === '1B-TIERS-400');
+        const cubicTierItem = existingItems.find((i: Item) => i.name === '1A-TIERS');
+        const customTierItem = existingItems.find((i: Item) => i.name === '1B-TIERS-400');
 
         if (config.enclosureType === 'Cubic' && cubicTierItem) {
             tierCount = cubicTierItem.quantity;
@@ -331,7 +332,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 // Fix 2026-01-23: Respect user-edited quantity for busbars.
                 // Auto-add with default 1 only if it doesn't exist.
                 // If it exists, use its current quantity to prevent sync from reverting edits.
-                const existingBusbar = existingItems.find(i => i.name === busbarPartNumber);
+                const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
                 const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
                 addTarget(busbarPartNumber, busbarQty);
             }
@@ -394,7 +395,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const effectiveBusbarItems = new Map<string, { qty: number, price: number, labour: number, category: string }>();
 
     // 1. Process Existing Items first
-    existingItems.forEach(item => {
+    existingItems.forEach((item: Item) => {
         if (item.name === BUSBAR_INSULATION_ITEM) return;
         const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
             (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
@@ -421,7 +422,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         let isBusbar = false;
         let category = 'Basics';
 
-        const existing = existingItems.find(i => i.name === pn);
+        const existing = existingItems.find((i: Item) => i.name === pn);
         if (existing) category = existing.category;
 
         if (category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) {
@@ -488,8 +489,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const catalogItems = await prisma.catalogItem.findMany({
         where: { partNumber: { in: targetPartNumbersArray } }
     });
-    const catalogMap = new Map<string, CatalogItem>();
-    catalogItems.forEach((i: any) => { if (i.partNumber) catalogMap.set(i.partNumber, i); });
+    const catalogMap = new Map<string, CatalogItem>(); // Local interface usage
+    catalogItems.forEach((i: PrismaCatalogItem) => { if (i.partNumber) catalogMap.set(i.partNumber, i as any); });
 
 
     // --- 4. STAINLESS UPLIFT CALCULATION ---
@@ -505,7 +506,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         for (const itemPn of SHEET_METAL_BASE_ITEMS) {
             // Determine Qty
             const targetQty = itemQuantities.get(itemPn);
-            const existing = existingItems.find(i => i.name === itemPn);
+            const existing = existingItems.find((i: Item) => i.name === itemPn);
 
             // Priority for Qty: Target > Existing > 0
             const qty = targetQty !== undefined ? targetQty : (existing?.quantity || 0);
@@ -654,7 +655,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const isManagedPattern = (name: string) =>
         name.startsWith('BB-') || name.startsWith('BBC-') || (name.startsWith('CT-') && name.endsWith('A'));
 
-    const itemsToRemove = existingItems.filter(item =>
+    const itemsToRemove = existingItems.filter((item: Item) =>
         item.isDefault &&
         (allManagedItems.includes(item.name) || isManagedPattern(item.name)) &&
         !targetItemPartNumbers.has(item.name)
@@ -662,7 +663,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     if (itemsToRemove.length > 0) {
         await prisma.item.deleteMany({
-            where: { id: { in: itemsToRemove.map(i => i.id) } }
+            where: { id: { in: itemsToRemove.map((i: Item) => i.id) } }
         });
     }
 
@@ -676,7 +677,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const targetPrice = customPricing.get(partNumber); // undefined if not custom
         const targetLabour = customLabour.get(partNumber);
 
-        const existingItem = existingItems.find(i => i.name === partNumber && i.isDefault);
+        const existingItem = existingItems.find((i: Item) => i.name === partNumber && i.isDefault);
         const catalogItem = catalogMap.get(partNumber);
 
         if (!existingItem && !catalogItem && !customPricing.has(partNumber)) {

@@ -1,6 +1,7 @@
-
-const { PrismaClient } = require('@prisma/client');
-const { AutomationService } = require('../lib/automation');
+import { PrismaClient } from '@prisma/client';
+// import { AutomationService } from '../lib/automation'; // AutomationService might need import too, but let's check path.
+// It was require('../lib/automation').
+import { AutomationService } from '../lib/automation';
 
 const prisma = new PrismaClient();
 
@@ -135,3 +136,4 @@ async function main() {
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());
+export { };
