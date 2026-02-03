@@ -10,6 +10,9 @@ import BoardSummary from './BoardSummary';
 // ONLY these 3 master categories should appear as top-level collapsibles
 // Using singular form to match database schema
 const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
+import { Switch } from '@/components/ui/switch'; // Ensure Switch is available or use standard input checkbox
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"; // Ensure Tooltip is available
+import { RefreshCw, RotateCcw } from 'lucide-react'; // Import RotateCcw for Restore icon
 
 const CATEGORY_LABELS: Record<string, string> = {
     'Basics': 'Basics',
@@ -73,7 +76,7 @@ interface BoardContentProps {
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
-    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings } = useQuote();
+    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote } = useQuote();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
 
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
@@ -103,28 +106,124 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         }));
     };
 
+
+    // Helper: Toggle NSX100 Handle Override
+    const toggleNSX100Handle = async (disable: boolean) => {
+        if (!selectedBoard) return;
+        try {
+            const res = await fetch(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/mccb-overrides`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ disableNSX100250RotaryHandle: disable })
+            });
+            if (res.ok) {
+                await refreshQuote();
+            } else {
+                console.error("Failed to toggle handle");
+                alert("Failed to update handle preference");
+            }
+        } catch (e) {
+            console.error("Network error toggling handle", e);
+            alert("Network error");
+        }
+    };
+
+    // Helper: Restore Auto Accessories
+    const restoreAccessories = async () => {
+        if (!selectedBoard) return;
+        if (!confirm("Start fresh: This will restore all auto-managed MCCB accessories (Shields & Handles) for this board to their default state.")) return;
+
+        try {
+            const res = await fetch(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/restore-accessories`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                await refreshQuote();
+            } else {
+                console.error("Failed to restore");
+                alert("Failed to restore accessories");
+            }
+        } catch (e) {
+            console.error("Network error restoring", e);
+            alert("Network error");
+        }
+    };
+
     const handleQuantityChange = (itemId: string, newQty: number) => {
         // Ensure quantity is valid (>= 0, allow decimals)
         const validQty = Math.max(0, newQty);
         updateItem(itemId, { quantity: validQty });
     };
 
-    const renderItemRow = (item: Item) => {
+    const renderItemRow = (item: Item, isGhost = false) => {
+        if (isGhost) {
+            // Render specific ghost row for Missing NSX100 Handle
+            // SKU: LV429338T
+            return (
+                <div
+                    key="ghost-nsx100-handle"
+                    className="px-4 py-2 flex items-center gap-4 bg-gray-50/30 text-gray-400 group transition-colors text-sm"
+                >
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                            <div className="font-medium italic truncate">
+                                Rotary Handle (NSX100-250)
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 ring-1 ring-inset ring-gray-600/10">
+                                    Excluded
+                                </span>
+                            </div>
+                        </div>
+                        <div className="text-[10px] text-gray-300 truncate flex items-center gap-2">
+                            <span className="font-medium">LV429338T</span>
+                        </div>
+                    </div>
+
+                    {/* Ghost Controls */}
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 px-2">
+                            <span className="text-xs text-gray-400">Include</span>
+                            {/* Simple Toggle - Checked = False (Include means Disable=False) */}
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={false} // OFF
+                                    onChange={() => toggleNSX100Handle(false)} // Enable (disable=false)
+                                />
+                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                    {/* Spacer for delete button alignment */}
+                    <div className="w-[14px]"></div>
+                </div>
+            );
+        }
+
         // Use database flag for system management, fallback to name-check only if necessary (or remove legacy check)
         const autoManaged = item.isSystemManaged || isAutoManaged(item.name) || item.isDefault;
         const formulaPriced = isFormulaPriced(item.name);
 
         // Lock Logic:
-        // 1. Qty is locked if autoManaged.
+        // 1. Qty is always locked if autoManaged.
         // 2. Delete is locked if autoManaged UNLESS it's the specific NSX100 Handle (LV429338T).
         // 3. Delete is ALWAYS locked for Shields (LV429517, LV432593, 33628) - explicitly checked for safety.
 
         const isShield = ['LV429517', 'LV432593', '33628'].includes(item.name);
         // Explicitly allowed handle (NSX100-250)
-        const isAllowedHandle = item.name === 'LV429338T';
+        const isNSX100Handle = item.name === 'LV429338T';
+        const isOtherHandle = ['LV432598T', '33873'].includes(item.name);
 
         const isQtyLocked = !!autoManaged;
-        const isDeleteLocked = isShield || (!!autoManaged && !isAllowedHandle);
+        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle);
+
+        // Determine Tooltip Text
+        let lockTooltip = "";
+        if (isShield) lockTooltip = "Auto included. Quantity = 2 per breaker. Required by standard.";
+        else if (isOtherHandle) lockTooltip = "Auto included. Quantity = 1 per breaker. Required for this breaker frame.";
+        else if (isNSX100Handle) lockTooltip = "Optional for this breaker range. Can be excluded if not required."; // Though this won't show lock icon, we put it on Auto badge
 
         return (
             <div
@@ -150,10 +249,19 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         )}
                         {autoManaged && !formulaPriced && (
                             <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20" title="System-managed item">
-                                    <Lock size={8} className="text-blue-700" />
-                                    Auto
-                                </span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger>
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 cursor-help">
+                                                <Lock size={8} className="text-blue-700" />
+                                                Auto
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="top">
+                                            <p className="max-w-xs text-xs">{lockTooltip || "System managed item"}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
                         )}
                     </div>
@@ -242,20 +350,37 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </div>
                 </div>
 
-                {/* Actions (Delete Lock if Auto-Managed) */}
-                <button
-                    onClick={() => removeItem(item.id)}
-                    className={cn(
-                        "transition-colors",
-                        isDeleteLocked
-                            ? "text-gray-200 cursor-not-allowed"
-                            : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
-                    )}
-                    disabled={isDeleteLocked}
-                    title={isDeleteLocked ? "This item is system-managed and cannot be removed" : "Remove item"}
-                >
-                    {isDeleteLocked ? <Lock size={14} /> : <Trash2 size={14} />}
-                </button>
+                {/* Actions: Toggle for NSX100 Handle, Lock for others */}
+                {isNSX100Handle ? (
+                    <div className="flex items-center gap-2 px-2" title={lockTooltip}>
+                        <span className="text-xs text-gray-400">Include</span>
+                        {/* Toggle Switch */}
+                        <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={true} // Always ON if it exists in list
+                                onChange={() => toggleNSX100Handle(true)} // Disable
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                        {/* Hidden Trash Spacer to keep alignment */}
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => removeItem(item.id)}
+                        className={cn(
+                            "transition-colors",
+                            isDeleteLocked
+                                ? "text-gray-200 cursor-not-allowed"
+                                : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                        )}
+                        disabled={isDeleteLocked}
+                        title={isDeleteLocked ? "This item is system-managed and cannot be removed" : "Remove item"}
+                    >
+                        {isDeleteLocked ? <Lock size={14} /> : <Trash2 size={14} />}
+                    </button>
+                )}
             </div>
         )
     };
@@ -332,7 +457,36 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             {/* Sub-collapsible items */}
                             {!isSubcatCollapsed && (
                                 <div className="divide-y divide-gray-50 bg-white">
-                                    {subcatItems.map(renderItemRow)}
+                                    {/* Include Ghost Row check for Accessories subcategory */}
+                                    {subcat === 'MCCB Accessories' && (() => {
+                                        // Specific Check: Do we need to show the NSX100 Ghost Handle?
+                                        // 1. Are there NSX100-250 breakers?
+                                        // 2. Is the LV429338T missing?
+
+                                        // We can infer presence from 'items' list, but how to infer 'Requirement'?
+                                        // We can count breakers on the client side just like we do on server, roughly.
+                                        // Filter items with productFrame NSX100-250.
+                                        const nsx100Breakers = items.filter(i =>
+                                            !i.isSystemManaged &&
+                                            i.productFrame === 'NSX100-250' &&
+                                            i.subcategory !== 'MCCB Accessories'
+                                        );
+                                        const hasRequirement = nsx100Breakers.length > 0;
+
+                                        const hasHandle = subcatItems.some(i => i.name === 'LV429338T');
+
+                                        if (hasRequirement && !hasHandle) {
+                                            return (
+                                                <>
+                                                    {subcatItems.map(item => renderItemRow(item, false))}
+                                                    {renderItemRow({} as any, true)}
+                                                </>
+                                            )
+                                        }
+                                        return subcatItems.map(item => renderItemRow(item, false));
+                                    })()}
+
+                                    {subcat !== 'MCCB Accessories' && subcatItems.map(item => renderItemRow(item, false))}
                                 </div>
                             )}
                         </div>
@@ -393,6 +547,15 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     >
                         <Edit2 size={10} />
                         Refresh Prices
+                    </button>
+                    {/* Restore Accessories Action */}
+                    <button
+                        onClick={restoreAccessories}
+                        className="text-[10px] font-medium text-gray-400 hover:text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                        title="Restore all auto-managed MCCB accessories (Shields & Handles) for this board"
+                    >
+                        <RotateCcw size={10} />
+                        Restore Auto
                     </button>
                     <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         {selectedBoard.description || selectedBoard.name}
@@ -476,7 +639,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                         ) : (
                                             // For Busbars, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
-                                                {categoryItems.map(renderItemRow)}
+                                                {categoryItems.map(item => renderItemRow(item, false))}
                                             </div>
                                         )}
                                     </>
