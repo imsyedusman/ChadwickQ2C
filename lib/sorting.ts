@@ -1,0 +1,169 @@
+import { CatalogItem } from '@prisma/client';
+
+// Define a type that covers both CatalogItem and board Item (which has similar fields)
+// We align fields to ensure both can be passed in.
+export interface SortableItem {
+    category?: string | null;      // Master: Basics, Switchboard, Busbar
+    subcategory?: string | null;   // e.g. "Circuit Breakers > MCCB > 25kA"
+    name?: string | null;          // Part Number (Item) or Part Number (CatalogItem via alias)
+    partNumber?: string | null;    // CatalogItem has partNumber
+    description?: string | null;
+
+    // Structured Category Fields (Future-proofing / if available)
+    categoryPathSegments?: string[];
+    categoryBreadcrumbs?: string[];
+}
+
+const MASTER_CATEGORY_ORDER: Record<string, number> = {
+    'Basics': 0,
+    'Switchboard': 1,
+    'Busbar': 2
+};
+
+const MCCB_ACCESSORY_ORDER: Record<string, number> = {
+    'Terminal Shield': 1,
+    'Rotary Handle': 2
+};
+
+
+export function getSortParts(item: SortableItem): any[] {
+    const parts: any[] = [];
+
+    // 1. Group Order (Basics -> Switchboard -> Busbar)
+    const masterCat = item.category || 'Switchboard';
+    const masterOrder = MASTER_CATEGORY_ORDER[masterCat] ?? 99;
+    parts.push(masterOrder);
+
+    // 2. Category Hierarchy & Structured Segments
+    let segments: string[] = [];
+
+    // Priority 1: Structured Fields
+    if (item.categoryPathSegments && item.categoryPathSegments.length > 0) {
+        segments = item.categoryPathSegments;
+    } else if (item.categoryBreadcrumbs && item.categoryBreadcrumbs.length > 0) {
+        segments = item.categoryBreadcrumbs;
+    }
+    // Priority 2: Fallback to String Splitting
+    else if (item.subcategory) {
+        segments = item.subcategory.split(' > ').map(s => s.trim());
+    }
+
+    // Iterate segments and inject priority/numeric values
+    let inMccbAccessories = false;
+
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        let priority = 999999; // Default high (neutral)
+        let val: string | number = seg;
+
+        // Context checks
+        if (seg === 'MCCB Accessories') {
+            inMccbAccessories = true;
+            // The segment itself is neutral
+        } else if (inMccbAccessories) {
+            // Check for Priority Children
+            if (seg.includes('Terminal Shield')) priority = 1;
+            else if (seg.includes('Rotary Handle')) priority = 2;
+            else priority = 3;
+        }
+
+        // Fault Rating Check (e.g. "25kA") - Sort numerically
+        const faultMatch = seg.match(/^(\d+)\s*kA$/i);
+        if (faultMatch) {
+            // Is it a fault rating segment?
+            // "25kA" -> priority = 25.
+            priority = parseInt(faultMatch[1]);
+        }
+
+        parts.push(priority);
+        parts.push(val);
+    }
+
+    // 3. Fallback MCCB Accessories Ordering (For items in the same folder lacking child segments)
+    // If segments didn't differentiate (e.g. both in "MCCB Accessories" flat), 
+    // we assume the loop above yielded equal parts.
+    // Now check Name/SKU to force order.
+
+    // Are we in MCCB Accessories context effectively?
+    // Use the flag computed during loop, or re-check segments (safe)
+    const effectiveInAccessories = inMccbAccessories || segments.includes('MCCB Accessories');
+
+    if (effectiveInAccessories) {
+        let accessorySkuOrder = 3;
+        const name = (item.partNumber || item.name || '').toUpperCase();
+
+        // Terminal Shields
+        if (['LV429517', 'LV432593', '33628'].includes(name)) accessorySkuOrder = 1;
+        // Rotary Handles
+        else if (['LV429338T', 'LV432598T', '33873'].includes(name)) accessorySkuOrder = 2;
+
+        parts.push(accessorySkuOrder);
+    } else {
+        parts.push(0);
+    }
+
+    // 4. Breaker Specifics (Current Rating)
+    // Heuristic: Is it a breaker?
+    const isBreaker = segments.some(s => s.includes('Circuit Breaker') || s.includes('MCCB') || s.includes('MCB')) ||
+        (item.description && item.description.match(/\b(kA)\b/i));
+
+    if (isBreaker) {
+        // Extract Current Rating (Amps) - Numeric Sort
+        let ampRating = 99999;
+        const ampRegex = /(\d+)\s*A\b/i; // Matches 160A, 250A
+
+        // Description is usually best bet for Amps
+        if (item.description) {
+            const match = item.description.match(ampRegex);
+            if (match) ampRating = parseInt(match[1]);
+        }
+
+        parts.push(ampRating);
+    } else {
+        parts.push(99999);
+    }
+
+    // 5. Tie-Breakers
+    const partNum = item.partNumber || item.name || '';
+    parts.push(partNum);
+
+    // 6. Name/Description Tie-Break
+    const desc = item.description || '';
+    parts.push(desc);
+
+    return parts;
+}
+
+
+/**
+ * Compare two items using the generated sort parts.
+ * Usage: items.sort(compareItems);
+ */
+export function compareItems(a: SortableItem, b: SortableItem): number {
+    const partsA = getSortParts(a);
+    const partsB = getSortParts(b);
+
+    const length = Math.min(partsA.length, partsB.length);
+
+    for (let i = 0; i < length; i++) {
+        const valA = partsA[i];
+        const valB = partsB[i];
+
+        if (valA === valB) continue;
+
+        // Handle numeric comparison
+        if (typeof valA === 'number' && typeof valB === 'number') {
+            return valA - valB;
+        }
+
+        // Handle string comparison (lexicographical)
+        if (typeof valA === 'string' && typeof valB === 'string') {
+            return valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+        }
+
+        // Mixed types? Should adhere to consistent schema, but failsafe:
+        return String(valA).localeCompare(String(valB));
+    }
+
+    return partsA.length - partsB.length;
+}

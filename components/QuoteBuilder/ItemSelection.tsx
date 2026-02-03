@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
+import { compareItems } from '@/lib/sorting';
 
 interface CatalogItem {
     id: string;
@@ -403,7 +404,10 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                 // Filter out system-managed basics that shouldn't be added manually
                 const filteredData = data;
 
-                setItems(filteredData);
+                // Apply Deterministic Sorting
+                const sortedData = [...filteredData].sort(compareItems);
+
+                setItems(sortedData);
             }
         } catch (error) {
             console.error('Failed to fetch items', error);

@@ -5,6 +5,7 @@ import { useQuote, Item } from '@/context/QuoteContext';
 import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
+import { compareItems } from '@/lib/sorting';
 import BoardSummary from './BoardSummary';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
@@ -429,14 +430,32 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             });
 
         } else {
-            // Default sort for Switchboards (Alphabetical)
-            subcatKeys.sort();
+            // Default sort for Switchboards (Deterministic)
+            // We want to sort the GROUPS (subcats) by the same logic as items.
+            // Create a dummy item for each subcat to use the shared sorter.
+            // Or just sort the subcat string?
+            // Shared sorter handles "Switchgear > MCCB Accessories" vs "Circuit Breakers" better if we pass a full item.
+            // But here we only have the subcat key "MCCB Accessories".
+            // The key in `groupedBySubcat` is mostly just the last part or full path?
+            // "groupedBySubcat" uses `item.subcategory`. logic: `const subcat = item.subcategory || 'Other';`
+            // So it IS the full path "Switchgear > MCCB Accessories".
+            // So we can use `compareItems` with dummy items.
+
+            subcatKeys.sort((a, b) => {
+                // Create dummy items for comparison
+                const itemA = { category: 'Switchboard', subcategory: a };
+                const itemB = { category: 'Switchboard', subcategory: b };
+                return compareItems(itemA, itemB);
+            });
         }
 
         return (
             <div className="divide-y divide-gray-100">
                 {subcatKeys.map(subcat => {
-                    const subcatItems = groupedBySubcat[subcat];
+                    // Sort the items INSIDE the subcategory too
+                    // (Though usually they are sorted by default fetch or insertion, strictly enforcing it here is safer)
+                    const subcatItems = groupedBySubcat[subcat].sort(compareItems);
+
                     const subcatKey = `${isBasics ? 'Basics' : 'Switchboard'}-${subcat}`;
                     const isSubcatCollapsed = collapsedSections[subcatKey];
 
@@ -639,7 +658,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                         ) : (
                                             // For Busbars, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
-                                                {categoryItems.map(item => renderItemRow(item, false))}
+                                                {[...categoryItems].sort(compareItems).map(item => renderItemRow(item, false))}
                                             </div>
                                         )}
                                     </>
