@@ -114,6 +114,18 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const autoManaged = item.isSystemManaged || isAutoManaged(item.name) || item.isDefault;
         const formulaPriced = isFormulaPriced(item.name);
 
+        // Lock Logic:
+        // 1. Qty is locked if autoManaged.
+        // 2. Delete is locked if autoManaged UNLESS it's the specific NSX100 Handle (LV429338T).
+        // 3. Delete is ALWAYS locked for Shields (LV429517, LV432593, 33628) - explicitly checked for safety.
+
+        const isShield = ['LV429517', 'LV432593', '33628'].includes(item.name);
+        // Explicitly allowed handle (NSX100-250)
+        const isAllowedHandle = item.name === 'LV429338T';
+
+        const isQtyLocked = !!autoManaged;
+        const isDeleteLocked = isShield || (!!autoManaged && !isAllowedHandle);
+
         return (
             <div
                 key={item.id}
@@ -165,7 +177,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             "transition-colors",
                             autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
                         )}
-                        disabled={!!autoManaged}
+                        disabled={isQtyLocked}
                     >
                         <Minus size={12} />
                     </button>
@@ -191,7 +203,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         }}
                         step="0.01"
                         min="0"
-                        readOnly={!!autoManaged}
+                        readOnly={isQtyLocked}
                         className={cn(
                             "w-12 text-center text-xs font-medium bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
                             autoManaged ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
@@ -203,7 +215,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             "transition-colors",
                             autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
                         )}
-                        disabled={!!autoManaged}
+                        disabled={isQtyLocked}
                     >
                         <Plus size={12} />
                     </button>
@@ -235,14 +247,14 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     onClick={() => removeItem(item.id)}
                     className={cn(
                         "transition-colors",
-                        autoManaged
+                        isDeleteLocked
                             ? "text-gray-200 cursor-not-allowed"
                             : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
                     )}
-                    disabled={!!autoManaged}
-                    title={autoManaged ? "Auto-managed items cannot be manually removed" : "Remove item"}
+                    disabled={isDeleteLocked}
+                    title={isDeleteLocked ? "This item is system-managed and cannot be removed" : "Remove item"}
                 >
-                    {autoManaged ? <Lock size={14} /> : <Trash2 size={14} />}
+                    {isDeleteLocked ? <Lock size={14} /> : <Trash2 size={14} />}
                 </button>
             </div>
         )

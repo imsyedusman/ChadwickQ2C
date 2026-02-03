@@ -86,6 +86,60 @@ export async function DELETE(
             select: { name: true, boardId: true, category: true, productFrame: true }
         });
 
+        // Enforce MCCB Accessory Rules (Server-Side)
+        const { getAccessoryType, getAccessoryFrame } = await import('@/lib/automation');
+
+        const accessoryType = getAccessoryType(item?.name || '');
+
+        if (accessoryType === 'SHIELD') {
+            return NextResponse.json({ error: 'Terminal Shields cannot be manually deleted.' }, { status: 400 });
+        }
+
+        if (accessoryType === 'HANDLE') {
+            const frame = getAccessoryFrame(item?.name || '');
+
+            // Allow delete ONLY for NSX100-250 (LV429338T)
+            // Block all others
+            if (item?.name !== 'LV429338T') {
+                return NextResponse.json({ error: 'This Rotary Handle is system-managed and cannot be deleted.' }, { status: 400 });
+            }
+
+            // If it IS LV429338T, we allow delete BUT we must persist an override
+            // so automation doesn't add it back.
+            // We append 'NSX100-250' to the board's disabled frames list in settings.
+            if (frame === 'NSX100-250') {
+                const boardId = item.boardId;
+
+                // Fetch current settings
+                const quoteReq = await prisma.board.findUnique({
+                    where: { id: boardId },
+                    select: { quote: { select: { id: true, settingsSnapshot: true } } }
+                });
+
+                if (quoteReq?.quote) {
+                    let settings: any = {};
+                    try {
+                        settings = quoteReq.quote.settingsSnapshot ? JSON.parse(quoteReq.quote.settingsSnapshot) : {};
+                    } catch (e) { }
+
+                    if (!settings.mccbOverrides) settings.mccbOverrides = {};
+                    if (!settings.mccbOverrides[boardId]) settings.mccbOverrides[boardId] = {};
+
+                    const currentDisabled = settings.mccbOverrides[boardId].disableRotaryHandleFrames || [];
+
+                    if (!currentDisabled.includes('NSX100-250')) {
+                        settings.mccbOverrides[boardId].disableRotaryHandleFrames = [...currentDisabled, 'NSX100-250'];
+
+                        // Save back to Quote
+                        await prisma.quote.update({
+                            where: { id: quoteReq.quote.id },
+                            data: { settingsSnapshot: JSON.stringify(settings) }
+                        });
+                    }
+                }
+            }
+        }
+
         await prisma.item.delete({
             where: { id: itemId },
         });
@@ -109,7 +163,10 @@ export async function DELETE(
         }
 
         // Hook: MCCB Accessory Automation (Post-Delete)
-        if (item?.productFrame) {
+        // If we just deleted a breaker, we need to sync.
+        // If we deleted an accessory (only allowed for NSX100 handle), we do NOT sync immediately to avoid re-creation loop logic? 
+        // actually syncBoardAccessories respects overrides now, so it's safe to run.
+        if (item?.productFrame || (item?.name && ['LV429338T', 'LV432598T', '33873'].includes(item.name))) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.syncBoardAccessories(item.boardId);
         }

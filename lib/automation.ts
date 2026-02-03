@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Accessory SKUs
+// Accessory SKUs Configuration
 const ACCESSORY_MAP = {
     'NSX100-250': {
         shield: 'LV429517',
@@ -20,6 +20,27 @@ const ACCESSORY_MAP = {
 
 type FrameType = keyof typeof ACCESSORY_MAP;
 
+// Helper: Identify Accessory Type and Frame from SKU
+export type AccessoryType = 'HANDLE' | 'SHIELD' | 'NONE';
+
+export const getAccessoryType = (sku: string): AccessoryType => {
+    // Handles
+    if (['LV429338T', 'LV432598T', '33873'].includes(sku)) return 'HANDLE';
+    // Shields
+    if (['LV429517', 'LV432593', '33628'].includes(sku)) return 'SHIELD';
+    return 'NONE';
+};
+
+export const getAccessoryFrame = (sku: string): FrameType | null => {
+    // Reverse lookup from ACCESSORY_MAP
+    for (const [frame, map] of Object.entries(ACCESSORY_MAP)) {
+        if (map.handle === sku || map.shield === sku) {
+            return frame as FrameType;
+        }
+    }
+    return null;
+};
+
 export class AutomationService {
 
     /**
@@ -27,13 +48,32 @@ export class AutomationService {
      * Call this whenever an ITEM is added/updated/deleted on a board.
      */
     static async syncBoardAccessories(boardId: string) {
-        // 1. Fetch all items on the board
-        const items = await prisma.item.findMany({
-            where: { boardId }
+        // 1. Fetch Board and Items to check settings
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { quote: true, items: true }
         });
 
+        if (!board) return;
+
+        const items = board.items;
+
+        // Load Overrides from Quote Settings
+        let overrides: any = {};
+        if (board.quote?.settingsSnapshot) {
+            try {
+                const settings = JSON.parse(board.quote.settingsSnapshot);
+                if (settings.mccbOverrides && settings.mccbOverrides[boardId]) {
+                    overrides = settings.mccbOverrides[boardId];
+                }
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+
+        const disabledHandleFrames: string[] = overrides.disableRotaryHandleFrames || [];
+
         // 2. Group Breakers by Frame (only items with a productFrame set)
-        // CRITICAL: Exclude system-managed items and accessories from this count to prevent runaway loops.
         const frameCounts: Record<FrameType, number> = {
             'NSX100-250': 0,
             'NSX400-630': 0,
@@ -50,7 +90,6 @@ export class AutomationService {
             // 2. Has a productFrame
             // 3. Not an accessory SKU (double safety)
             // 4. Not in 'MCCB Accessories' subcategory (triple safety)
-            // 5. Explicit check to ensure we don't count accessories even if they have frames
             const isBreaker = !item.isSystemManaged
                 && item.productFrame
                 && !ACCESSORY_SKUS.has(item.name)
@@ -62,21 +101,13 @@ export class AutomationService {
         }
 
         // 3. Calculate Required Accessories
-        // Map: Key (SKU + Frame) -> { quantity: number, frame: string, sku: string }
-        // We need unique keys because different frames might potentially share SKUs (though currently they don't seem to)
-        // But user requirement "4 system-managed accessory lines total (2 per frame)" implies separation by frame.
         const requirements: Record<string, { quantity: number, frame: string, sku: string }> = {};
 
         for (const [frame, qty] of Object.entries(frameCounts)) {
             if (qty > 0) {
                 const map = ACCESSORY_MAP[frame as FrameType];
 
-                // Rules:
-                // Terminal Shield = 2 * Breaker Qty
-                // Rotary Handle = 1 * Breaker Qty
-
                 const addReq = (sku: string, q: number, frm: string) => {
-                    // Key must be unique combinaison of SKU + Frame
                     const key = `${sku}::${frm}`;
                     if (!requirements[key]) {
                         requirements[key] = { quantity: 0, frame: frm, sku: sku };
@@ -84,20 +115,27 @@ export class AutomationService {
                     requirements[key].quantity += q;
                 };
 
+                // Add Shield (Always)
                 addReq(map.shield, qty * 2, frame);
-                addReq(map.handle, qty, frame);
+
+                // Add Handle (Unless overridden)
+                // Override Rule: "If override says disabled, do not create it"
+                // Currently only applies to NSX100-250 but generic check is safer
+                const isHandleDisabled = disabledHandleFrames.includes(frame);
+
+                if (!isHandleDisabled) {
+                    addReq(map.handle, qty, frame);
+                } else {
+                    console.log(`[Automation] Skipping handle for ${frame} due to override.`);
+                }
             }
         }
 
         // 4. Sync with Database
-        // We only touch items that are "System Managed" (isSystemManaged = true)
-
-        // Find existing system-managed accessories on the board
         const systemItems = items.filter(i => i.isSystemManaged);
 
         // A. Update or Create Logic
         for (const req of Object.values(requirements)) {
-            // STRICT Match: Same Board (implicit), Same SKU, Same Frame
             const matchingItems = systemItems.filter(i =>
                 i.name === req.sku &&
                 i.productFrame === req.frame
@@ -106,24 +144,20 @@ export class AutomationService {
             const primaryItem = matchingItems[0];
             const duplicates = matchingItems.slice(1);
 
-            // 1. Handle Duplicates: Delete them immediately
+            // 1. Handle Duplicates
             for (const dup of duplicates) {
                 await prisma.item.delete({ where: { id: dup.id } });
-                console.warn(`[Automation] Removed duplicate accessory ${dup.name} (${dup.productFrame})`);
             }
 
             if (primaryItem) {
-                // Update if quantity changed
                 if (primaryItem.quantity !== req.quantity) {
                     await prisma.item.update({
                         where: { id: primaryItem.id },
                         data: { quantity: req.quantity, cost: primaryItem.unitPrice * req.quantity }
                     });
-                    console.log(`[Automation] Updated ${req.sku} (${req.frame}) to qty ${req.quantity}`);
                 }
             } else {
                 // Create new
-                // Need to fetch details from CatalogItem first to get Price/Desc
                 const catalogItem = await prisma.catalogItem.findFirst({
                     where: { partNumber: req.sku }
                 });
@@ -134,7 +168,7 @@ export class AutomationService {
                             boardId,
                             category: 'Switchboard',
                             subcategory: 'MCCB Accessories',
-                            name: req.sku, // Store SKU in name
+                            name: req.sku,
                             description: catalogItem.description,
                             unitPrice: catalogItem.unitPrice,
                             labourHours: catalogItem.labourHours,
@@ -142,38 +176,32 @@ export class AutomationService {
                             cost: catalogItem.unitPrice * req.quantity,
                             isSystemManaged: true,
                             isDefault: true,
-                            productFrame: req.frame, // Store the frame that triggered this
+                            productFrame: req.frame,
                             notes: 'System Managed'
                         }
                     });
-                    console.log(`[Automation] Created ${req.sku} (${req.frame}) qty ${req.quantity}`);
-                } else {
-                    console.error(`[Automation] CRITICAL: Missing catalog item for accessory SKU: ${req.sku}. Check catalog data.`);
-                    // Do NOT create fake item - strict guardnail
                 }
             }
         }
 
         // B. Cleanup Logic
         // Delete any system-managed item that is NOT in our requirements list anymore
-        // (i.e. breaker count went to 0, or frame changed)
         for (const item of systemItems) {
-            // Check if this item matches any requirement
-            // Match Key = SKU + Frame
-            // If item has no productFrame, it might be legacy or broken. If we can't map it to a requirement, we delete it.
-
-            // We reconstruct the key that WOULD produce this item
             const frame = item.productFrame || '';
             const sku = item.name;
             const key = `${sku}::${frame}`;
 
+            // Check if this item is required
             const isRequired = requirements[key];
 
             if (!isRequired) {
+                // If it's not required, it might be because:
+                // 1. Breakers removed (frame count 0)
+                // 2. Override active (requirements didn't include it)
+                // In both cases, we delete it.
                 await prisma.item.delete({
                     where: { id: item.id }
                 });
-                console.log(`[Automation] Removed unused accessory ${sku} (${frame || 'no-frame'})`);
             }
         }
     }
