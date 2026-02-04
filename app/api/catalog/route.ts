@@ -83,9 +83,9 @@ export async function GET(request: Request) {
         if (search) {
             whereClause.AND.push({
                 OR: [
-                    { partNumber: { contains: search } },
-                    { description: { contains: search } },
-                    { brand: { contains: search } },
+                    { name: { contains: search, mode: 'insensitive' } },
+                    { partNumber: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } }
                 ]
             });
         }

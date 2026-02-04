@@ -87,6 +87,11 @@ model Item {
   partNumber      String?
   productFrame    String? // e.g. "NSX100-250", "NSX400-630"
   mccbVariant     String? // Copied from CatalogItem at creation
+
+  // Automation Provenance
+  systemRuleType  String? // e.g. "MCB_CHASSIS_TO_NE_LINK_165A"
+
+  @@unique([boardId, systemRuleType, partNumber])
 }
 
 model CatalogItem {
@@ -141,6 +146,18 @@ model Settings {
   companyAddress        String?
   
   updatedAt             DateTime @updatedAt
+}
+
+model PairingRule {
+  id              String   @id @default(uuid())
+  ruleType        String   // e.g. "MCB_CHASSIS_TO_NE_LINK_165A"
+  inputPartNumber String
+  outputPartNumber String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([ruleType, inputPartNumber])
 }
 
 model Template {

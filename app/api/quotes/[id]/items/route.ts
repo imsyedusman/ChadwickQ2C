@@ -148,6 +148,19 @@ export async function POST(
             }
         }
 
+        // Hook: Generic Pairing Automation (MCB Chassis -> Link)
+        // Trigger for any item that might be a chassis (SAU...) or generally Switchboard items
+        if (newItem.partNumber && (newItem.partNumber.startsWith('SAU') || newItem.category === 'Switchboard')) {
+            const { AutomationService } = await import('@/lib/automation');
+            // We can fire-and-forget strictly speaking IF we didn't need the frontend to update immediately.
+            // But we DO need immediate update.
+            const { warnings } = await AutomationService.applyPairingRules(boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
+
+            if (warnings.length > 0) {
+                console.warn(`[API] Pairing Warnings: ${warnings.join(', ')}`);
+            }
+        }
+
         // Return the full updated list of items for the board to ensure frontend is in sync
         const allItems = await prisma.item.findMany({
             where: { boardId },

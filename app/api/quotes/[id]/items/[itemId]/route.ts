@@ -53,20 +53,40 @@ export async function PUT(
         }
 
         // Hook: MCCB Accessory Automation
-        // Use 'item' (pre-update) to check if it WAS a breaker, or check DB again?
-        // 'item' might lack productFrame if not selected. Let's fetch it or trust the flag.
-        // We need productFrame. We can fetch it or if we trust 'item' selection above.
-        // The selection above didn't select productFrame. Let's update the selection.
-        const freshItem = await prisma.item.findUnique({ where: { id: itemId }, select: { productFrame: true, boardId: true, isSystemManaged: true } });
+        // We fetch fresh item data to ensure we have the latest state (productFrame, system flags)
+        const freshItem = await prisma.item.findUnique({
+            where: { id: itemId },
+            select: { productFrame: true, boardId: true, isSystemManaged: true, partNumber: true, category: true }
+        });
 
         // GUARD: Do NOT trigger sync if we are just updating a system-managed item (prevent loops)
-        if (freshItem?.productFrame && !freshItem.isSystemManaged && quantity !== undefined) {
+        if (freshItem?.productFrame && !freshItem.isSystemManaged) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.syncBoardAccessories(freshItem.boardId);
         }
 
+        // Hook: Generic Pairing Automation (MCB Chassis -> Link)
+        // Trigger if item is Switchboard/Chassis and NOT system managed (manual update of chassis)
+        const isChassis = freshItem && (freshItem.isSystemManaged === false) &&
+            freshItem.partNumber &&
+            (freshItem.partNumber.startsWith('SAU') || freshItem.category === 'Switchboard');
 
-        return NextResponse.json(updatedItem);
+        if (isChassis && freshItem) {
+            const { AutomationService } = await import('@/lib/automation');
+            const { warnings } = await AutomationService.applyPairingRules(freshItem.boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
+            if (warnings.length > 0) {
+                console.warn(`[API] Pairing Warnings: ${warnings.join(', ')}`);
+            }
+        }
+
+        // Return the full updated list of items to ensure frontend is in sync
+        const boardId = item?.boardId || freshItem?.boardId;
+        const allItems = await prisma.item.findMany({
+            where: { boardId },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        return NextResponse.json(allItems);
     } catch (error) {
         console.error('Failed to update item', error);
         return NextResponse.json({ error: 'Failed to update item' }, { status: 500 });
@@ -172,13 +192,19 @@ export async function DELETE(
         }
 
         // Hook: MCCB Trip Base Pairing (Post-Delete)
-        // If we deleted a Trip Unit (or potentially one), run the sync to cleanup Bases.
-        // We can check if it had a variant or role, or just run it for Switchboard items to be safe.
         if (item?.category === 'Switchboard') {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.syncMccbTripBasePairs(item.boardId);
-        }
 
+            // Hook: Generic Pairing Automation (MCB Chassis -> Link) - Post Delete
+            // If we deleted a chassis, we must recalc links.
+            // Check if name/partNumber started with SAU or category is Switchboard
+            const mightBeChassis = (item?.name?.startsWith('SAU') || item?.category === 'Switchboard');
+            if (mightBeChassis) {
+                const { warnings } = await AutomationService.applyPairingRules(item.boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
+                if (warnings.length > 0) console.warn(`[API] Pairing Warnings (Delete): ${warnings.join(', ')}`);
+            }
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { normalizePartNumber } from './normalization';
 
 const prisma = new PrismaClient();
 
@@ -380,6 +381,239 @@ export class AutomationService {
             if (pNum && !requiredBases.has(pNum)) {
                 await prisma.item.delete({ where: { id: item.id } });
             }
+        }
+    }
+
+    /**
+     * Applies deterministic pairing rules (e.g. MCB Chassis -> Enb Link).
+     * @param boardId 
+     * @param ruleType 
+     * @returns { warnings: string[] }
+     */
+    static async applyPairingRules(boardId: string, ruleType: string): Promise<{ warnings: string[] }> {
+        const warnings: string[] = [];
+        const SYSTEM_TAG = 'MCB_CHASSIS_LINK';
+
+        try {
+            // 1. Fetch Rules (Safely)
+            // Use explicit try/catch for table existence check as Prisma might throw if table doesn't exist yet (migration pending)
+            let rules: any[] = [];
+            try {
+                // @ts-ignore - dynamic access or known model
+                if ((prisma as any).pairingRule) {
+                    rules = await (prisma as any).pairingRule.findMany({
+                        where: { ruleType }
+                    });
+                } else {
+                    console.warn(`[Automation] PairingRule table not accessible.`);
+                    return { warnings: [] };
+                }
+            } catch (e: any) {
+                console.warn(`[Automation] Failed to fetch PairingRules (migration maybe pending): ${e.message}`);
+                return { warnings: [] };
+            }
+
+            if (rules.length === 0) {
+                // No rules loaded? Safe no-op.
+                return { warnings: [] };
+            }
+
+            const ruleMap = new Map<string, string>(); // Input -> Output
+            const knownInputs = new Set<string>();
+            const requiredOutputs = new Set<string>();
+
+            for (const rule of rules) {
+                ruleMap.set(rule.inputPartNumber, rule.outputPartNumber);
+                knownInputs.add(rule.inputPartNumber);
+                requiredOutputs.add(rule.outputPartNumber);
+            }
+
+            // 2. Fetch Board Items and Scope Sources
+            const allItems = await prisma.item.findMany({
+                where: { boardId }
+            });
+
+            // STRICT SOURCING: Normalize partNumber for comparison
+            const sourceItems = allItems.filter(i => {
+                if (!i.partNumber) return false;
+                const p = normalizePartNumber(i.partNumber);
+                return knownInputs.has(p);
+            });
+
+            // 3. Aggregate Requirements
+            const requirements = new Map<string, number>(); // Normalized Output Part -> TotalQty
+
+            for (const item of sourceItems) {
+                const inputNorm = normalizePartNumber(item.partNumber);
+                const outputPart = ruleMap.get(inputNorm);
+
+                if (outputPart) {
+                    // Diagnostic Log
+                    console.log(`[Automation] Rule Match: ${inputNorm} -> ${outputPart}`);
+
+                    const current = requirements.get(outputPart) || 0;
+                    requirements.set(outputPart, current + item.quantity);
+                }
+            }
+
+            // 4. Validate Requirements against Catalog (CASE INSENSITIVE / NORMALIZED)
+            const requiredPartNumbers = Array.from(requirements.keys()); // These are already normalized from rules
+
+            // Optimization: Fetch only needed catalog items
+            let catalogItems: any[] = [];
+            if (requiredPartNumbers.length > 0) {
+                // Fetch broadly then filter
+                // Or fetch all catalog items? Catalog might be large.
+                // We need to match 'enb48' (normalized 'ENB48') to DB value 'ENB48' or 'enb48'.
+                // Since we backfilled catalog to be uppercase, direct match SHOULD work if we trust backfill.
+                // But specifically requested: "Automation must resolve CatalogItem for enb48 even if stored as ENB48" 
+                // (and we defined normalized as UPPERCASE).
+                // So we query by IN normalized list.
+                // BUT if backfill didn't run or missed something, we might still want loose match?
+                // The plan said: "Fetch by normalized part number (or case-insensitive search)".
+                // Given we ran backfill, we can try exact match on normalized values first.
+                // Safest: findMany with partNumber in list.
+                catalogItems = await (prisma as any).catalogItem.findMany({
+                    where: {
+                        partNumber: { in: requiredPartNumbers }
+                    }
+                });
+            }
+
+            const validRequirements = new Map<string, number>();
+
+            for (const [part, qty] of requirements.entries()) {
+                // Canonical lookup
+                // Part from 'requirements' is Normalized (UPPER).
+                // Catalog items from DB should be Normalized (UPPER) if backfill ran.
+                // If DB has mixed case, we might miss it *unless* we normalize catalog items in memory too.
+                const catItem = catalogItems.find((c: any) => normalizePartNumber(c.partNumber) === part);
+
+                if (!catItem) {
+                    // Try one last fetch attempt with loose sensitive check? (Probably too expensive/complex)
+                    // If proper backfill ran, this shouldn't happen.
+                    console.warn(`[Automation] Warning: Required link ${part} missing from Catalog. Item will NOT be created.`);
+                    warnings.push(`Missing catalog item for required link: ${part}`);
+                } else {
+                    validRequirements.set(part, qty);
+                }
+            }
+
+            // 5. Transaction-Safe Sync
+            await prisma.$transaction(async (tx) => {
+                // A. Fetch Existing System Items strictly scoped
+                const existingSystemItems = await tx.item.findMany({
+                    where: {
+                        boardId,
+                        // @ts-ignore - Pending client regeneration
+                        systemRuleType: ruleType,       // Provenance
+                        systemTag: SYSTEM_TAG,          // Type
+                        isSystemManaged: true           // Flag
+                    }
+                });
+
+                // B. Runtime Duplicate Cleanup (Uniqueness Guard)
+                // Group by normalized partNumber
+                const byPart = new Map<string, any[]>();
+                for (const item of existingSystemItems) {
+                    const p = normalizePartNumber((item as any).partNumber);
+                    if (!p) continue;
+                    if (!byPart.has(p)) byPart.set(p, []);
+                    byPart.get(p)?.push(item);
+                }
+
+                // If any part has > 1 item, delete duplicates (keep first created or id sort)
+                for (const [p, items] of byPart.entries()) {
+                    if (items.length > 1) {
+                        // Sort by createdAt or ID to be deterministic
+                        items.sort((a, b) => a.id.localeCompare(b.id));
+                        const keep = items[0];
+                        const remove = items.slice(1);
+
+                        console.warn(`[Automation] Found duplicate system items for ${p} in rule ${ruleType}. Cleaning up ${remove.length} items.`);
+
+                        await tx.item.deleteMany({
+                            where: { id: { in: remove.map(i => i.id) } }
+                        });
+
+                        // Fix local list for next steps
+                        byPart.set(p, [keep]);
+                    }
+                }
+
+                // Re-flatten existing items after cleanup
+                const cleanExistingItems = Array.from(byPart.values()).flat();
+
+                // C. Sync Actions
+                for (const [part, qty] of validRequirements.entries()) {
+                    // Part is Normalized (UPPER)
+                    const existing = cleanExistingItems.find(i => normalizePartNumber((i as any).partNumber) === part);
+                    const catItem = catalogItems.find((c: any) => normalizePartNumber(c.partNumber) === part);
+
+                    if (!catItem) continue; // Final safety check
+
+                    if (existing) {
+                        if (existing.quantity !== qty) {
+                            await tx.item.update({
+                                where: { id: existing.id },
+                                data: {
+                                    quantity: qty,
+                                    cost: existing.unitPrice * qty
+                                }
+                            });
+                        }
+                        // Ensure existing item has normalized part number?
+                        if (existing.partNumber !== part) {
+                            await tx.item.update({ where: { id: existing.id }, data: { partNumber: part } });
+                        }
+                    } else {
+                        // Create NEW
+                        // STRICT SOURCING: Use catItem data ONLY.
+                        // Ensure partNumber is canonical.
+                        await tx.item.create({
+                            data: {
+                                boardId,
+                                category: catItem.category || 'Switchboard',
+                                subcategory: catItem.subcategory || 'Neutral and Earth Links - 165A', // Prefer catalog subcategory
+                                name: catItem.partNumber, // Use PartNumber as name for links
+                                description: catItem.description,
+                                quantity: qty,
+                                unitPrice: catItem.unitPrice,
+                                labourHours: catItem.labourHours,
+                                cost: catItem.unitPrice * qty,
+                                isSystemManaged: true,
+                                systemTag: SYSTEM_TAG,
+                                systemRuleType: ruleType,   // Strict Provenance
+                                partNumber: part, // Strict Match to Requirement (Normalized)
+                                productFrame: null,         // Not a frame itself
+                                isSheetmetal: catItem.isSheetmetal,
+                                notes: 'System Managed'
+                            } as any
+                        });
+                        console.log(`[Automation] Created ${part} (Qty ${qty}) for rule ${ruleType}`);
+                    }
+                }
+
+                // D. Delete Orphaned Items
+                // Items in cleanExistingItems that are NOT in validRequirements
+                for (const item of cleanExistingItems) {
+                    const p = (item as any).partNumber;
+                    if (!validRequirements.has(p)) {
+                        console.log(`[Automation] Removing orphaned item ${p} (Rule: ${ruleType})`);
+                        await tx.item.delete({
+                            where: { id: item.id }
+                        });
+                    }
+                }
+            });
+
+            // 6. Return Warnings
+            return { warnings };
+
+        } catch (error: any) {
+            console.error(`[Automation] Error applying rules for ${ruleType}:`, error);
+            // Don't crash, but report
+            return { warnings: [`Automation Failed: ${error.message || 'Unknown error'}`] };
         }
     }
 }
