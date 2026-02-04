@@ -1,0 +1,20 @@
+Starting Verification...
+Starting MCCB Automation Verification...
+Created test board: c658e22f-5cfa-4ca4-9651-015e675a18c1
+
+--- Scenario 1: Add Trip Unit (C1035E100) ---
+PASS: Base C10B3 added automatically with qty 1.
+
+--- Scenario 2: Increase Trip Qty to 3 ---
+PASS: Base C10B3 updated to qty 3.
+
+--- Scenario 3: Add Second Trip Unit (C1036E100 - same base) ---
+PASS: Base C10B3 updated to qty 5 (Sum of 3 + 2).
+
+--- Scenario 4: Delete All Trip Units ---
+PASS: Base C10B3 removed.
+
+--- Scenario 5: TM Breaker (C10B3TM063) ---
+PASS: No base added for TM breaker.
+
+Cleaning up test board...

@@ -255,7 +255,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                         <TooltipTrigger>
                                             <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 cursor-help">
                                                 <Lock size={8} className="text-blue-700" />
-                                                Auto
+                                                {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
                                             </span>
                                         </TooltipTrigger>
                                         <TooltipContent side="top">

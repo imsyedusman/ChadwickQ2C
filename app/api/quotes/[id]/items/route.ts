@@ -70,11 +70,24 @@ export async function POST(
                 labourHours: labourHours || 0,
                 cost,
                 notes,
-                isDefault: isDefault || false,
+                isSystemManaged: isDefault || false,
+                partNumber: (body.partNumber || (catalogItem as any)?.partNumber || (name && !name.includes(' ') ? name : null)), // Robust Part Number resolution
                 isSheetmetal: isSheetmetal,
-                productFrame: catalogItem?.productFrame // Copy Frame ID from Catalog
-            },
+                productFrame: (catalogItem as any)?.productFrame,
+                // Strict Logic: Only copy variant if it exists in Catalog.
+                // Do NOT stamp board fallback here. Let sync logic handle dynamic resolution for generic items.
+                mccbVariant: (catalogItem as any)?.mccbVariant || null
+            } as any,
         });
+
+        // Debug / Validation Logging for Trip Units
+        if (catalogItem && (catalogItem as any).mccbRole === 'TRIP_UNIT') {
+            if (!(catalogItem as any).mccbVariant) {
+                console.warn(`[API] Creating Trip Unit Item ${name} but CatalogItem ${catalogItem.id} has NO mccbVariant! Pairing will fail.`);
+            } else {
+                console.log(`[API] Created Trip Unit Item ${name} with Variant ${(catalogItem as any).mccbVariant}`);
+            }
+        }
 
         // Check if item addition should trigger a board sync (e.g. Busbar items affect Insulation Cost)
         const isBusbarItem = (category && category.toLowerCase() === 'busbar') ||
@@ -102,7 +115,46 @@ export async function POST(
             await AutomationService.syncBoardAccessories(boardId);
         }
 
-        return NextResponse.json(newItem);
+        // Hook: MCCB Trip Base Pairing Automation
+        // Trigger for Trip Units (check via rule table would be expensive here, but sync is safe)
+        // Or if we just added a Trip Unit.
+        // syncMccbTripBasePairs checks rule table internally.
+        // We trigger it if it MIGHT be a trip unit (Safe to trigger always? It fetches items & rules).
+        // To be safe, trigger if category is Switchboard?
+        const isSwitchboard = category === 'Switchboard' || newItem.category === 'Switchboard';
+        if (isSwitchboard) {
+            console.log(`[API] Before Sync: Checking items for Board ${boardId}`);
+            // Count items before
+            const countBefore = await prisma.item.count({ where: { boardId } });
+            console.log(`[API] Item Count Before: ${countBefore}`);
+
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncMccbTripBasePairs(boardId);
+
+            // Count items after
+            const countAfter = await prisma.item.count({ where: { boardId } });
+            console.log(`[API] Item Count After: ${countAfter}`);
+
+            // List generated bases
+            if (countAfter > countBefore) {
+                const newBases = await prisma.item.findMany({
+                    where: {
+                        boardId,
+                        systemTag: 'MCCB_TRIP_BASE',
+                        createdAt: { gte: newItem.createdAt } // Roughly new
+                    }
+                });
+                console.log(`[API] Created ${newBases.length} System Bases:`, newBases.map(b => `${b.partNumber} (${b.mccbVariant})`));
+            }
+        }
+
+        // Return the full updated list of items for the board to ensure frontend is in sync
+        const allItems = await prisma.item.findMany({
+            where: { boardId },
+            orderBy: { createdAt: 'asc' } // Or order by 'order' if implemented
+        });
+
+        return NextResponse.json(allItems);
     } catch (error) {
         console.error('Failed to create/update item:', error);
         return NextResponse.json({ error: 'Failed to create item' }, { status: 500 });

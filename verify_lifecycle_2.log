@@ -1,0 +1,16 @@
+--- MCCB Pairing Lifecycle Verification ---
+[SETUP] Board Ready: c71e86ba-0eea-41d6-afdb-89aea90a9cfa (N3)
+[STEP 1] Adding Trip Unit A (Qty 1)...
+[PASS] Base Creation: Base found with Qty 1.
+       Metadata Correct: Cat=Switchboard, Sub=Circuit Breakers > MCCB > 50kA FRAME, Name=C10N3
+[STEP 2] Updating Trip Unit A Qty to 2...
+[PASS] Base Update: Base found with Qty 2.
+       Metadata Correct: Cat=Switchboard, Sub=Circuit Breakers > MCCB > 50kA FRAME, Name=C10N3
+[STEP 3] Adding Trip Unit B (Qty 1, Same Variant)...
+[PASS] Base Aggregation: Base found with Qty 3.
+       Metadata Correct: Cat=Switchboard, Sub=Circuit Breakers > MCCB > 50kA FRAME, Name=C10N3
+[STEP 4] Deleting Trip Unit B...
+[PASS] Base Reduction: Base found with Qty 2.
+       Metadata Correct: Cat=Switchboard, Sub=Circuit Breakers > MCCB > 50kA FRAME, Name=C10N3
+[STEP 5] Deleting Trip Unit A...
+[PASS] Base Cleanup: Base correctly removed.

@@ -27,17 +27,19 @@ interface ItemSelectionProps {
 interface ItemRowProps {
     item: CatalogItem;
     existingQty?: number;
+    isSystemManaged?: boolean;
     onAdd: (item: CatalogItem, qty: number) => void;
 }
 
-function ItemRow({ item, existingQty = 0, onAdd }: ItemRowProps) {
+function ItemRow({ item, existingQty = 0, isSystemManaged, onAdd }: ItemRowProps) {
     // If it exists on board, start with that qty. Otherwise default to 1.
     // However, if we want "control surface" feel, we might want to default to 0 if not selected?
     // User requirement: "If the item is not on the board → show default quantity (e.g. 1)"
     const initialQty = existingQty > 0 ? existingQty : 1;
 
     const [qty, setQty] = useState(initialQty);
-    const autoManaged = isAutoManaged(item.partNumber);
+    // Combine client-side check with server-side flag
+    const autoManaged = isAutoManaged(item.partNumber) || isSystemManaged;
 
     // Sync state if existingQty changes (live update from board)
     useEffect(() => {
@@ -460,6 +462,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                 subcategory: item.subcategory,
                 name: item.partNumber || item.description,
                 description: item.description,
+                partNumber: item.partNumber, // Explicitly pass Part Number
                 unitPrice: item.unitPrice,
                 labourHours: item.labourHours,
                 quantity: qty
@@ -759,6 +762,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                     key={item.id}
                                     item={item}
                                     existingQty={existingQty}
+                                    isSystemManaged={(existingItem as any)?.isSystemManaged}
                                     onAdd={handleAddItem}
                                 />
                             );

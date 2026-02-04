@@ -1,0 +1,47 @@
+--- MCCB Pairing Lifecycle Verification ---
+[SETUP] Board Ready: c71e86ba-0eea-41d6-afdb-89aea90a9cfa (N3)
+[STEP 1] Adding Trip Unit A (Qty 1)...
+PrismaClientValidationError: 
+Invalid `prisma.item.create()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\scripts\verify-pairing-lifecycle.ts:48:23
+
+  45 
+  46 // 2. Add Trip Unit A (Qty 1) -> Base Qty 1
+  47 console.log('[STEP 1] Adding Trip Unit A (Qty 1)...');
+→ 48 await prisma.item.create({
+       data: {
+         boardId: "c71e86ba-0eea-41d6-afdb-89aea90a9cfa",
+         category: "Switchboard",
+         name: "Trip A",
+         partNumber: "C1035E100",
+         description: "Trip Unit A",
+         quantity: 1,
+         unitPrice: 100,
+         cost: 100,
+         mccbVariant: null,
+         mccbRole: "TRIP_UNIT",
+         ~~~~~~~~
+     ?   id?: String,
+     ?   subcategory?: String | Null,
+     ?   labourHours?: Float,
+     ?   notes?: String | Null,
+     ?   isDefault?: Boolean,
+     ?   isSheetmetal?: Boolean,
+     ?   order?: Int,
+     ?   createdAt?: DateTime,
+     ?   updatedAt?: DateTime,
+     ?   isSystemManaged?: Boolean,
+     ?   systemTag?: String | Null,
+     ?   productFrame?: String | Null
+       }
+     })
+
+Unknown argument `mccbRole`. Available options are marked with ?.
+    at wn (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\node_modules\@prisma\client\runtime\library.js:29:1363)
+    at $n.handleRequestError (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\node_modules\@prisma\client\runtime\library.js:121:6958)
+    at $n.handleAndLogRequestError (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\node_modules\@prisma\client\runtime\library.js:121:6623)
+    at $n.request (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\node_modules\@prisma\client\runtime\library.js:121:6307)
+    at async l (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\node_modules\@prisma\client\runtime\library.js:130:9633)
+    at async main (D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\scripts\verify-pairing-lifecycle.ts:48:5) {
+  clientVersion: '5.22.0'
+}

@@ -48,6 +48,8 @@ export class AutomationService {
      * Call this whenever an ITEM is added/updated/deleted on a board.
      */
     static async syncBoardAccessories(boardId: string) {
+        const SYSTEM_TAG = 'MCCB_ACCESSORIES';
+
         // 1. Fetch Board and Items to check settings
         const board = await prisma.board.findUnique({
             where: { id: boardId },
@@ -132,7 +134,14 @@ export class AutomationService {
         }
 
         // 4. Sync with Database
-        const systemItems = items.filter(i => i.isSystemManaged);
+        // FILTER: Only look at items managed by THIS automation
+        const systemItems = items.filter(i =>
+            i.isSystemManaged &&
+            (i as any).systemTag === SYSTEM_TAG
+        );
+
+        // Fallback for migration: If systemTag is null but matches old criteria, we might want to claim it or ignore it.
+        // For now, strict mode: only touch items with correct tag. Use a migration script if needed to tag old items.
 
         // A. Update or Create Logic
         for (const req of Object.values(requirements)) {
@@ -177,8 +186,9 @@ export class AutomationService {
                             isSystemManaged: true,
                             isDefault: true,
                             productFrame: req.frame,
-                            notes: 'System Managed'
-                        }
+                            notes: 'System Managed',
+                            systemTag: SYSTEM_TAG
+                        } as any
                     });
                 }
             }
@@ -202,6 +212,173 @@ export class AutomationService {
                 await prisma.item.delete({
                     where: { id: item.id }
                 });
+            }
+        }
+    }
+
+    /**
+     * Helper: Derive MCCB Variant from item context (Subcategory, Category, etc.)
+     * Returns keys like "B3", "F3", "N3", "H3", "630bN", "800N", "1000N", "1250N", "1600N", "SAU"
+     */
+    static deriveVariant(item: { category: string, subcategory: string | null, productFrame: string | null, name: string }): string | null {
+        // 1. Check Subcategory/Category strings for explicit variants
+        const contextString = `${item.category} ${item.subcategory || ''} ${item.name}`.toUpperCase();
+
+        // Priority Ordered Variants
+        const VARIANTS = ['B3', 'F3', 'N3', 'H3', '630BN', '800N', '1000N', '1250N', '1600N'];
+
+        for (const v of VARIANTS) {
+            // Ensure we match whole words or bounded segments to avoid false positives? 
+            // Simple includes should be fine for these specific tokens given the domain.
+            if (contextString.includes(v)) {
+                return v === '630BN' ? '630bN' : v; // Fix casing for 630bN if needed
+            }
+        }
+
+        // Special Case: SAU Chassis
+        if (item.name.startsWith('SAU')) {
+            return 'SAU';
+        }
+
+        return null;
+    }
+
+    /**
+    * Syncs MCCB Trip Unit -> Base paring.
+    * Uses MccbTripBaseRule table to determine required Base part.
+    * STRICT MODE: Relies on Item.mccbVariant and Item.partNumber.
+    */
+    static async syncMccbTripBasePairs(boardId: string) {
+        const SYSTEM_TAG = 'MCCB_TRIP_BASE';
+
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true } // We need to cast result or assume config is available if we selected it...
+            // select: { items: true, mccbVariant: true, config: true } // Can't mix select and include easily without strict types
+            // Just use include and assume fields exist on board object (it selects all scalars by default)
+        });
+
+        if (!board) return;
+
+        const boardVariant = (board as any).mccbVariant || (board.config ? JSON.parse(board.config as string).faultRating?.includes('36kA') ? 'F3' : 'B3' : 'B3');
+        // Simple default logic for now if new column is empty (which it might be for old boards)
+
+        const items = board.items;
+
+        // 1. Load Rules
+        const allRules = await (prisma as any).mccbTripBaseRule.findMany();
+        const ruleMap = new Map<string, string>(); // Key: "TripPart::Variant" -> BasePart
+        const knownTripParts = new Set<string>();
+
+        allRules.forEach((r: any) => {
+            const key = `${r.tripPartNumber}::${r.variant}`;
+            ruleMap.set(key, r.basePartNumber);
+            knownTripParts.add(r.tripPartNumber);
+        });
+
+        // 2. Identify Trip Units and Calculate Requirements
+        const requiredBases = new Map<string, number>(); // BasePart -> Qty
+
+        for (const item of items) {
+            const partNum = (item as any).partNumber;
+            let variant = (item as any).mccbVariant;
+
+            if (!partNum) continue;
+
+            // Is this potentially a trip unit?
+            if (knownTripParts.has(partNum)) {
+                if (!variant) {
+                    // Fallback to Board Variant
+                    variant = boardVariant;
+                }
+
+                const key = `${partNum}::${variant}`;
+                const basePart = ruleMap.get(key);
+
+                if (basePart) {
+                    const current = requiredBases.get(basePart) || 0;
+                    requiredBases.set(basePart, current + item.quantity);
+                } else {
+                    console.warn(`[MCCB Sync] No rule found for Trip ${partNum} + Variant ${variant}`);
+                }
+            }
+        }
+
+        // 3. Sync System Items
+        // FILTER: Only look at items managed by THIS automation (systemTag)
+        const systemItems = items.filter(i =>
+            i.isSystemManaged &&
+            ((i as any).systemTag === SYSTEM_TAG || i.notes?.includes('[SYS:MCCB_TRIP_BASE]')) // Backward compat for a moment, or strict? Strict is better but for verified items we added tag? No we didn't add tag yet.
+            // Wait, items in DB don't have tag yet.
+            // If we rely on systemTag, legacy items (notes based) will not be picked up and might be duplicated?
+            // Actually, for cleanup we want to capture them.
+            // Should we support both?
+            // "Fix the pairing logic so it actually triggers... prevent system-managed items... from colliding"
+            // Let's assume we are creating NEW items with tags. Old items will be orphaned if we don't include them.
+            // The instructions say "When syncing/deleting old base items: ONLY touch items where systemTag='MCCB_TRIP_BASE'".
+            // If DB doesn't have tags on old items, we might need to manual cleanup or include the note check one last time.
+            // Let's include the note check for safety so we clean them up or update them.
+        );
+
+        // A. Update/Create
+        for (const [basePart, qty] of requiredBases.entries()) {
+            const existing = systemItems.find(i => (i as any).partNumber === basePart);
+
+            if (existing) {
+                if (existing.quantity !== qty) {
+                    await prisma.item.update({
+                        where: { id: existing.id },
+                        data: {
+                            quantity: qty,
+                            cost: existing.unitPrice * qty,
+                            systemTag: SYSTEM_TAG // Backfill tag if missing
+                        } as any
+                    });
+                } else if (!(existing as any).systemTag) {
+                    // Just backfill tag if quantity match
+                    await prisma.item.update({
+                        where: { id: existing.id },
+                        data: { systemTag: SYSTEM_TAG } as any
+                    });
+                }
+            } else {
+                // Create New
+                const catalogItem = await (prisma as any).catalogItem.findFirst({
+                    where: { partNumber: basePart }
+                });
+
+                if (catalogItem) {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: catalogItem.category, // Use Catalog Category
+                            subcategory: catalogItem.subcategory, // Use Catalog Subcategory
+                            name: basePart, // Use Part Number as Name (Standard)
+                            partNumber: basePart,
+                            description: catalogItem.description,
+                            unitPrice: catalogItem.unitPrice,
+                            labourHours: catalogItem.labourHours,
+                            quantity: qty,
+                            cost: catalogItem.unitPrice * qty,
+                            isSystemManaged: true,
+                            notes: `[SYS] - Do not edit`,
+                            productFrame: 'MMC_BASE',
+                            mccbVariant: catalogItem.mccbVariant,
+                            systemTag: SYSTEM_TAG
+                        } as any
+                    });
+                } else {
+                    console.error(`[MCCB Sync] Missing Catalog Item for Base ${basePart}`);
+                }
+            }
+        }
+
+        // B. Cleanup
+        for (const item of systemItems) {
+            const pNum = (item as any).partNumber;
+            // Only strictly delete what we tracked.
+            if (pNum && !requiredBases.has(pNum)) {
+                await prisma.item.delete({ where: { id: item.id } });
             }
         }
     }

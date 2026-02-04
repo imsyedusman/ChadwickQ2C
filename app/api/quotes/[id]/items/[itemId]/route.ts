@@ -171,6 +171,14 @@ export async function DELETE(
             await AutomationService.syncBoardAccessories(item.boardId);
         }
 
+        // Hook: MCCB Trip Base Pairing (Post-Delete)
+        // If we deleted a Trip Unit (or potentially one), run the sync to cleanup Bases.
+        // We can check if it had a variant or role, or just run it for Switchboard items to be safe.
+        if (item?.category === 'Switchboard') {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncMccbTripBasePairs(item.boardId);
+        }
+
 
         return NextResponse.json({ success: true });
     } catch (error) {

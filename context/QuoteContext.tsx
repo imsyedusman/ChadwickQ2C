@@ -477,7 +477,25 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
 
             if (res.ok) {
-                await fetchQuoteData();
+                const updatedItems = await res.json();
+
+                if (Array.isArray(updatedItems)) {
+                    // Update local state immediately for responsiveness and correctness
+                    setBoards(prev => prev.map(b => {
+                        if (b.id === boardId) {
+                            return { ...b, items: updatedItems };
+                        }
+                        return b;
+                    }));
+
+                    // Also trigger full refresh to be safe (calculations etc)
+                    // But maybe debounce or skip if we trust the items?
+                    // Calculations happen in calculateTotals() which depends on `boards`.
+                    // So updating `boards` is sufficient for totals!
+                } else {
+                    // Fallback to old behavior if API returns single item (legacy safety)
+                    await fetchQuoteData();
+                }
             }
         } catch (error) {
             console.error('Failed to add item', error);

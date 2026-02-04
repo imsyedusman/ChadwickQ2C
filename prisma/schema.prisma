@@ -50,6 +50,7 @@ model Board {
   
   isOptional  Boolean  @default(false)
   config      String?  // JSON string storing Pre-Selection values (IP, Form, etc.)
+  mccbVariant String?  // e.g. "B3", "F3" (Resolved from Fault Rating)
   
   items       Item[]
   
@@ -82,7 +83,10 @@ model Item {
   updatedAt   DateTime @updatedAt
 
   isSystemManaged Boolean @default(false)
+  systemTag       String?  // e.g. "MCCB_ACCESSORIES", "MCCB_TRIP_BASE"
+  partNumber      String?
   productFrame    String? // e.g. "NSX100-250", "NSX400-630"
+  mccbVariant     String? // Copied from CatalogItem at creation
 }
 
 model CatalogItem {
@@ -105,6 +109,20 @@ model CatalogItem {
   updatedAt       DateTime @updatedAt
 
   productFrame    String? // e.g. "NSX100-250"
+  mccbVariant     String? // e.g. "B3", "F3", "N3", "H3", "630bN"
+  mccbRole        String? // e.g. "TRIP_UNIT", "BASE"
+}
+
+model MccbTripBaseRule {
+  id              String   @id @default(uuid())
+  tripPartNumber  String
+  variant         String   // e.g. "B3", "F3", "N3", "H3"
+  basePartNumber  String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tripPartNumber, variant])
 }
 
 
