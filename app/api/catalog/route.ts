@@ -7,12 +7,12 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const mode = searchParams.get('mode');
-        const search = searchParams.get('search') || '';
+        const search = searchParams.get('search')?.trim() || '';
         const category = searchParams.get('category');
         const subcategory = searchParams.get('subcategory');
         const exportMode = searchParams.get('export') === 'true';
         const brand = searchParams.get('brand');
-        const take = searchParams.get('take') ? parseInt(searchParams.get('take')!) : 100;
+        const take = searchParams.get('take') ? parseInt(searchParams.get('take')!) : 200; // Default limit for performance
 
         // Mode: Stats (Get unique brands and counts)
         if (mode === 'stats') {
@@ -75,20 +75,76 @@ export async function GET(request: Request) {
         }
 
         // Standard Search with Filters
+
+        // If searching, we skip standard filtering logic and prioritize relevance
+        if (search) {
+            // 1. Exact Match / Prefix Query (High Priority)
+            // We want to guarantee these show up, so we query them specifically
+            const exactMatches = await prisma.catalogItem.findMany({
+                where: {
+                    partNumber: { equals: search, mode: 'insensitive' }
+                },
+                take: 50
+            });
+
+            // 2. Broad Query (Contains)
+            const broadMatches = await prisma.catalogItem.findMany({
+                where: {
+                    OR: [
+                        { partNumber: { contains: search, mode: 'insensitive' } },
+                        { description: { contains: search, mode: 'insensitive' } },
+                        { subcategory: { contains: search, mode: 'insensitive' } },
+                        { category: { contains: search, mode: 'insensitive' } }
+                    ],
+                    // Exclude IDs we already found in exactMatches to avoid fetching duplicates (optional optimization, but easy enough to dedup in memory)
+                    // NOT doing NOT IN for simplicity and because exactMatches is small.
+                },
+                take: take // Limit broad results
+            });
+
+            // Merge and Deduplicate
+            const allDocs = [...exactMatches, ...broadMatches];
+            const uniqueDocs = Array.from(new Map(allDocs.map(item => [item.id, item])).values());
+
+            // Rank Results
+            const rankedDocs = uniqueDocs.map(item => {
+                let score = 0;
+                const partNo = (item.partNumber || '').toUpperCase();
+                const q = search.toUpperCase();
+
+                if (partNo === q) {
+                    score = 100; // Exact Part Number
+                } else if (partNo.startsWith(q)) {
+                    score = 80; // Prefix Part Number
+                } else if (partNo.includes(q)) {
+                    score = 60; // Contains Part Number
+                } else if ((item.description || '').toUpperCase().includes(q)) {
+                    score = 40; // Description
+                } else {
+                    score = 20; // Category/Subcategory
+                }
+
+                return { item, score };
+            });
+
+            // Sort by Score DESC, then PartNumber ASC, then ID ASC
+            rankedDocs.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                // Tie-breaker: Part Number
+                const pA = (a.item.partNumber || '').toUpperCase();
+                const pB = (b.item.partNumber || '').toUpperCase();
+                if (pA < pB) return -1;
+                if (pA > pB) return 1;
+                return 0; // Stable
+            });
+
+            return NextResponse.json(rankedDocs.map(r => r.item));
+        }
+
+        // Non-Search Filtering (Browser Mode)
         const whereClause: any = {
             AND: []
         };
-
-        // 1. Search Query
-        if (search) {
-            whereClause.AND.push({
-                OR: [
-                    { name: { contains: search, mode: 'insensitive' } },
-                    { partNumber: { contains: search, mode: 'insensitive' } },
-                    { description: { contains: search, mode: 'insensitive' } }
-                ]
-            });
-        }
 
         // 2. Category Filter
         if (category) {

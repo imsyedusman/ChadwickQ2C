@@ -272,6 +272,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
         const l3 = new Set<string>();
         let powerMeterActive = false;
 
+        // Standard Navigation Logic (unchanged)
         allSubcategories.forEach(sub => {
             if (!sub) return;
             const parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
@@ -287,8 +288,6 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             }
         });
 
-        // Detect if we are in Power Meters section (L2 = 'Power Meters')
-        // OR if the user clicked "Power Meters" directly if it's L1 (though mapped as subcat)
         if (selectedL1 === 'Power Meters' || selectedL2 === 'Power Meters' || selectedL3 === 'Power Meters') {
             powerMeterActive = true;
         }
@@ -300,6 +299,45 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             isPowerMeterSelection: powerMeterActive
         };
     }, [allSubcategories, selectedL1, selectedL2, selectedL3]);
+
+    // Separate Memo for Search Grouping (Depends on Items)
+    const groupedItems = useMemo(() => {
+        let grouped = {
+            topHits: [] as CatalogItem[],
+            basics: [] as CatalogItem[],
+            switchgears: [] as CatalogItem[],
+            busbars: [] as CatalogItem[],
+            others: [] as CatalogItem[]
+        };
+
+        if (searchQuery && items.length > 0) {
+            const q = searchQuery.toUpperCase();
+
+            items.forEach(item => {
+                const partNo = (item.partNumber || '').toUpperCase();
+                let isTopHit = false;
+                if (partNo === q || partNo.startsWith(q)) {
+                    isTopHit = true;
+                }
+
+                if (isTopHit) {
+                    grouped.topHits.push(item);
+                } else {
+                    const cat = (item.category || '').toLowerCase();
+                    if (cat === 'basics') {
+                        grouped.basics.push(item);
+                    } else if (cat === 'switchboard') {
+                        grouped.switchgears.push(item);
+                    } else if (cat === 'busbar') {
+                        grouped.busbars.push(item);
+                    } else {
+                        grouped.others.push(item);
+                    }
+                }
+            });
+        }
+        return grouped;
+    }, [items, searchQuery]);
 
     // Derived Power Meter Filters
     const { uniqueBrands, filteredItems } = useMemo(() => {
@@ -695,81 +733,165 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-3">
-                        {/* Power Meters: Filter UI Header */}
-                        {isPowerMeterSelection && items.length > 0 && (
-                            <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm space-y-4">
-                                {/* Brand Tabs */}
-                                <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-100 no-scrollbar">
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2 shrink-0">Brand:</span>
-                                    <button
-                                        onClick={() => setMeterBrandFilter('All')}
-                                        className={cn(
-                                            "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
-                                            meterBrandFilter === 'All'
-                                                ? "bg-blue-600 text-white shadow-md"
-                                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                        )}
-                                    >
-                                        All Brands
-                                    </button>
-                                    {uniqueBrands.map(brand => (
-                                        <button
-                                            key={brand}
-                                            onClick={() => setMeterBrandFilter(brand)}
-                                            className={cn(
-                                                "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
-                                                meterBrandFilter === brand
-                                                    ? "bg-blue-600 text-white shadow-md"
-                                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                            )}
-                                        >
-                                            {brand}
-                                        </button>
-                                    ))}
-                                </div>
+                    <>
+                        {/* Normal Navigation View (No Search) */}
+                        {!searchQuery && (
+                            <div className="grid grid-cols-1 gap-3">
+                                {/* Power Meters: Filter UI Header */}
+                                {isPowerMeterSelection && (
+                                    <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm space-y-4">
+                                        {/* Brand Tabs */}
+                                        <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-100 no-scrollbar">
+                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2 shrink-0">Brand:</span>
+                                            <button
+                                                onClick={() => setMeterBrandFilter('All')}
+                                                className={cn(
+                                                    "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
+                                                    meterBrandFilter === 'All'
+                                                        ? "bg-blue-600 text-white shadow-md"
+                                                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                )}
+                                            >
+                                                All Brands
+                                            </button>
+                                            {uniqueBrands.map(brand => (
+                                                <button
+                                                    key={brand}
+                                                    onClick={() => setMeterBrandFilter(brand)}
+                                                    className={cn(
+                                                        "px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap",
+                                                        meterBrandFilter === brand
+                                                            ? "bg-blue-600 text-white shadow-md"
+                                                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                                    )}
+                                                >
+                                                    {brand}
+                                                </button>
+                                            ))}
+                                        </div>
 
-                                {/* Type Filters */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Type:</span>
-                                    {['All', 'Direct', 'CT', 'NMI', 'Special'].map(type => (
-                                        <button
-                                            key={type}
-                                            onClick={() => setMeterTypeFilter(type)}
-                                            className={cn(
-                                                "px-4 py-1.5 rounded-md text-xs font-semibold border transition-all",
-                                                meterTypeFilter === type
-                                                    ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-200"
-                                                    : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-                                            )}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
-                                </div>
+                                        {/* Type Filters */}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Type:</span>
+                                            {['All', 'Direct', 'CT', 'NMI', 'Special'].map(type => (
+                                                <button
+                                                    key={type}
+                                                    onClick={() => setMeterTypeFilter(type)}
+                                                    className={cn(
+                                                        "px-4 py-1.5 rounded-md text-xs font-semibold border transition-all",
+                                                        meterTypeFilter === type
+                                                            ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-200"
+                                                            : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                                                    )}
+                                                >
+                                                    {type}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(isPowerMeterSelection ? filteredItems : items).map((item) => (
+                                    <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                ))}
                             </div>
                         )}
 
-                        {(isPowerMeterSelection ? filteredItems : items).map((item) => {
-                            const selectedBoard = boards.find(b => b.id === selectedBoardId);
-                            // Lookup logic: Match Part Number (name)
-                            const key = item.partNumber || item.description;
-                            const existingItem = selectedBoard?.items.find(i => i.name === key);
-                            const existingQty = existingItem ? existingItem.quantity : 0;
+                        {/* Search Results Grouping */}
+                        {searchQuery && (
+                            <div className="space-y-6">
+                                {/* 1. Top Hits */}
+                                {groupedItems.topHits.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                            <Zap size={16} className="text-amber-500 fill-amber-500" />
+                                            Top Hits
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {groupedItems.topHits.map(item => (
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
-                            return (
-                                <ItemRow
-                                    key={item.id}
-                                    item={item}
-                                    existingQty={existingQty}
-                                    isSystemManaged={(existingItem as any)?.isSystemManaged}
-                                    onAdd={handleAddItem}
-                                />
-                            );
-                        })}
-                    </div>
+                                {/* 2. Switchgears */}
+                                {groupedItems.switchgears.length > 0 && (
+                                    <div>
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-blue-500">
+                                            Switchgears
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {groupedItems.switchgears.map(item => (
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 3. Basics */}
+                                {groupedItems.basics.length > 0 && (
+                                    <div>
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-green-500">
+                                            Basics
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {groupedItems.basics.map(item => (
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 4. Busbars */}
+                                {groupedItems.busbars.length > 0 && (
+                                    <div>
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-amber-500">
+                                            Busbars
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {groupedItems.busbars.map(item => (
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 5. Others */}
+                                {groupedItems.others.length > 0 && (
+                                    <div>
+                                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-gray-500">
+                                            Other Matches
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {groupedItems.others.map(item => (
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div >
+    );
+}
+
+// Helper for Search View to reduce duplication
+function ItemWrapper({ item, boards, selectedBoardId, handleAddItem }: { item: CatalogItem, boards: any[], selectedBoardId: string | null, handleAddItem: any }) {
+    const selectedBoard = boards.find(b => b.id === selectedBoardId);
+    const key = item.partNumber || item.description;
+    const existingItem = selectedBoard?.items.find((i: any) => i.name === key);
+    const existingQty = existingItem ? existingItem.quantity : 0;
+
+    return (
+        <ItemRow
+            item={item}
+            existingQty={existingQty}
+            isSystemManaged={(existingItem as any)?.isSystemManaged}
+            onAdd={handleAddItem}
+        />
     );
 }
