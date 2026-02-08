@@ -166,7 +166,7 @@ const CUBIC_OPTIONS_ITEMS = [
 function getCleatType(currentRating: number): string | null {
     if (currentRating <= 400) return '1B1-CLEAT-SMALL-1';
     if (currentRating <= 1000) return '1B1-CLEAT-SMALL-2';
-    if (currentRating <= 2000) return '1B1-CLEAT-LARGE-2';
+    if (currentRating <= 1600) return '1B1-CLEAT-LARGE-2';
     return '1B1-CLEAT-LARGE-3';
 }
 
@@ -174,9 +174,28 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     console.log(`Syncing items for board ${boardId} with config:`, JSON.stringify(config, null, 2));
 
     // Fetch existing items to respect manual edits
-    const existingItems = await prisma.item.findMany({
-        where: { boardId }
+    // Also fetch Quote settings for overrides
+    const boardData = await prisma.board.findUnique({
+        where: { id: boardId },
+        include: { items: true, quote: true }
     });
+
+    if (!boardData) return;
+
+    const existingItems = boardData.items;
+
+    // Parse Settings/Overrides
+    let cleatOverrides: Record<string, number> = {};
+    if (boardData.quote?.settingsSnapshot) {
+        try {
+            const settings = JSON.parse(boardData.quote.settingsSnapshot);
+            if (settings.cleatOverrides && settings.cleatOverrides[boardId]) {
+                cleatOverrides = settings.cleatOverrides[boardId];
+            }
+        } catch (e) {
+            console.warn('Failed to parse quote settings', e);
+        }
+    }
 
     // --- 1. DETERMINE TIER SOURCE OF TRUTH ---
     // Rule: if forceTiers (Wizard Save) -> Config is king.
@@ -436,9 +455,27 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     });
 
-    // --- CLEAT LOGIC (Form 3B) ---
-    const form = (config.form || '').toLowerCase();
-    if (form === '3b') {
+    // --- CLEAT LOGIC (Form 3B Custom Only) ---
+    // Strict Scope: Custom + Form 3B + Fault <= 50kA
+    const isCustom = config.enclosureType === 'Custom';
+    const isForm3B = (config.form || '').toLowerCase() === '3b'; // Form field might be "Form 3B" or just "3B" - strict check? "3b" matches plan.
+    // Fault Rating Safety: Strip non-numeric and parse
+    const faultRatingStr = config.faultRating || '999';
+    const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
+    const isFaultSafe = faultkA <= 50;
+
+    const CLEAT_ITEMS = [
+        '1B1-CLEAT-SMALL-1',
+        '1B1-CLEAT-SMALL-2',
+        '1B1-CLEAT-LARGE-2',
+        '1B1-CLEAT-LARGE-3'
+    ];
+
+    // Track if we are managing cleats this run
+    let managingCleats = false;
+
+    if (isCustom && isForm3B && isFaultSafe) {
+        managingCleats = true;
         const cleatMap = new Map<string, number>();
 
         effectiveBusbarItems.forEach((val, key) => {
@@ -449,17 +486,37 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 const cleatType = getCleatType(rating);
 
                 if (cleatType) {
-                    const cleatQty = Math.ceil(val.qty * 2.5); // 1000/400 = 2.5
+                    // Quantity Rule: ceil(Length_mm / 400) + 1
+                    // val.qty is in Metres (e.g. 2.0).
+                    // Length_mm = val.qty * 1000
+                    // Formula: ceil((val.qty * 1000) / 400) + 1
+                    const lengthMm = val.qty * 1000;
+                    let cleatQty = Math.ceil(lengthMm / 400) + 1;
+
+                    // Minimum check: If length > 0, we expect at least 2 cleats logic-wise from formula?
+                    // 0.1m -> 100mm -> ceil(0.25) = 1 -> +1 = 2. Correct.
+                    // 0m -> 0 -> 1. Correct. 
+                    // Requirement says: "Minimum >0 length implies minimum 2 cleats."
+                    if (lengthMm > 0 && cleatQty < 2) cleatQty = 2; // Should be covered by formula but safety first.
+
                     const currentTotal = cleatMap.get(cleatType) || 0;
                     cleatMap.set(cleatType, currentTotal + cleatQty);
                 }
             }
         });
 
-        // Add consolidated cleat targets (will be fetched in Step 3)
+        // Add consolidated cleat targets
         cleatMap.forEach((qty, partNumber) => {
-            addTarget(partNumber, qty);
+            // CHECK OVERRIDES
+            if (cleatOverrides[partNumber] !== undefined) {
+                console.log(`[Cleats] Overriding ${partNumber} qty to ${cleatOverrides[partNumber]}`);
+                addTarget(partNumber, cleatOverrides[partNumber]);
+            } else {
+                addTarget(partNumber, qty);
+            }
         });
+    } else {
+        console.log(`[Cleats] Skipping automation. Scope: Custom=${isCustom}, Form3B=${isForm3B}, FaultSafe=${isFaultSafe} (${faultkA}kA)`);
     }
 
     // --- 3. FETCH CATALOG DATA ---
@@ -648,16 +705,28 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B1-CLEAT-SMALL-1',
         '1B1-CLEAT-SMALL-2',
         '1B1-CLEAT-LARGE-2',
-        '1B1-CLEAT-LARGE-3'
+        '1B1-CLEAT-LARGE-3', // Note: Will be filtered out below if not managing
     ];
 
-    // Also add Busbars/Labour patterns to removal check
-    const isManagedPattern = (name: string) =>
-        name.startsWith('BB-') || name.startsWith('BBC-') || (name.startsWith('CT-') && name.endsWith('A'));
+    // Add cleats to managed list ONLY if we are managing them this run
+    if (managingCleats) {
+        // They are already in the array above? 
+        // No, wait. '1B1-CLEAT-SMALL-1' etc are in `allManagedItems` literal above.
+        // We need to REMOVE them from `allManagedItems` if !managingCleats, so they are not deleted.
+        // OR better: Define `allManagedItems` dynamically.
+    }
+
+    // Safety: Filter `allManagedItems` to exclude cleats if !managingCleats
+    const finalManagedItems = allManagedItems.filter(name => {
+        if (CLEAT_ITEMS.includes(name)) {
+            return managingCleats;
+        }
+        return true;
+    });
 
     const itemsToRemove = existingItems.filter((item: Item) =>
         item.isDefault &&
-        (allManagedItems.includes(item.name) || isManagedPattern(item.name)) &&
+        (finalManagedItems.includes(item.name) || isManagedPattern(item.name)) &&
         !targetItemPartNumbers.has(item.name)
     );
 
