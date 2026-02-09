@@ -24,6 +24,7 @@ export interface BoardConfig {
     cableZones?: string; // 'Yes' | 'No'
     cableZoneCount?: number;
     includesAcbs?: string; // 'Yes' | 'No'
+    wholeCurrentMeters?: { type: string; quantity: number }[];
     [key: string]: any;
 }
 
@@ -363,32 +364,56 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // E. Whole Current Metering
-    // Only if NOT in CT Mode AND Amps <= 100 (Implicit by !isCtMode definition above)
-    // Wait, isCtMode definition covers amps > 100. So !isCtMode implies amps <= 100 AND ctMetering != Yes.
-    // So checking !isCtMode is sufficient for mutual exclusivity.
+    // Only if NOT in CT Mode
+    // We normalize legacy config to a list, then iterate and accumulate totals locally.
+    if (!isCtMode) {
+        // 1. Normalize Config
+        let meterList: { type: string, quantity: number }[] = [];
 
-    if (!isCtMode && config.wholeCurrentMetering === 'Yes') {
-        const wcQty = config.wcQuantity || 1;
-
-        // Add 100A Meter Panel & Kit items
-        addTarget('100A-PANEL', wcQty);
-
-        if (config.wcType === '100A wiring 3-phase') {
-            addTarget('100A-FUSE', wcQty * 3);
-            addTarget('100A-NEUTRAL-LINK', wcQty);
-            addTarget('100A-MCB-3PH', wcQty);
-        } else if (config.wcType === '100A wiring 1-phase') {
-            addTarget('100A-FUSE', wcQty);
-            addTarget('100A-NEUTRAL-LINK', wcQty);
-            addTarget('100A-MCB-1PH', wcQty);
+        if (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0) {
+            meterList = config.wholeCurrentMeters;
+        } else if (config.wholeCurrentMetering === 'Yes') {
+            // Legacy / Single mode
+            meterList = [{ type: config.wcType || '', quantity: config.wcQuantity || 1 }];
         }
+
+        // 2. Local Accumulator (Preserve addTarget as distinct setter)
+        const wcTotals = new Map<string, number>();
+        const addWc = (part: string, qty: number) => {
+            const current = wcTotals.get(part) || 0;
+            wcTotals.set(part, current + qty);
+        };
+
+        // 3. Automation Loop
+        for (const meter of meterList) {
+            const wcQty = meter.quantity || 1;
+            const wcType = meter.type;
+
+            // Add 100A Meter Panel & Kit items
+            addWc('100A-PANEL', wcQty);
+
+            if (wcType === '100A wiring 3-phase') {
+                addWc('100A-FUSE', wcQty * 3);
+                addWc('100A-NEUTRAL-LINK', wcQty);
+                addWc('100A-MCB-3PH', wcQty);
+            } else if (wcType === '100A wiring 1-phase') {
+                addWc('100A-FUSE', wcQty);
+                addWc('100A-NEUTRAL-LINK', wcQty);
+                addWc('100A-MCB-1PH', wcQty);
+            }
+        }
+
+        // 4. Apply Totals to Target
+        wcTotals.forEach((qty, part) => {
+            addTarget(part, qty);
+        });
     }
 
     // F. "Meter Panel" Checkbox Legacy/Helper
     // If user clicked "Meter Panel" but is NOT in CT mode (so didn't get CT-PANEL)
     // AND didn't select WC Metering (so didn't get 100A-PANEL).
     // This allows a standalone panel if explicitly requested.
-    if (meterPanelSelected && !isCtMode && config.wholeCurrentMetering !== 'Yes') {
+    if (meterPanelSelected && !isCtMode && !config.wholeCurrentMeters?.length && config.wholeCurrentMetering !== 'Yes') {
         addTarget('100A-PANEL', ctQty); // Default to smaller panel if no rating/mode implies otherwise
     }
 

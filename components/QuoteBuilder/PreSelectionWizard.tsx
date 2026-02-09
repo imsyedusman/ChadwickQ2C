@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, ArrowRight, ArrowLeft, AlertCircle } from 'lucide-react';
+import { X, Check, ArrowRight, ArrowLeft, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BoardConfig } from '@/lib/board-item-service';
 import { applyBoardPrefix } from '@/lib/board-naming';
@@ -100,6 +100,7 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     wholeCurrentMetering: 'No',
     wcType: '100A wiring 3-phase',
     wcQuantity: 1,
+    wholeCurrentMeters: [],
     drawingRef: 'No',
     drawingRefNumber: '',
     notes: '',
@@ -136,6 +137,15 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     newConfig.material = newConfig.enclosureType;
                     newConfig.enclosureType = 'Custom';
                 }
+
+                // Migration: Single WC -> List (if missing list but has legacy Yes)
+                if (newConfig.wholeCurrentMetering === 'Yes' && (!newConfig.wholeCurrentMeters || newConfig.wholeCurrentMeters.length === 0)) {
+                    newConfig.wholeCurrentMeters = [{
+                        type: newConfig.wcType || '100A wiring 3-phase',
+                        quantity: newConfig.wcQuantity || 1
+                    }];
+                }
+
                 // Merge on top of defaults to ensure no missing fields
                 setConfig({ ...DEFAULT_BOARD_CONFIG, ...newConfig });
             } else {
@@ -707,33 +717,87 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             <select
                                 className="p-1 px-2 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
                                 value={config.wholeCurrentMetering}
-                                onChange={e => setConfig({ ...config, wholeCurrentMetering: e.target.value })}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    let newMeters = config.wholeCurrentMeters || [];
+                                    // If turning ON and empty, add default
+                                    if (val === 'Yes' && newMeters.length === 0) {
+                                        newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+                                    }
+                                    setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters });
+                                }}
                             >
                                 {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
                             </select>
                         </div>
                         {config.wholeCurrentMetering === 'Yes' && (
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-gray-500 block">Type</label>
-                                    <select
-                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.wcType}
-                                        onChange={e => setConfig({ ...config, wcType: e.target.value })}
-                                    >
-                                        {WC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                                    </select>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-gray-500 block">Number of Meters</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.wcQuantity}
-                                        onChange={e => setConfig({ ...config, wcQuantity: parseInt(e.target.value) || 1 })}
-                                    />
-                                </div>
+                            <div className="pt-2 border-t border-gray-100 space-y-3">
+                                {/* Ensure valid state if empty (should be migrated by useEffect, but good fallback) */}
+                                {(!config.wholeCurrentMeters || config.wholeCurrentMeters.length === 0) && (() => {
+                                    // Auto-fix empty list if Yes is selected
+                                    const defaultMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+                                    // We can't set state during render. We rely on the "Add" button or initialization.
+                                    // Actually, let's just render the default if empty, but effectively it should be in state.
+                                    // Better: The useEffect handles distinct "initial" load.
+                                    // If user toggled "Yes" just now:
+                                    return <div className="text-xs text-red-500">Please add a meter.</div>;
+                                })()}
+
+                                {(config.wholeCurrentMeters || []).map((meter, index) => (
+                                    <div key={index} className="flex gap-2 items-end bg-gray-50 p-2 rounded">
+                                        <div className="flex-grow">
+                                            <label className="text-[10px] text-gray-500 block mb-1">Type</label>
+                                            <select
+                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                value={meter.type}
+                                                onChange={e => {
+                                                    const newMeters = [...(config.wholeCurrentMeters || [])];
+                                                    newMeters[index] = { ...meter, type: e.target.value };
+                                                    setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                                }}
+                                            >
+                                                {WC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="w-16">
+                                            <label className="text-[10px] text-gray-500 block mb-1">Qty</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                value={meter.quantity}
+                                                onChange={e => {
+                                                    const newMeters = [...(config.wholeCurrentMeters || [])];
+                                                    newMeters[index] = { ...meter, quantity: parseInt(e.target.value) || 1 };
+                                                    setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                                }}
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const newMeters = [...(config.wholeCurrentMeters || [])];
+                                                newMeters.splice(index, 1);
+                                                setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                            }}
+                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors mb-0.5"
+                                            title="Remove Meter"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                <button
+                                    onClick={() => {
+                                        const newMeters = [...(config.wholeCurrentMeters || [])];
+                                        newMeters.push({ type: '100A wiring 3-phase', quantity: 1 });
+                                        setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                    }}
+                                    className="w-full py-2 flex items-center justify-center gap-2 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"
+                                >
+                                    <Plus size={14} />
+                                    Add Meter Type
+                                </button>
                             </div>
                         )}
                     </div>
