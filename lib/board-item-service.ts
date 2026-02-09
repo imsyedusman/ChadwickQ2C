@@ -726,7 +726,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     const itemsToRemove = existingItems.filter((item: Item) =>
         item.isDefault &&
-        (finalManagedItems.includes(item.name) || isManagedPattern(item.name)) &&
+        finalManagedItems.includes(item.name) &&
         !targetItemPartNumbers.has(item.name)
     );
 
