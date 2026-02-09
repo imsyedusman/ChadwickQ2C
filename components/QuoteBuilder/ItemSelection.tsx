@@ -29,17 +29,45 @@ interface ItemRowProps {
     existingQty?: number;
     isSystemManaged?: boolean;
     onAdd: (item: CatalogItem, qty: number) => void;
+    boardConfig?: any; // To determine scope for conditional locking
 }
 
-function ItemRow({ item, existingQty = 0, isSystemManaged, onAdd }: ItemRowProps) {
+function ItemRow({ item, existingQty = 0, isSystemManaged, onAdd, boardConfig }: ItemRowProps) {
     // If it exists on board, start with that qty. Otherwise default to 1.
     // However, if we want "control surface" feel, we might want to default to 0 if not selected?
     // User requirement: "If the item is not on the board → show default quantity (e.g. 1)"
     const initialQty = existingQty > 0 ? existingQty : 1;
 
     const [qty, setQty] = useState(initialQty);
+
+    // CLEAT EXEMPTION LOGIC
+    // Cleats are statically defined as "Auto Managed" in system-definitions.ts
+    // BUT we want them to be Manual if out-of-scope (Fault > 50kA or Form != 3B).
+    const isCleatPart = item.partNumber?.startsWith('1B1-CLEAT');
+    const isCleatSection = item.subcategory === 'Busbar Supports - Required for Custom Boards Only';
+    const isCleat = isCleatPart || isCleatSection;
+
+    let isAuto = isAutoManaged(item.partNumber) || isSystemManaged;
+
+    if (isCleat && boardConfig) {
+        // Parse Scope
+        const isCustom = boardConfig.enclosureType === 'Custom';
+        const isForm3B = (boardConfig.form || '').toLowerCase() === '3b'; // Handles undefined
+        // Safe Parse Fault Rating
+        const faultRatingStr = boardConfig.faultRating || '999';
+        const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
+        const isFaultSafe = faultkA <= 50; // In-scope only if 50kA or less
+
+        const inScope = isCustom && isForm3B && isFaultSafe;
+
+        if (!inScope) {
+            // OUT OF SCOPE: Force Manual Control
+            isAuto = false;
+        }
+    }
+
     // Combine client-side check with server-side flag
-    const autoManaged = isAutoManaged(item.partNumber) || isSystemManaged;
+    const autoManaged = isAuto;
 
     // Sync state if existingQty changes (live update from board)
     useEffect(() => {
@@ -892,6 +920,7 @@ function ItemWrapper({ item, boards, selectedBoardId, handleAddItem }: { item: C
             existingQty={existingQty}
             isSystemManaged={(existingItem as any)?.isSystemManaged}
             onAdd={handleAddItem}
+            boardConfig={selectedBoard?.config}
         />
     );
 }

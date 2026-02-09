@@ -40,7 +40,13 @@ export async function PUT(
             await AutomationService.syncMccbTripBasePairs(boardId);
         }
 
-        return NextResponse.json({ ...updatedBoard, debugConfig: config });
+        // Refetch board with items to ensure UI gets the latest state (including auto-added/released items)
+        const freshBoard = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+
+        return NextResponse.json({ ...freshBoard, debugConfig: config });
     } catch (error) {
         console.error('Failed to update board', error);
         return NextResponse.json({ error: 'Failed to update board' }, { status: 500 });

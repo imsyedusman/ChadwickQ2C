@@ -455,14 +455,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     });
 
-    // --- CLEAT LOGIC (Form 3B Custom Only) ---
-    // Strict Scope: Custom + Form 3B + Fault <= 50kA
+    // --- CLEAT LOGIC (Universal Sync Participation) ---
+    // Architecture Change: Cleats ALWAYS participate in sync (targets + removal).
+    // Scope determines AUTHORITY (System vs User).
+
+    // 1. Determine Scope
     const isCustom = config.enclosureType === 'Custom';
-    const isForm3B = (config.form || '').toLowerCase() === '3b'; // Form field might be "Form 3B" or just "3B" - strict check? "3b" matches plan.
-    // Fault Rating Safety: Strip non-numeric and parse
+    const isForm3B = (config.form || '').toLowerCase() === '3b';
     const faultRatingStr = config.faultRating || '999';
     const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
     const isFaultSafe = faultkA <= 50;
+
+    const managingCleats = isCustom && isForm3B && isFaultSafe;
 
     const CLEAT_ITEMS = [
         '1B1-CLEAT-SMALL-1',
@@ -471,53 +475,72 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B1-CLEAT-LARGE-3'
     ];
 
-    // Track if we are managing cleats this run
-    let managingCleats = false;
+    if (!managingCleats) {
+        console.log(`[Cleats] Out of Scope (User Managed). Custom=${isCustom}, Form3B=${isForm3B}, Fault=${faultkA}kA`);
+    }
 
-    if (isCustom && isForm3B && isFaultSafe) {
-        managingCleats = true;
-        const cleatMap = new Map<string, number>();
+    const cleatTargets = new Map<string, number>();
 
-        effectiveBusbarItems.forEach((val, key) => {
-            // Extract rating from Part Number
-            const ratingMatch = key.match(/-(\d+)A/);
-            if (ratingMatch && ratingMatch[1]) {
-                const rating = parseInt(ratingMatch[1]);
-                const cleatType = getCleatType(rating);
+    // 2. Iterate Busbars to determine VALID cleats (Parent existence check)
+    effectiveBusbarItems.forEach((val, key) => {
+        // Extract rating from Part Number
+        const ratingMatch = key.match(/-(\d+)A/);
+        if (ratingMatch && ratingMatch[1]) {
+            const rating = parseInt(ratingMatch[1]);
+            const cleatType = getCleatType(rating);
 
-                if (cleatType) {
-                    // Quantity Rule: ceil(Length_mm / 400) + 1
-                    // val.qty is in Metres (e.g. 2.0).
-                    // Length_mm = val.qty * 1000
-                    // Formula: ceil((val.qty * 1000) / 400) + 1
+            if (cleatType) {
+                // We have a specialized cleat type needed for this busbar
+
+                if (managingCleats) {
+                    // SCOPE: IN (System Authority)
+                    // Calculate Quantity
                     const lengthMm = val.qty * 1000;
                     let cleatQty = Math.ceil(lengthMm / 400) + 1;
+                    if (lengthMm > 0 && cleatQty < 2) cleatQty = 2;
 
-                    // Minimum check: If length > 0, we expect at least 2 cleats logic-wise from formula?
-                    // 0.1m -> 100mm -> ceil(0.25) = 1 -> +1 = 2. Correct.
-                    // 0m -> 0 -> 1. Correct. 
-                    // Requirement says: "Minimum >0 length implies minimum 2 cleats."
-                    if (lengthMm > 0 && cleatQty < 2) cleatQty = 2; // Should be covered by formula but safety first.
+                    const currentTotal = cleatTargets.get(cleatType) || 0;
+                    cleatTargets.set(cleatType, currentTotal + cleatQty);
 
-                    const currentTotal = cleatMap.get(cleatType) || 0;
-                    cleatMap.set(cleatType, currentTotal + cleatQty);
+                } else {
+                    // SCOPE: OUT (User Authority)
+                    // Preserve EXISTING Quantity if item exists.
+                    // Do NOT auto-add if missing.
+                    // Do NOT recalculate.
+
+                    const existing = existingItems.find((i: Item) => i.name === cleatType);
+                    if (existing) {
+                        // User "Keep this" authority
+                        // We sum up? No, existing item is unique per part number in this list context.
+                        // But wait, we are iterating BUSBARS. Multiple busbars might map to same cleat type.
+                        // Existing item quantity is the TOTAL for that part number.
+                        // We simply need to ensure we mark this Part Number as "Targeted" once.
+
+                        // If we haven't processed this cleatType yet, grab existing qty.
+                        if (!cleatTargets.has(cleatType)) {
+                            cleatTargets.set(cleatType, existing.quantity);
+                        }
+                    }
+                    // If not existing, we do NOTHING (don't auto-add).
                 }
             }
-        });
+        }
+    });
 
-        // Add consolidated cleat targets
-        cleatMap.forEach((qty, partNumber) => {
-            // CHECK OVERRIDES
+    // 3. Apply Targets
+    cleatTargets.forEach((qty, partNumber) => {
+        if (managingCleats) {
+            // Apply Overrides if System Managed
             if (cleatOverrides[partNumber] !== undefined) {
-                console.log(`[Cleats] Overriding ${partNumber} qty to ${cleatOverrides[partNumber]}`);
                 addTarget(partNumber, cleatOverrides[partNumber]);
             } else {
                 addTarget(partNumber, qty);
             }
-        });
-    } else {
-        console.log(`[Cleats] Skipping automation. Scope: Custom=${isCustom}, Form3B=${isForm3B}, FaultSafe=${isFaultSafe} (${faultkA}kA)`);
-    }
+        } else {
+            // User Managed: Trust the derived quantity (Existing).
+            addTarget(partNumber, qty);
+        }
+    });
 
     // --- 3. FETCH CATALOG DATA ---
     // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
@@ -705,29 +728,20 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B1-CLEAT-SMALL-1',
         '1B1-CLEAT-SMALL-2',
         '1B1-CLEAT-LARGE-2',
-        '1B1-CLEAT-LARGE-3', // Note: Will be filtered out below if not managing
+        '1B1-CLEAT-LARGE-3',
     ];
 
-    // Add cleats to managed list ONLY if we are managing them this run
-    if (managingCleats) {
-        // They are already in the array above? 
-        // No, wait. '1B1-CLEAT-SMALL-1' etc are in `allManagedItems` literal above.
-        // We need to REMOVE them from `allManagedItems` if !managingCleats, so they are not deleted.
-        // OR better: Define `allManagedItems` dynamically.
-    }
-
-    // Safety: Filter `allManagedItems` to exclude cleats if !managingCleats
-    const finalManagedItems = allManagedItems.filter(name => {
-        if (CLEAT_ITEMS.includes(name)) {
-            return managingCleats;
-        }
-        return true;
-    });
+    // NOTE: Removed 'finalManagedItems' filtering logic as Cleats now always participate in sync.
+    // This allows them to be removed if orphaned (parent busbar removed) even when out of scope.
 
     const itemsToRemove = existingItems.filter((item: Item) =>
-        item.isDefault &&
-        finalManagedItems.includes(item.name) &&
+        (item.isDefault || CLEAT_ITEMS.includes(item.name)) && // Cleats must be removed if orphaned, even if released (isDefault=false)
+        allManagedItems.includes(item.name) && // Cleats are always in here
         !targetItemPartNumbers.has(item.name)
+        // If Out-of-Scope and user removed busbar, 'targetItemPartNumbers' will NOT have the cleat (logic above).
+        // So this will correctly remove it.
+        // If Out-of-Scope and busbar exists, 'targetItemPartNumbers' WILL have the cleat (logic above).
+        // So this will PRESERVE it.
     );
 
     if (itemsToRemove.length > 0) {
@@ -746,7 +760,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const targetPrice = customPricing.get(partNumber); // undefined if not custom
         const targetLabour = customLabour.get(partNumber);
 
-        const existingItem = existingItems.find((i: Item) => i.name === partNumber && i.isDefault);
+        const isCleat = CLEAT_ITEMS.includes(partNumber);
+
+        // Lookup: Loose lookup for Cleats (to allow re-acquisition), Strict for others (default)
+        let existingItem: Item | undefined;
+
+        if (isCleat) {
+            // For cleats, we want to find ANY match to update it, regardless of lock state
+            existingItem = existingItems.find((i: Item) => i.name === partNumber);
+        } else {
+            existingItem = existingItems.find((i: Item) => i.name === partNumber && i.isDefault);
+        }
+
         const catalogItem = catalogMap.get(partNumber);
 
         if (!existingItem && !catalogItem && !customPricing.has(partNumber)) {
@@ -812,7 +837,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
                 (forcedCategory && existingItem.category !== forcedCategory) ||
                 (forcedSubcategory && existingItem.subcategory !== forcedSubcategory) ||
-                (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false))) {
+                (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false)) ||
+                // Trigger update if lock state mismatch for Cleats
+                (isCleat && existingItem.isDefault !== managingCleats)) {
+
+                // Clean Info Note if acquiring
+                let newNotes = existingItem.notes;
+                if (isCleat && managingCleats) {
+                    newNotes = newNotes?.replace(/\n\[INFO\] Cleat automation applies up to 50kA\..*/g, '') || null;
+                } else if (isCleat && !managingCleats && !newNotes?.includes('[INFO]')) {
+                    // Add Note if releasing (should have been handled? No, we might be transitioning)
+                    newNotes = (newNotes || '') + '\n[INFO] Cleat automation applies up to 50kA. Above this rating, cleats are fully manual and must be reviewed by engineering.';
+                }
 
                 await prisma.item.update({
                     where: { id: existingItem.id },
@@ -823,12 +859,16 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         cost: newUnitPrice * newQty,
                         category: forcedCategory || existingItem.category, // Enforce basics/busbar if needed
                         subcategory: forcedSubcategory || existingItem.subcategory,
-                        isSheetmetal: catalogItem?.isSheetmetal || false
+                        isSheetmetal: catalogItem?.isSheetmetal || false,
+
+                        // Dynamic Locking
+                        isDefault: isCleat ? managingCleats : true,
+                        isSystemManaged: isCleat ? managingCleats : existingItem.isSystemManaged, // Don't touch others
+                        notes: newNotes
                     }
                 });
             }
         } else {
-
             // Create new
             // Catalog item might be undefined for dynamic items!
             const catItem = catalogItem || {
