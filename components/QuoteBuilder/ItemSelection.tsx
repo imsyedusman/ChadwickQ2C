@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X } from 'lucide-react';
+import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
@@ -27,12 +27,14 @@ interface ItemSelectionProps {
 interface ItemRowProps {
     item: CatalogItem;
     existingQty?: number;
+    existingItemId?: string; // ID of the item if it exists on the board
     isSystemManaged?: boolean;
     onAdd: (item: CatalogItem, qty: number) => void;
+    onDelete?: (itemId: string) => void;
     boardConfig?: any; // To determine scope for conditional locking
 }
 
-function ItemRow({ item, existingQty = 0, isSystemManaged, onAdd, boardConfig }: ItemRowProps) {
+function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd, onDelete, boardConfig }: ItemRowProps) {
     // If it exists on board, start with that qty. Otherwise default to 1.
     // However, if we want "control surface" feel, we might want to default to 0 if not selected?
     // User requirement: "If the item is not on the board → show default quantity (e.g. 1)"
@@ -218,6 +220,21 @@ function ItemRow({ item, existingQty = 0, isSystemManaged, onAdd, boardConfig }:
                         </>
                     )}
                 </button>
+
+                {/* Delete Button - ONLY if item exists on board AND is NOT system managed */}
+                {existingItemId && !autoManaged && onDelete && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(existingItemId);
+                            setQty(1); // Reset local state immediately
+                        }}
+                        className="h-9 w-9 flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:border-red-300 transition-all shadow-sm active:scale-95"
+                        title="Remove from board"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                )}
             </div>
         </div>
     );
@@ -229,7 +246,7 @@ interface ItemSelectionProps {
 }
 
 export default function ItemSelection({ onClose, initialCategory }: ItemSelectionProps) {
-    const { addItemToBoard, updateItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
+    const { addItemToBoard, updateItem, removeItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     // Prioritize passed initialCategory, then default to Switchboard. 
     // State restoration (Lines 50+) will only run if initialCategory is NOT provided, to respect user context.
     const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>(
@@ -536,6 +553,11 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
         }
     };
 
+    const handleDeleteItem = (itemId: string) => {
+        if (!itemId) return;
+        removeItem(itemId);
+    };
+
     // Breadcrumb / Back Navigation
     const renderNavigation = () => {
         if (searchQuery) return null;
@@ -820,7 +842,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                 )}
 
                                 {(isPowerMeterSelection ? filteredItems : items).map((item) => (
-                                    <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                    <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                 ))}
                             </div>
                         )}
@@ -837,7 +859,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {groupedItems.topHits.map(item => (
-                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
                                         </div>
                                     </div>
@@ -851,7 +873,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {groupedItems.switchgears.map(item => (
-                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
                                         </div>
                                     </div>
@@ -865,7 +887,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {groupedItems.basics.map(item => (
-                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
                                         </div>
                                     </div>
@@ -879,7 +901,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {groupedItems.busbars.map(item => (
-                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
                                         </div>
                                     </div>
@@ -893,7 +915,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                                         </h3>
                                         <div className="grid grid-cols-1 gap-3">
                                             {groupedItems.others.map(item => (
-                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} />
+                                                <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
                                         </div>
                                     </div>
@@ -908,7 +930,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
 }
 
 // Helper for Search View to reduce duplication
-function ItemWrapper({ item, boards, selectedBoardId, handleAddItem }: { item: CatalogItem, boards: any[], selectedBoardId: string | null, handleAddItem: any }) {
+function ItemWrapper({ item, boards, selectedBoardId, handleAddItem, handleDeleteItem }: { item: CatalogItem, boards: any[], selectedBoardId: string | null, handleAddItem: any, handleDeleteItem: any }) {
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
     const key = item.partNumber || item.description;
     const existingItem = selectedBoard?.items.find((i: any) => i.name === key);
@@ -918,8 +940,10 @@ function ItemWrapper({ item, boards, selectedBoardId, handleAddItem }: { item: C
         <ItemRow
             item={item}
             existingQty={existingQty}
+            existingItemId={existingItem?.id}
             isSystemManaged={(existingItem as any)?.isSystemManaged}
             onAdd={handleAddItem}
+            onDelete={handleDeleteItem}
             boardConfig={selectedBoard?.config}
         />
     );
