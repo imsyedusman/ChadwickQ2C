@@ -114,35 +114,24 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
     ];
 
     return (
-        <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center gap-2 text-xs text-gray-500 font-medium select-none overflow-x-auto">
+        <div className="px-6 py-1.5 bg-white border-b border-gray-100 flex items-center gap-6 text-xs text-gray-500 font-medium select-none overflow-x-auto h-9">
             <div className="text-gray-400 font-mono text-[10px] uppercase tracking-wider mr-2 shrink-0">Composition</div>
             {indicators.map((ind) => (
                 <TooltipProvider key={ind.label}>
                     <Tooltip delayDuration={300}>
                         <TooltipTrigger asChild>
                             <div className={cn(
-                                "flex flex-col px-3 py-1.5 rounded-md border transition-all cursor-help min-w-[100px]",
-                                ind.isActive
-                                    ? "bg-blue-50/50 border-blue-100 text-blue-700"
-                                    : "bg-gray-50/50 border-gray-100 text-gray-400 opacity-60"
+                                "flex items-center gap-2 transition-colors cursor-help",
+                                ind.isActive ? "text-blue-700" : "text-gray-300"
                             )}>
-                                <div className="flex items-center gap-1.5 mb-1">
-                                    <div className={cn(
-                                        "w-1.5 h-1.5 rounded-full shrink-0",
-                                        ind.isActive ? "bg-blue-600" : "bg-gray-300"
-                                    )} />
-                                    <span className="font-semibold truncate text-[11px] leading-none">{ind.label}</span>
-                                </div>
-                                <div className="flex flex-col gap-0.5 ml-3">
-                                    <div className="flex justify-between items-center text-[10px] gap-2">
-                                        <span className="opacity-70">Hrs</span>
-                                        <span className="font-mono">{ind.totalLabour.toFixed(1)}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-[10px] gap-2">
-                                        <span className="opacity-70">Mat</span>
-                                        <span className="font-mono">{formatCurrency(ind.totalCost)}</span>
-                                    </div>
-                                </div>
+                                <div className={cn(
+                                    "w-1.5 h-1.5 rounded-full shrink-0",
+                                    ind.isActive ? "bg-blue-600" : "bg-gray-300"
+                                )} />
+                                <span className={cn(
+                                    "font-medium truncate text-[11px] leading-none",
+                                    ind.isActive ? "text-gray-700" : "text-gray-400"
+                                )}>{ind.label}</span>
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="bottom" className="text-xs p-3">

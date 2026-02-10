@@ -10,7 +10,7 @@ import CostingView from '@/components/QuoteBuilder/CostingView';
 import GrandTotalView from '@/components/QuoteBuilder/GrandTotalView';
 import QuoteCostingOverrides from '@/components/QuoteBuilder/QuoteCostingOverrides';
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
-import { Loader2, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Loader2, ChevronLeft, ChevronRight, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
 
 function QuoteBuilderContent() {
@@ -19,6 +19,7 @@ function QuoteBuilderContent() {
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
     const [drawerCategory, setDrawerCategory] = useState<'Basics' | 'Switchboard' | 'Busbar' | undefined>(undefined);
+    const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
 
     // Load persisted preferences on mount
     useEffect(() => {
@@ -65,100 +66,166 @@ function QuoteBuilderContent() {
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
             {/* Quote Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center gap-6 shadow-sm z-10">
-                <div className="flex-1 flex items-center gap-4">
-                    <div className="group relative">
-                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                            Quote No
-                        </label>
-                        <input
-                            type="text"
-                            value={quoteNumber}
-                            onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
-                            className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
-                            placeholder="Q-..."
-                        />
-                    </div>
+            <div className={cn(
+                "bg-white border-b border-gray-200 transition-all duration-200 ease-in-out z-10",
+                isHeaderExpanded ? "py-3 shadow-sm" : "h-12 flex items-center shadow-sm hover:bg-gray-50 cursor-pointer"
+            )}
+                onClick={(e) => {
+                    if (!isHeaderExpanded) setIsHeaderExpanded(true);
+                }}
+            >
+                {!isHeaderExpanded ? (
+                    // ----------------------------------------------------------------------
+                    // COMPACT VIEW
+                    // ----------------------------------------------------------------------
+                    <div className="w-full px-6 flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <ChevronDown size={14} />
+                            <span className="text-xs uppercase tracking-wider font-semibold">Quote</span>
+                        </div>
 
-                    <div className="h-8 w-px bg-gray-200" />
+                        {/* Quote No */}
+                        <div className="font-bold text-gray-900">{quoteNumber || 'Q-...'}</div>
+                        <div className="h-4 w-px bg-gray-200" />
 
-                    <div className="group relative flex-1 max-w-xs">
-                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                            Client
-                        </label>
-                        <input
-                            type="text"
-                            value={clientName}
-                            onChange={(e) => updateMetadata({ clientName: e.target.value })}
-                            className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
-                            placeholder="Client Name"
-                        />
-                    </div>
+                        {/* Client */}
+                        <div className="text-gray-700 font-medium truncate max-w-[200px]" title={clientName}>
+                            {clientName || <span className="text-gray-400 italic">No Client Name</span>}
+                        </div>
+                        <div className="h-4 w-px bg-gray-200" />
 
-                    <div className="h-8 w-px bg-gray-200" />
+                        {/* Project */}
+                        <div className="text-gray-700 font-medium truncate max-w-[300px]" title={projectRef}>
+                            {projectRef || <span className="text-gray-400 italic">No Project Ref</span>}
+                        </div>
 
-                    <div className="group relative flex-1 max-w-xs">
-                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                            Company
-                        </label>
-                        <input
-                            type="text"
-                            value={clientCompany}
-                            onChange={(e) => updateMetadata({ clientCompany: e.target.value })}
-                            className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
-                            placeholder="Client Company"
-                        />
-                    </div>
+                        <div className="flex-1" />
 
-                    <div className="h-8 w-px bg-gray-200" />
-
-                    <div className="group relative flex-1 max-w-md">
-                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                            Project
-                        </label>
-                        <input
-                            type="text"
-                            value={projectRef}
-                            onChange={(e) => updateMetadata({ projectRef: e.target.value })}
-                            className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
-                            placeholder="Project Reference"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                    {/* Status Dropdown */}
-                    <div className="relative group">
-                        <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
-                            Status
-                        </label>
-                        <select
-                            value={status}
-                            onChange={(e) => updateStatus(e.target.value)}
-                            className={`text-sm font-medium px-3 py-1.5 rounded-md border cursor-pointer transition-colors ${getStatusColor(status)}`}
-                        >
-                            <option value="DRAFT">Draft</option>
-                            <option value="SENT">Sent</option>
-                            <option value="WON">Won</option>
-                            <option value="LOST">Lost</option>
-                        </select>
-                    </div>
-
-                    {/* Autosave Indicator */}
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        {saving ? (
-                            <span className="flex items-center gap-1.5">
+                        {/* Status & Save State */}
+                        <div className="flex items-center gap-4">
+                            <span className={cn(
+                                "text-xs font-medium px-2 py-0.5 rounded-full border",
+                                getStatusColor(status)
+                            )}>
+                                {status}
+                            </span>
+                            {saving ? (
                                 <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
-                                Saving...
-                            </span>
-                        ) : (
-                            <span className="flex items-center gap-1.5">
+                            ) : (
                                 <Check className="w-3 h-3 text-green-500" />
-                                All changes saved
-                            </span>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    // ----------------------------------------------------------------------
+                    // EXPANDED VIEW (Original)
+                    // ----------------------------------------------------------------------
+                    <div className="px-6 flex items-center gap-6">
+                        <div className="flex-1 flex items-center gap-4">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsHeaderExpanded(false);
+                                }}
+                                className="p-1 -ml-2 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+                            >
+                                <ChevronUp size={16} />
+                            </button>
+
+                            <div className="group relative">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                    Quote No
+                                </label>
+                                <input
+                                    type="text"
+                                    value={quoteNumber}
+                                    onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
+                                    className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
+                                    placeholder="Q-..."
+                                />
+                            </div>
+
+                            <div className="h-8 w-px bg-gray-200" />
+
+                            <div className="group relative flex-1 max-w-xs">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                    Client
+                                </label>
+                                <input
+                                    type="text"
+                                    value={clientName}
+                                    onChange={(e) => updateMetadata({ clientName: e.target.value })}
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    placeholder="Client Name"
+                                />
+                            </div>
+
+                            <div className="h-8 w-px bg-gray-200" />
+
+                            <div className="group relative flex-1 max-w-xs">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                    Company
+                                </label>
+                                <input
+                                    type="text"
+                                    value={clientCompany}
+                                    onChange={(e) => updateMetadata({ clientCompany: e.target.value })}
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    placeholder="Client Company"
+                                />
+                            </div>
+
+                            <div className="h-8 w-px bg-gray-200" />
+
+                            <div className="group relative flex-1 max-w-md">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                    Project
+                                </label>
+                                <input
+                                    type="text"
+                                    value={projectRef}
+                                    onChange={(e) => updateMetadata({ projectRef: e.target.value })}
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    placeholder="Project Reference"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            {/* Status Dropdown */}
+                            <div className="relative group">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
+                                    Status
+                                </label>
+                                <select
+                                    value={status}
+                                    onChange={(e) => updateStatus(e.target.value)}
+                                    className={`text-sm font-medium px-3 py-1.5 rounded-md border cursor-pointer transition-colors ${getStatusColor(status)}`}
+                                >
+                                    <option value="DRAFT">Draft</option>
+                                    <option value="SENT">Sent</option>
+                                    <option value="WON">Won</option>
+                                    <option value="LOST">Lost</option>
+                                </select>
+                            </div>
+
+                            {/* Autosave Indicator */}
+                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                                {saving ? (
+                                    <span className="flex items-center gap-1.5">
+                                        <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5">
+                                        <Check className="w-3 h-3 text-green-500" />
+                                        All changes saved
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* 3-Column CSS Grid Layout */}
