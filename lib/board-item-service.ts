@@ -24,6 +24,8 @@ export interface BoardConfig {
     cableZones?: string; // 'Yes' | 'No'
     cableZoneCount?: number;
     includesAcbs?: string; // 'Yes' | 'No'
+    ctSpareProvision?: string; // 'Yes' | 'No'
+    ctSpareQuantity?: number;
     wholeCurrentMeters?: { type: string; quantity: number }[];
     [key: string]: any;
 }
@@ -146,6 +148,46 @@ function getLabourPartNumber(currentRating: string): string | null {
     };
 
     return labourMapping[band] || null;
+}
+
+// Helper to add CT items (Shared between Active and Spare)
+function addCtItems(
+    targetMap: (part: string, qty: number) => void,
+    qty: number,
+    includeCtType: boolean,
+    config: BoardConfig,
+    existingItems: any[]
+) {
+    // 1. Base Items (Wiring, Test Block, Compartments)
+    CT_BASE_ITEMS.forEach(pn => targetMap(pn, qty));
+
+    // 2. CT Type (Coils) - Only if Active Metering
+    if (includeCtType && config.ctType) {
+        targetMap(`CT-${config.ctType}-TYPE`, qty);
+    }
+
+    // 3. Panel Logic (Outdoor 600x600 Rule)
+    // CT-PANEL is the 600x600 item. It's in CT_BASE_ITEMS so already added.
+    // If we needed strict enforcement or distinct items, we'd do it here.
+    // Current requirement: "Outdoor -> enforce 600x600".
+    // CT-PANEL *IS* 600x600. So effectively done.
+
+    // 4. Busbars & Labour (Only if rating available)
+    if (config.currentRating) {
+        // Busbars
+        if (config.enclosureType) {
+            const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
+            if (busbarPartNumber) {
+                // Respect user edits for busbars (don't force-reset to 1)
+                const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
+                const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
+                targetMap(busbarPartNumber, busbarQty);
+            }
+        }
+        // Labour
+        const labour = getLabourPartNumber(config.currentRating);
+        if (labour) targetMap(labour, qty);
+    }
 }
 
 // Items that contribute to the Stainless Steel Uplift calculation (S)
@@ -339,29 +381,31 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // 2. APPLY LOGIC
 
-    // D. CT Metering (SACT)
+    // D. CT Metering & Spare CT Provisioning (Additive Logic)
+
+    // Helper accumulator for additive logic
+    const ctTotals = new Map<string, number>();
+    const addCtTarget = (part: string, qty: number) => {
+        const current = ctTotals.get(part) || 0;
+        ctTotals.set(part, current + qty);
+    };
+
+    // 1. Active Metering
     if (isCtMode) {
-        // Add CT Base Items strictly
-        CT_BASE_ITEMS.forEach(pn => addTarget(pn, ctQty));
-
-        if (config.ctType) addTarget(`CT-${config.ctType}-TYPE`, ctQty);
-
-        if (config.currentRating && config.enclosureType) {
-            const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
-            if (busbarPartNumber) {
-                // Fix 2026-01-23: Respect user-edited quantity for busbars.
-                // Auto-add with default 1 only if it doesn't exist.
-                // If it exists, use its current quantity to prevent sync from reverting edits.
-                const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
-                const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
-                addTarget(busbarPartNumber, busbarQty);
-            }
-        }
-        if (config.currentRating) {
-            const labour = getLabourPartNumber(config.currentRating);
-            if (labour) addTarget(labour, ctQty);
-        }
+        const activeQty = config.ctQuantity || 1;
+        addCtItems(addCtTarget, activeQty, true, config, existingItems);
     }
+
+    // 2. Spare CT Provisioning
+    if (config.ctSpareProvision === 'Yes') {
+        const spareQty = config.ctSpareQuantity || 1;
+        addCtItems(addCtTarget, spareQty, false, config, existingItems);
+    }
+
+    // 3. Apply Totals to Main Target Map
+    ctTotals.forEach((qty, part) => {
+        addTarget(part, qty);
+    });
 
     // E. Whole Current Metering
     // Only if NOT in CT Mode

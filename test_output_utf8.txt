@@ -1,0 +1,33 @@
+﻿--- STARTING CT INTENT TESTS ---
+
+1. Creating Quote...
+node : Error: Failed 
+to create quote
+At line:1 char:1
++ node scripts/test-ct
+-logic.js > 
+test_output.txt 2>&1
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Error: Fai   
+ led to create quo    
+te:String) [], Re    
+moteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+    at runTests 
+(D:\Work\1. 
+Projects\3. My Project
+s\Chadwick\Quotes\My 
+Workings\Web App\scrip
+ts\test-ct-logic.js:19
+:29)
+    at process.process
+TicksAndRejections (no
+de:internal/process/ta
+sk_queues:105:5)

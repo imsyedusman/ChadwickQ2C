@@ -1,0 +1,240 @@
+﻿--- STARTING CT INTENT TESTS ---
+
+1. Creating Quote...
+node : Status: 500 
+Internal Server Error
+At line:1 char:1
++ node scripts/test-ct
+-logic.js > 
+test_log_correct.txt 
+2>&1
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Status: 50   
+ 0 Internal Server    
+ Error:String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+Response: <!DOCTYPE ht
+ml><html><head><meta 
+charSet="utf-8" data-n
+ext-head=""/><meta 
+name="viewport" conten
+t="width=device-width"
+ data-next-head=""/><s
+tyle data-next-hide-fo
+uc="true">body{display
+:none}</style><noscrip
+t data-next-hide-fouc=
+"true"><style>body{dis
+play:block}</style></n
+oscript><noscript data
+-n-css=""></noscript><
+script src="/_next/sta
+tic/chunks/node_module
+s_next_dist_compiled_8
+ca6b690._.js" defer=""
+></script><script src=
+"/_next/static/chunks/
+node_modules_next_dist
+_shared_lib_8bac8163._
+.js" defer=""></script
+><script src="/_next/s
+tatic/chunks/node_modu
+les_next_dist_client_5
+a8a528e._.js" defer=""
+></script><script src=
+"/_next/static/chunks/
+node_modules_next_dist
+_b3fb3b5f._.js" defer=
+""></script><script sr
+c="/_next/static/chunk
+s/node_modules_next_ap
+p_72f3d36f.js" defer="
+"></script><script src
+="/_next/static/chunks
+/%5Bnext%5D_entry_page
+-loader_ts_742e4b53._.
+js" defer=""></script>
+<script src="/_next/st
+atic/chunks/node_modul
+es_react-dom_4411d9bd.
+_.js" defer=""></scrip
+t><script src="/_next/
+static/chunks/node_mod
+ules_7f09fef0._.js" de
+fer=""></script><scrip
+t src="/_next/static/c
+hunks/%5Broot-of-the-s
+erver%5D__45f039c3._.j
+s" defer=""></script><
+script src="/_next/sta
+tic/chunks/pages__app_
+2da965e7._.js" defer="
+"></script><script src
+="/_next/static/chunks
+/turbopack-pages__app_
+0fce199e._.js" defer="
+"></script><script src
+="/_next/static/chunks
+/node_modules_next_dis
+t_shared_lib_9a2a7093.
+_.js" defer=""></scrip
+t><script src="/_next/
+static/chunks/node_mod
+ules_next_dist_a183fb7
+7._.js" defer=""></scr
+ipt><script src="/_nex
+t/static/chunks/node_m
+odules_next_error_1cfb
+b379.js" defer=""></sc
+ript><script src="/_ne
+xt/static/chunks/%5Bne
+xt%5D_entry_page-loade
+r_ts_43b523b5._.js" de
+fer=""></script><scrip
+t src="/_next/static/c
+hunks/%5Broot-of-the-s
+erver%5D__092393de._.j
+s" defer=""></script><
+script src="/_next/sta
+tic/chunks/pages__erro
+r_2da965e7._.js" defer
+=""></script><script s
+rc="/_next/static/chun
+ks/turbopack-pages__er
+ror_af01c4e3._.js" def
+er=""></script><script
+ src="/_next/static/de
+velopment/_ssgManifest
+.js" defer=""></script
+><script src="/_next/s
+tatic/development/_bui
+ldManifest.js" defer="
+"></script><noscript i
+d="__next_css__DO_NOT_
+USE__"></noscript></he
+ad><body><div id="__ne
+xt"></div><script 
+id="__NEXT_DATA__" typ
+e="application/json">{
+"props":{"pageProps":{
+"statusCode":500,"host
+name":"localhost"}},"p
+age":"/_error","query"
+:{},"buildId":"develop
+ment","isFallback":fal
+se,"err":{"name":"Erro
+r","source":"server","
+message":"./lib/board-
+item-service.ts:1025:6
+\nParsing ecmascript 
+source code failed\n  
+1023 |             
+}\n  1024 |         
+}));\n\u003e 1025 |   
+  }\n       |      
+^\n  1026 
+|\n\nExpected '}', 
+got '\u003ceof\u003e'\
+n\nImport trace:\n  
+App Route:\n    ./lib/
+board-item-service.ts\
+n    ./app/api/quotes/
+[id]/boards/route.ts\n
+\n","stack":"Error: ./
+lib/board-item-service
+.ts:1025:6\nParsing 
+ecmascript source 
+code 
+failed\n\u001b[0m 
+\u001b[90m 1023 
+|\u001b[39m           
+  }\n \u001b[90m 1024 
+|\u001b[39m         })
+)\u001b[33m;\u001b[39m
+\n\u001b[31m\u001b[1m\
+u003e\u001b[22m\u001b[
+39m\u001b[90m 1025 
+|\u001b[39m     }\n 
+\u001b[90m      
+|\u001b[39m      \u001
+b[31m\u001b[1m^\u001b[
+22m\u001b[39m\n 
+\u001b[90m 1026 |\u001
+b[39m\u001b[0m\n\nExpe
+cted '}', got '\u003ce
+of\u003e'\n\nImport 
+trace:\n  App 
+Route:\n    ./lib/boar
+d-item-service.ts\n   
+ ./app/api/quotes/[id]
+/boards/route.ts\n\n\n
+    at Object.getCompi
+lationErrors 
+(D:\\Work\\1. 
+Projects\\3. My Projec
+ts\\Chadwick\\Quotes\\
+My Workings\\Web App\\
+node_modules\\next\\di
+st\\server\\dev\\hot-r
+eloader-turbopack.js:1
+008:59)\n    at DevBun
+dlerService.getCompila
+tionError 
+(D:\\Work\\1. 
+Projects\\3. My Projec
+ts\\Chadwick\\Quotes\\
+My Workings\\Web App\\
+node_modules\\next\\di
+st\\server\\lib\\dev-b
+undler-service.js:44:5
+5)\n    at DevServer.g
+etCompilationError 
+(D:\\Work\\1. 
+Projects\\3. My Projec
+ts\\Chadwick\\Quotes\\
+My Workings\\Web App\\
+node_modules\\next\\di
+st\\server\\dev\\next-
+dev-server.js:706:42)\
+n    at DevServer.find
+PageComponents 
+(D:\\Work\\1. 
+Projects\\3. My Projec
+ts\\Chadwick\\Quotes\\
+My Workings\\Web App\\
+node_modules\\next\\di
+st\\server\\dev\\next-
+dev-server.js:676:43)\
+n    at async DevServe
+r.renderErrorToRespons
+eImpl (D:\\Work\\1. 
+Projects\\3. My Projec
+ts\\Chadwick\\Quotes\\
+My Workings\\Web App\\
+node_modules\\next\\di
+st\\server\\base-serve
+r.js:1713:26)"},"gip":
+true,"scriptLoader":[]
+}</script></body></htm
+l>
+Error: Failed to 
+create quote
+    at runTests 
+(D:\Work\1. 
+Projects\3. My Project
+s\Chadwick\Quotes\My 
+Workings\Web App\scrip
+ts\test-ct-logic.js:23
+:15)
+    at process.process
+TicksAndRejections (no
+de:internal/process/ta
+sk_queues:105:5)

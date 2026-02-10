@@ -115,7 +115,9 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     shippingSections: 1,
     cableZones: 'No',
     cableZoneCount: 0,
-    includesAcbs: 'No'
+    includesAcbs: 'No',
+    ctSpareProvision: 'No',
+    ctSpareQuantity: 1
 };
 
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
@@ -710,6 +712,37 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         )}
                     </div>
 
+                    {/* CT Spare Provisioning */}
+                    <div className="bg-white p-3 rounded border border-gray-200 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-gray-700">Spare CT / Space</label>
+                            <select
+                                className="p-1 px-2 bg-white border border-gray-200 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                value={config.ctSpareProvision || 'No'}
+                                onChange={e => setConfig({ ...config, ctSpareProvision: e.target.value })}
+                            >
+                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                        </div>
+                        {config.ctSpareProvision === 'Yes' && (
+                            <div className="pt-2 border-t border-gray-100">
+                                <div>
+                                    <label className="text-[10px] text-gray-500 block">Quantity</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                        value={config.ctSpareQuantity || 1}
+                                        onChange={e => setConfig({ ...config, ctSpareQuantity: parseInt(e.target.value) || 1 })}
+                                    />
+                                    <p className="text-[9px] text-gray-400 mt-1">
+                                        Note: Adds full CT infrastructure (Wiring, Panels) but excludes CT Coils.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     {/* Whole Current */}
                     <div className="bg-white p-3 rounded border border-gray-200 space-y-3">
                         <div className="flex justify-between items-center">
@@ -845,8 +878,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         onChange={e => setConfig({ ...config, notes: e.target.value })}
                     />
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 
     return (
