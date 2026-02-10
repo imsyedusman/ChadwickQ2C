@@ -7,6 +7,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
 import BoardSummary from './BoardSummary';
+import BoardComposition from './BoardComposition';
 
 // ONLY these 3 master categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -604,6 +605,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 </div>
             </div>
 
+
+
             {/* Electrical Identity Strip */}
             <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center text-xs text-gray-500 font-mono tracking-tight">
                 {[
@@ -640,6 +643,9 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </span>
                 ))}
             </div>
+
+            {/* Board Composition Indicators */}
+            <BoardComposition items={items} />
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <BoardSummary />

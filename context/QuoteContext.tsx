@@ -39,6 +39,8 @@ export interface Item {
     isSheetmetal?: boolean;
     isSystemManaged?: boolean;
     productFrame?: string | null;
+    systemTag?: string | null;
+    partNumber?: string | null;
 }
 
 // ...
