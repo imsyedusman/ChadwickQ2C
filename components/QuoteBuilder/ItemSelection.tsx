@@ -425,25 +425,33 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             return () => clearTimeout(delayDebounceFn);
         }
 
-        // If browsing Switchboards or Busbars, fetch when fully drilled down
+        // Strict Category Gating: Only fetch if explicitly drilled down
+        let shouldFetch = false;
+
         if (activeCategory === 'Switchboard' || activeCategory === 'Busbar') {
             // Case 1: 3-level hierarchy (L3 selected)
             if (selectedL3) {
-                fetchItems();
+                shouldFetch = true;
             }
             // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist)
             else if (selectedL2 && l3Options.length === 0) {
-                fetchItems();
+                shouldFetch = true;
             }
             // Case 3: 1-level hierarchy (L1 selected, and no L2 options exist)
             else if (selectedL1 && l2Options.length === 0) {
-                fetchItems();
-            } else {
-                setItems([]); // Clear items if navigating up or drilling down
+                shouldFetch = true;
             }
-        } else {
-            // For Basics, fetch when any level is selected OR show all if none selected
+        } else if (activeCategory === 'Basics') {
+            // Basics: Strictly require L1 selection
+            if (selectedL1) {
+                shouldFetch = true;
+            }
+        }
+
+        if (shouldFetch) {
             fetchItems();
+        } else {
+            setItems([]); // Clear items if navigating up or drilling down
         }
     }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options, l3Options]);
 
@@ -776,10 +784,8 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                     <div className="text-center py-12 text-gray-500">
                         {searchQuery ? (
                             <p>No items found matching "{searchQuery}"</p>
-                        ) : activeCategory === 'Switchboard' && !selectedL3 ? (
-                            <p className="text-sm">Select a category above to view items</p>
                         ) : (
-                            <p>No items found in this category.</p>
+                            <p className="text-sm">Select a category to view items</p>
                         )}
                     </div>
                 ) : (
