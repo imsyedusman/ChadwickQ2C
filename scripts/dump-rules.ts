@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('--- All Rules by Type ---');
     const allRules = await prisma.pairingRule.findMany();
-    const byType = {};
+    const byType: Record<string, number> = {};
     allRules.forEach(r => {
         if (!byType[r.ruleType]) byType[r.ruleType] = 0;
         byType[r.ruleType]++;
