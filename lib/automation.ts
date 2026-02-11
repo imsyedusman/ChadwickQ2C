@@ -42,6 +42,34 @@ export const getAccessoryFrame = (sku: string): FrameType | null => {
     return null;
 };
 
+// ATS Breaker Groups (Strict Match)
+const ATS_BREAKER_GROUPS = {
+    GROUP_1_100_250: [
+        'BLV429632/29642', 'BLV429642', // Variant handling? User said "BLV429632/29642". We put exact string.
+        'BLV429630/29640',
+        'BLV430631/30641',
+        'BLV431631/31641',
+        'BLV431630/31640'
+    ],
+    GROUP_2_400_630: [
+        'BLV432693/32694',
+        'BLV432695/32696'
+    ],
+    GROUP_3_800_1600: [
+        'NS800N ML2.0 3P/4P BTS',
+        'NS1000N ML2.0 3P/4P BTS',
+        'NS1250N ML2.0 3P/4P BTS',
+        'NS1600N ML2.0 3P/4P BTS'
+    ]
+} as const;
+
+const ATS_ACCESSORIES = {
+    LOGIC_PANEL: '29472',
+    PFR: 'RM17TG00',
+    BUSBAR_250: 'LV429358',
+    BUSBAR_400: 'LV432620'
+} as const;
+
 export class AutomationService {
 
     /**
@@ -614,6 +642,120 @@ export class AutomationService {
             console.error(`[Automation] Error applying rules for ${ruleType}:`, error);
             // Don't crash, but report
             return { warnings: [`Automation Failed: ${error.message || 'Unknown error'}`] };
+        }
+    }
+
+    /**
+     * Applies ATS Accessory Rules based on strict part number matching.
+     * Scoped to ATS breakers only.
+     */
+    static async applyAtsRules(boardId: string) {
+        const SYSTEM_TAG = 'ATS_ACCESSORIES';
+
+        // 1. Fetch Board Items
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+
+        if (!board) return;
+
+        const items = board.items;
+
+        // 2. Aggregate Requirements
+        const requirements = new Map<string, number>();
+
+        const addRequirement = (partNumber: string, qty: number) => {
+            const current = requirements.get(partNumber) || 0;
+            requirements.set(partNumber, current + qty);
+        };
+
+        for (const item of items) {
+            // Strict match on Part Number
+            const part = item.partNumber;
+            if (!part) continue;
+
+            const qty = item.quantity;
+
+            // Group 1 (100-250A)
+            if (ATS_BREAKER_GROUPS.GROUP_1_100_250.includes(part as any)) {
+                addRequirement(ATS_ACCESSORIES.LOGIC_PANEL, qty);
+                addRequirement(ATS_ACCESSORIES.PFR, qty);
+                addRequirement(ATS_ACCESSORIES.BUSBAR_250, qty);
+            }
+            // Group 2 (400-630A)
+            else if (ATS_BREAKER_GROUPS.GROUP_2_400_630.includes(part as any)) {
+                addRequirement(ATS_ACCESSORIES.LOGIC_PANEL, qty);
+                addRequirement(ATS_ACCESSORIES.PFR, qty);
+                addRequirement(ATS_ACCESSORIES.BUSBAR_400, qty);
+            }
+            // Group 3 (800-1600A)
+            else if (ATS_BREAKER_GROUPS.GROUP_3_800_1600.includes(part as any)) {
+                addRequirement(ATS_ACCESSORIES.LOGIC_PANEL, qty);
+                addRequirement(ATS_ACCESSORIES.PFR, qty);
+                // No Busbars for Group 3
+            }
+        }
+
+        // 3. Sync System Items
+        // Filter for items owned by THIS rule
+        const systemItems = items.filter(i =>
+            i.isSystemManaged &&
+            (i as any).systemTag === SYSTEM_TAG
+        );
+
+        // A. Update / Create
+        for (const [partNumber, qty] of requirements.entries()) {
+            const existing = systemItems.find(i => (i as any).partNumber === partNumber);
+
+            if (existing) {
+                if (existing.quantity !== qty) {
+                    await prisma.item.update({
+                        where: { id: existing.id },
+                        data: {
+                            quantity: qty,
+                            cost: existing.unitPrice * qty
+                        }
+                    });
+                }
+            } else {
+                // Create New
+                const catalogItem = await prisma.catalogItem.findFirst({
+                    where: { partNumber: partNumber }
+                });
+
+                if (catalogItem) {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: catalogItem.category,
+                            subcategory: catalogItem.subcategory || 'ATS Accessories',
+                            name: catalogItem.partNumber, // Use part number as name
+                            partNumber: catalogItem.partNumber,
+                            description: catalogItem.description,
+                            unitPrice: catalogItem.unitPrice,
+                            labourHours: catalogItem.labourHours,
+                            quantity: qty,
+                            cost: catalogItem.unitPrice * qty,
+                            isSystemManaged: true,
+                            systemTag: SYSTEM_TAG,
+                            notes: '[SYS] ATS Accessory'
+                        } as any
+                    });
+                } else {
+                    console.warn(`[ATS Automation] Missing Catalog Item for ${partNumber}`);
+                }
+            }
+        }
+
+        // B. Cleanup (Remove unused)
+        for (const item of systemItems) {
+            const part = (item as any).partNumber;
+            if (!requirements.has(part)) {
+                await prisma.item.delete({
+                    where: { id: item.id }
+                });
+            }
         }
     }
 }

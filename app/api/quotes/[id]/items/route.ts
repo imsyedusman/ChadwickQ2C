@@ -161,6 +161,13 @@ export async function POST(
             }
         }
 
+        // Hook: ATS Accessory Automation
+        // Trigger for Switchboard items or if part number looks relevant
+        if (newItem.category === 'Switchboard' || newItem.partNumber) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyAtsRules(boardId);
+        }
+
         // Return the full updated list of items for the board to ensure frontend is in sync
         const allItems = await prisma.item.findMany({
             where: { boardId },

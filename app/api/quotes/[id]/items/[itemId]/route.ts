@@ -79,6 +79,12 @@ export async function PUT(
             }
         }
 
+        // Hook: ATS Accessory Automation
+        if (freshItem?.category === 'Switchboard' || freshItem?.partNumber) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyAtsRules(freshItem.boardId);
+        }
+
         // Return the full updated list of items to ensure frontend is in sync
         const boardId = item?.boardId || freshItem?.boardId;
         const allItems = await prisma.item.findMany({
@@ -103,7 +109,7 @@ export async function DELETE(
         // Get the item before deletion to check if it's a tier item OR a breaker
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, category: true, productFrame: true }
+            select: { name: true, boardId: true, category: true, productFrame: true, partNumber: true }
         });
 
         // Enforce MCCB Accessory Rules (Server-Side)
@@ -204,6 +210,12 @@ export async function DELETE(
                 const { warnings } = await AutomationService.applyPairingRules(item.boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
                 if (warnings.length > 0) console.warn(`[API] Pairing Warnings (Delete): ${warnings.join(', ')}`);
             }
+        }
+
+        // Hook: ATS Accessory Automation (Post-Delete)
+        if (item?.category === 'Switchboard' || item?.partNumber) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyAtsRules(item.boardId);
         }
 
         return NextResponse.json({ success: true });
