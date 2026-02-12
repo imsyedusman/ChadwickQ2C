@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateBoardBom, toCSV } from '@/lib/bom-generator';
+import { generateCanonicalBOM } from '@/lib/bom-engine';
+import { generateCSV } from '@/lib/bom-exporters/csv';
+import { generatePDF } from '@/lib/bom-exporters/pdf';
+
+export const runtime = 'nodejs'; // Required for pdfmake
 
 export async function GET(
     request: Request,
@@ -8,6 +12,8 @@ export async function GET(
 ) {
     try {
         const { id, boardId } = await params;
+        const { searchParams } = new URL(request.url);
+        const format = searchParams.get('format') || 'human'; // 'erp' | 'human' | 'pdf'
 
         // 1. Fetch Board & Items
         const board = await prisma.board.findUnique({
@@ -22,7 +28,6 @@ export async function GET(
         }
 
         // 2. Extract Unique Part Numbers
-        // We only care about items that have a part number (or name acting as one)
         const uniquePartNumbers = Array.from(new Set(
             board.items
                 .map(i => i.partNumber || i.name)
@@ -40,7 +45,7 @@ export async function GET(
             }
         });
 
-        // 4. Build Lookup Map (PartNumber -> Brand)
+        // 4. Build Brand Lookup
         const brandLookup: Record<string, string> = {};
         for (const item of catalogItems) {
             if (item.partNumber && item.brand) {
@@ -48,26 +53,43 @@ export async function GET(
             }
         }
 
-        // 5. Generate BOM
-        // Note: We cast board.items to any because Prisma types might slightly differ from our internal Item interface
-        // if context types are different, but structure is compatible.
-        const bomItems = generateBoardBom(board.items as any, brandLookup);
+        // 5. Generate Canonical Model (The Source of Truth)
+        // Note: Casting board.items to any because Prisma/Item types might differ slightly but compatible props exist
+        const canonicalModel = generateCanonicalBOM(board.items as any, brandLookup, board.name);
 
-        // 6. Convert to CSV
-        const csvContent = toCSV(bomItems);
-        const filename = `${board.name.replace(/[^a-zA-Z0-9-_]/g, '_')}_BOM.csv`;
+        // 6. Generate Requested Format
+        const sanitizedName = board.name.replace(/[^a-zA-Z0-9-_]/g, '_');
 
-        // 7. Return ID/Stream/Download
-        return new NextResponse(csvContent, {
-            status: 200,
-            headers: {
-                'Content-Type': 'text/csv; charset=utf-8',
-                'Content-Disposition': `attachment; filename="${filename}"`
-            }
-        });
+        if (format === 'pdf') {
+            const pdfBuffer = await generatePDF(canonicalModel);
+            const filename = `${sanitizedName}_BOM.pdf`;
+
+            return new NextResponse(pdfBuffer as any, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/pdf',
+                    'Content-Disposition': `attachment; filename="${filename}"`
+                }
+            });
+        }
+        else {
+            // CSV (erp or human)
+            const mode = format === 'erp' ? 'erp' : 'human';
+            const csvContent = generateCSV(canonicalModel, { mode });
+            const suffix = format === 'erp' ? '_BOM_ERP.csv' : '_BOM.csv';
+            const filename = `${sanitizedName}${suffix}`;
+
+            return new NextResponse(csvContent, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/csv; charset=utf-8',
+                    'Content-Disposition': `attachment; filename="${filename}"`
+                }
+            });
+        }
 
     } catch (error) {
         console.error('Failed to export BOM', error);
-        return NextResponse.json({ error: 'Failed to export BOM' }, { status: 500 });
+        return new NextResponse('Failed to export BOM', { status: 500 });
     }
 }

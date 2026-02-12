@@ -13,8 +13,16 @@ import BoardComposition from './BoardComposition';
 // Using singular form to match database schema
 const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
 import { Switch } from '@/components/ui/switch'; // Ensure Switch is available or use standard input checkbox
-import { RefreshCw, RotateCcw } from 'lucide-react'; // Import RotateCcw for Restore icon
+import { RefreshCw, FileSpreadsheet } from 'lucide-react'; // Import RotateCcw for Restore icon
 import { SystemItemHoverCard } from './SystemItemHoverCard';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const CATEGORY_LABELS: Record<string, string> = {
     'Basics': 'Basics',
@@ -130,26 +138,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         }
     };
 
-    // Helper: Restore Auto Accessories
-    const restoreAccessories = async () => {
-        if (!selectedBoard) return;
-        if (!confirm("Start fresh: This will restore all auto-managed MCCB accessories (Shields & Handles) for this board to their default state.")) return;
 
-        try {
-            const res = await fetch(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/restore-accessories`, {
-                method: 'POST'
-            });
-            if (res.ok) {
-                await refreshQuote();
-            } else {
-                console.error("Failed to restore");
-                alert("Failed to restore accessories");
-            }
-        } catch (e) {
-            console.error("Network error restoring", e);
-            alert("Network error");
-        }
-    };
 
     const handleQuantityChange = (itemId: string, newQty: number) => {
         // Ensure quantity is valid (>= 0, allow decimals)
@@ -576,16 +565,57 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             Add Items
                         </button>
                     )}
-                    <button
-                        onClick={() => {
-                            window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom`, '_blank');
-                        }}
-                        className="text-[10px] font-medium text-gray-400 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                        title="Download Engineering BOM (CSV)"
-                    >
-                        <FileText size={10} />
-                        Export BOM
-                    </button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                className="text-[10px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1 outline-none ring-0 focus:ring-2 focus:ring-blue-100"
+                                title="Download Engineering BOM"
+                            >
+                                <FileText size={10} />
+                                Export BOM
+                                <ChevronDown size={10} className="text-gray-400 group-hover:text-blue-500" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 bg-white shadow-lg border border-gray-100 p-1">
+                            <DropdownMenuLabel className="text-xs text-gray-500 font-semibold px-2 py-1.5">Select Format</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
+                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                            >
+                                <FileSpreadsheet size={14} className="text-green-600" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-700">Export CSV (ERP)</span>
+                                    <span className="text-[10px] text-gray-400">Strict tabular data for import</span>
+                                </div>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=human`, '_blank')}
+                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                            >
+                                <FileSpreadsheet size={14} className="text-blue-600" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-700">Export CSV (Detailed)</span>
+                                    <span className="text-[10px] text-gray-400">Includes summary & formatting</span>
+                                </div>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
+                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                            >
+                                <FileText size={14} className="text-red-600" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-700">Export PDF</span>
+                                    <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
+                                </div>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                     <button
                         onClick={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
@@ -611,14 +641,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         Refresh Prices
                     </button>
                     {/* Restore Accessories Action */}
-                    <button
-                        onClick={restoreAccessories}
-                        className="text-[10px] font-medium text-gray-400 hover:text-green-600 hover:bg-green-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                        title="Restore all auto-managed MCCB accessories (Shields & Handles) for this board"
-                    >
-                        <RotateCcw size={10} />
-                        Restore Auto
-                    </button>
+
                     <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
                         {selectedBoard.description || selectedBoard.name}
                     </div>
