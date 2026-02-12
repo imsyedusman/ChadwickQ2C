@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { X, ArrowRight, AlertCircle, ArrowLeftRight, ChevronDown, ChevronRight, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { ArrowRight, AlertCircle, ArrowLeftRight, ChevronDown, ChevronRight, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { aggregateBoardItems, compareAggregations, ComparisonRow } from '@/lib/board-comparison';
 import { Item } from '@prisma/client';
@@ -21,7 +21,10 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
     const [baseBoardId, setBaseBoardId] = useState<string>(initialBoardId || (boards[0]?.id || ''));
     const [compBoardId, setCompBoardId] = useState<string>(boards.length > 1 ? boards[1].id : (boards[0]?.id || ''));
 
-    // Section State
+    // Section State (Default expanded - set empty means none collapsed?)
+    // Actually "collapsedSections" implies if it's in the set, it is collapsed.
+    // So distinct categories NOT in set are Expanded.
+    // Default expanded = empty set.
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
     // Memoize comparison
@@ -57,6 +60,9 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
         if (baseline === 0) {
             return delta === 0 ? "0%" : "New";
         }
+        // Handle -100% case explicitly for cleanliness, though math works (-B/B = -1)
+        if (delta === -baseline) return "-100%";
+
         return percent.format(delta / baseline);
     };
 
@@ -89,7 +95,7 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                     </div>
 
                     <p className="text-xs text-gray-500 mt-1">
-                        This view shows how the comparison board differs from the baseline board.
+                        This view shows how the Comparison Board differs from the Baseline Board.
                     </p>
 
                     {/* Controls */}
@@ -132,7 +138,7 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
 
                         <div className="flex gap-8">
                             <div className="text-right">
-                                <span className="block text-[10px] text-blue-600 uppercase font-bold tracking-wider">Material Change</span>
+                                <span className="block text-[10px] text-blue-600 uppercase font-bold tracking-wider">Material Cost Change</span>
                                 <div className="flex items-baseline gap-2 justify-end">
                                     <span className={`text-lg font-bold ${comparison.summary.deltaMaterialCost > 0 ? 'text-red-600' : (comparison.summary.deltaMaterialCost < 0 ? 'text-green-600' : 'text-gray-700')}`}>
                                         {comparison.summary.deltaMaterialCost > 0 ? '+' : ''}{currency.format(comparison.summary.deltaMaterialCost)}
@@ -143,7 +149,7 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                                 </div>
                             </div>
                             <div className="text-right">
-                                <span className="block text-[10px] text-blue-600 uppercase font-bold tracking-wider">Labour Change</span>
+                                <span className="block text-[10px] text-blue-600 uppercase font-bold tracking-wider">Labour Hours Change</span>
                                 <div className="flex items-baseline gap-2 justify-end">
                                     <span className={`text-lg font-bold ${comparison.summary.deltaLabourHours > 0 ? 'text-red-600' : (comparison.summary.deltaLabourHours < 0 ? 'text-green-600' : 'text-gray-700')}`}>
                                         {comparison.summary.deltaLabourHours > 0 ? '+' : ''}{decimal.format(comparison.summary.deltaLabourHours)} hrs
@@ -174,7 +180,7 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                                     <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
                                         <TrendingUp size={16} className="text-gray-400" />
-                                        Biggest Cost Drivers
+                                        Biggest Cost Increases
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                                         {comparison.summary.topDrivers.map((row) => (
@@ -182,8 +188,8 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                                                 <div className="text-xs font-medium text-gray-900 truncate" title={row.description}>
                                                     {row.description || row.partNumber}
                                                 </div>
-                                                <div className={`text-sm font-bold mt-1 ${row.deltaCost > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                    {row.deltaCost > 0 ? '+' : ''}{currency.format(row.deltaCost)}
+                                                <div className="text-sm font-bold mt-1 text-red-600">
+                                                    +{currency.format(row.deltaCost)}
                                                 </div>
                                             </div>
                                         ))}
@@ -193,14 +199,15 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
 
                             {/* Grouped Table */}
                             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="grid grid-cols-[150px_1fr_80px_80px_80px_120px_100px] gap-0 bg-gray-100 border-b border-gray-200 text-xs text-gray-500 uppercase font-bold sticky top-0 z-10">
+                                {/* Sticky Header */}
+                                <div className="grid grid-cols-[180px_1fr_100px_100px_100px_140px_120px] gap-0 bg-gray-100 border-b border-gray-200 text-xs text-gray-500 uppercase font-bold sticky top-0 z-10 shadow-sm">
                                     <div className="px-4 py-3">Part Number</div>
                                     <div className="px-4 py-3">Description</div>
-                                    <div className="px-4 py-3 text-center">Qty A</div>
-                                    <div className="px-4 py-3 text-center">Qty B</div>
-                                    <div className="px-4 py-3 text-center">Change</div>
-                                    <div className="px-4 py-3 text-right">Material $$</div>
-                                    <div className="px-4 py-3 text-right">Labour Change</div>
+                                    <div className="px-4 py-3 text-center">Baseline Qty</div>
+                                    <div className="px-4 py-3 text-center">Comparison Qty</div>
+                                    <div className="px-4 py-3 text-center">Change in Quantity</div>
+                                    <div className="px-4 py-3 text-right">Material Cost Change</div>
+                                    <div className="px-4 py-3 text-right">Labour Hours Change</div>
                                 </div>
 
                                 {categories.map(category => {
@@ -224,10 +231,10 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                                                     <span className="text-xs font-normal text-gray-400">({rows.length} items)</span>
                                                 </div>
                                                 <div className="flex gap-8 text-xs font-medium">
-                                                    <div className={`w-[120px] text-right ${subDeltaCost !== 0 ? (subDeltaCost > 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-400'}`}>
+                                                    <div className={`w-[140px] text-right ${subDeltaCost !== 0 ? (subDeltaCost > 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-400'}`}>
                                                         {subDeltaCost !== 0 ? (subDeltaCost > 0 ? '+' : '') + currency.format(subDeltaCost) : '-'}
                                                     </div>
-                                                    <div className={`w-[100px] text-right ${subDeltaLabour !== 0 ? (subDeltaLabour > 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-400'}`}>
+                                                    <div className={`w-[120px] text-right ${subDeltaLabour !== 0 ? (subDeltaLabour > 0 ? 'text-red-600' : 'text-green-600') : 'text-gray-400'}`}>
                                                         {subDeltaLabour !== 0 ? (subDeltaLabour > 0 ? '+' : '') + decimal.format(subDeltaLabour) : '-'}
                                                     </div>
                                                 </div>
@@ -242,8 +249,8 @@ export default function BoardComparisonModal({ isOpen, onClose, boards, initialB
                                                         const diffClass = isPos ? 'text-green-600 bg-green-50/30' : (isNeg ? 'text-red-500 bg-red-50/30' : 'text-gray-300');
 
                                                         return (
-                                                            <div key={row.key} className="grid grid-cols-[150px_1fr_80px_80px_80px_120px_100px] gap-0 hover:bg-blue-50/10 transition-colors text-sm items-center">
-                                                                <div className="px-4 py-2 font-mono text-xs font-medium text-gray-600 truncate" title={row.partNumber}>
+                                                            <div key={row.key} className="grid grid-cols-[180px_1fr_100px_100px_100px_140px_120px] gap-0 hover:bg-blue-50/10 transition-colors text-sm items-center">
+                                                                <div className="px-4 py-2 font-mono text-xs font-medium text-gray-600 break-words" title={row.partNumber}>
                                                                     {row.partNumber}
                                                                 </div>
                                                                 <div className="px-4 py-2 text-gray-700 truncate" title={row.description}>
