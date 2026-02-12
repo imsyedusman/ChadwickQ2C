@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Settings, AlertCircle, Copy } from 'lucide-react';
+import { Plus, Trash2, Settings, AlertCircle, Copy, ArrowLeftRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PreSelectionWizard from './PreSelectionWizard';
+import BoardComparisonModal from './BoardComparisonModal';
 import { BoardConfig } from '@/lib/board-item-service';
 import { useQuote } from '@/context/QuoteContext';
 
@@ -27,6 +28,7 @@ interface BoardListProps {
 export default function BoardList({ boards, selectedBoardId, onSelectBoard, quoteId, onUpdate, collapsed = false }: BoardListProps & { collapsed?: boolean }) {
     const { addBoard, allBoardTotals } = useQuote();
     const [isWizardOpen, setIsWizardOpen] = useState(false);
+    const [isComparisonOpen, setIsComparisonOpen] = useState(false);
     const [editingBoard, setEditingBoard] = useState<Board | null>(null);
 
     const handleCreateBoard = async (config: BoardConfig) => {
@@ -150,16 +152,26 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
             {!collapsed ? (
                 <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0 h-[60px] pr-14">
                     <h2 className="font-semibold text-gray-700">Switchboards</h2>
-                    <button
-                        onClick={() => {
-                            setEditingBoard(null);
-                            setIsWizardOpen(true);
-                        }}
-                        className="p-1.5 hover:bg-gray-200 rounded-md text-gray-600 transition-colors"
-                        title="Add Board"
-                    >
-                        <Plus size={18} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setIsComparisonOpen(true)}
+                            className="p-1.5 hover:bg-gray-200 rounded-md text-gray-600 transition-colors"
+                            title="Compare Boards"
+                            disabled={boards.length < 2}
+                        >
+                            <ArrowLeftRight size={18} className={boards.length < 2 ? "opacity-30" : ""} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setEditingBoard(null);
+                                setIsWizardOpen(true);
+                            }}
+                            className="p-1.5 hover:bg-gray-200 rounded-md text-gray-600 transition-colors"
+                            title="Add Board"
+                        >
+                            <Plus size={18} />
+                        </button>
+                    </div>
                 </div>
             ) : (
                 <div className="flex flex-col items-center py-3 border-b border-gray-200 bg-gray-50 shrink-0 h-[80px] justify-end pb-2">
@@ -295,6 +307,13 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                 initialConfig={typeof editingBoard?.config === 'string'
                     ? JSON.parse(editingBoard.config)
                     : (editingBoard?.config || undefined)}
+            />
+
+            <BoardComparisonModal
+                isOpen={isComparisonOpen}
+                onClose={() => setIsComparisonOpen(false)}
+                boards={boards as any[]}
+                initialBoardId={selectedBoardId}
             />
         </div>
     );
