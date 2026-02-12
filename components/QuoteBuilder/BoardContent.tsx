@@ -13,8 +13,8 @@ import BoardComposition from './BoardComposition';
 // Using singular form to match database schema
 const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
 import { Switch } from '@/components/ui/switch'; // Ensure Switch is available or use standard input checkbox
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"; // Ensure Tooltip is available
 import { RefreshCw, RotateCcw } from 'lucide-react'; // Import RotateCcw for Restore icon
+import { SystemItemHoverCard } from './SystemItemHoverCard';
 
 const CATEGORY_LABELS: Record<string, string> = {
     'Basics': 'Basics',
@@ -265,27 +265,22 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         </div>
                         {formulaPriced && (
                             <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Price/Labour is calculated from configuration">
-                                    <Lock size={8} className="text-amber-700" />
-                                    Calculated
-                                </span>
+                                <SystemItemHoverCard item={{ ...item, isFormulaPriced: true } as any} boardItems={items}>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100 transition-colors cursor-help" title="">
+                                        <Lock size={8} className="text-amber-700" />
+                                        Calculated
+                                    </span>
+                                </SystemItemHoverCard>
                             </div>
                         )}
                         {autoManaged && !formulaPriced && (
                             <div className="flex items-center gap-1">
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger>
-                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 cursor-help">
-                                                <Lock size={8} className="text-blue-700" />
-                                                {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
-                                            </span>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="top">
-                                            <p className="max-w-xs text-xs">{lockTooltip || "System managed item"}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
+                                <SystemItemHoverCard item={item} boardItems={items}>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 hover:bg-blue-100 transition-colors">
+                                        <Lock size={8} className="text-blue-700" />
+                                        {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
+                                    </span>
+                                </SystemItemHoverCard>
                             </div>
                         )}
                     </div>
@@ -391,18 +386,33 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         {/* Hidden Trash Spacer to keep alignment */}
                     </div>
                 ) : (
+                    <SystemItemHoverCard item={item} boardItems={items}>
+                        <button
+                            className={cn(
+                                "transition-colors",
+                                isDeleteLocked
+                                    ? "text-gray-200" // active look but handled by popover
+                                    : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
+                            )}
+                            disabled={!isDeleteLocked} // Enable button if locked so popover works? No, popover works on wrapper. 
+                        // If disabled, click might not propagate. 
+                        // Actually, if I wrap it, I want the CLICK to trigger the popover. 
+                        // If the button is disabled, some browsers block events. 
+                        // Better: Render a DIV if locked.
+                        // But wait, if it's NOT locked, we want the delete button.
+                        // If it IS locked, we want the lock icon which triggers explanation.
+                        >
+                            {isDeleteLocked ? <Lock size={14} className="cursor-pointer text-gray-300 hover:text-blue-600" /> : null}
+                        </button>
+                    </SystemItemHoverCard>
+                )}
+                {!isNSX100Handle && !isDeleteLocked && (
                     <button
                         onClick={() => removeItem(item.id)}
-                        className={cn(
-                            "transition-colors",
-                            isDeleteLocked
-                                ? "text-gray-200 cursor-not-allowed"
-                                : "text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"
-                        )}
-                        disabled={isDeleteLocked}
-                        title={isDeleteLocked ? "This item is system-managed and cannot be removed" : "Remove item"}
+                        className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-colors"
+                        title="Remove item"
                     >
-                        {isDeleteLocked ? <Lock size={14} /> : <Trash2 size={14} />}
+                        <Trash2 size={14} />
                     </button>
                 )}
             </div>

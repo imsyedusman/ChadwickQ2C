@@ -41,6 +41,7 @@ export interface Item {
     productFrame?: string | null;
     systemTag?: string | null;
     partNumber?: string | null;
+    systemRuleType?: string | null; // Provenance Rule ID
 }
 
 // ...

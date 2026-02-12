@@ -4,7 +4,8 @@ import { normalizePartNumber } from './normalization';
 const prisma = new PrismaClient();
 
 // Accessory SKUs Configuration
-const ACCESSORY_MAP = {
+// Accessory SKUs Configuration
+export const ACCESSORY_MAP = {
     'NSX100-250': {
         shield: 'LV429517',
         handle: 'LV429338T'
@@ -43,7 +44,8 @@ export const getAccessoryFrame = (sku: string): FrameType | null => {
 };
 
 // ATS Breaker Groups (Strict Match)
-const ATS_BREAKER_GROUPS = {
+// ATS Breaker Groups (Strict Match)
+export const ATS_BREAKER_GROUPS = {
     GROUP_1_100_250: [
         'BLV429632/29642', 'BLV429642', // Variant handling? User said "BLV429632/29642". We put exact string.
         'BLV429630/29640',
@@ -63,12 +65,71 @@ const ATS_BREAKER_GROUPS = {
     ]
 } as const;
 
-const ATS_ACCESSORIES = {
+export const ATS_ACCESSORIES = {
     LOGIC_PANEL: '29472',
     PFR: 'RM17TG00',
     BUSBAR_250: 'LV429358',
     BUSBAR_400: 'LV432620'
 } as const;
+
+export interface SystemRuleMetadata {
+    id: string;
+    handler: string;
+    reason: string;
+    quantityExplanation: string;
+}
+
+export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
+    // MCCB Accessories
+    'MCCB_ACCESSORY_SHIELD': {
+        id: 'MCCB_ACCESSORY_SHIELD',
+        handler: 'syncBoardAccessories',
+        reason: 'Required for MCCB (Terminal Shield).',
+        quantityExplanation: '2 Shields per Breaker (Line & Load).'
+    },
+    'MCCB_ACCESSORY_HANDLE': {
+        id: 'MCCB_ACCESSORY_HANDLE',
+        handler: 'syncBoardAccessories',
+        reason: 'Required for MCCB (Rotary Handle).',
+        quantityExplanation: '1 Handle per Breaker.'
+    },
+
+    // MCCB Trip/Base
+    'MCCB_TRIP_BASE': {
+        id: 'MCCB_TRIP_BASE',
+        handler: 'syncMccbTripBasePairs',
+        reason: 'Base unit required for the selected Trip Unit (MCCB).',
+        quantityExplanation: '1 Base per Trip Unit.'
+    },
+
+    // ATS
+    'ATS_LOGIC_PANEL': {
+        id: 'ATS_LOGIC_PANEL',
+        handler: 'applyAtsRules',
+        reason: 'Required for ATS Breaker configuration.',
+        quantityExplanation: '1 Logic Panel per ATS Breaker.'
+    },
+    'ATS_PFR': {
+        id: 'ATS_PFR',
+        handler: 'applyAtsRules',
+        reason: 'Phase Failure Relay required for ATS.',
+        quantityExplanation: '1 PFR per ATS Breaker.'
+    },
+    'ATS_BUSBAR': {
+        id: 'ATS_BUSBAR',
+        handler: 'applyAtsRules',
+        reason: 'Bridging Bars required for ATS.',
+        quantityExplanation: '1 Set of Bars per ATS Breaker.'
+    },
+
+    // Generic Fallback/Dynamic
+    'MCB_CHASSIS_LINK': {
+        id: 'MCB_CHASSIS_LINK',
+        handler: 'applyPairingRules',
+        reason: 'Neutral/Earth Link required for MCB Chassis.',
+        quantityExplanation: 'Links provisioned based on Chassis pole capacity.'
+    }
+};
 
 export class AutomationService {
 
@@ -191,7 +252,13 @@ export class AutomationService {
                 if (primaryItem.quantity !== req.quantity) {
                     await prisma.item.update({
                         where: { id: primaryItem.id },
-                        data: { quantity: req.quantity, cost: primaryItem.unitPrice * req.quantity }
+                        data: {
+                            quantity: req.quantity,
+                            cost: primaryItem.unitPrice * req.quantity,
+                            systemRuleType: req.sku.includes('LV429517') || req.sku.includes('LV432593') || req.sku.includes('33628')
+                                ? 'MCCB_ACCESSORY_SHIELD'
+                                : 'MCCB_ACCESSORY_HANDLE'
+                        }
                     });
                 }
             } else {
@@ -216,7 +283,10 @@ export class AutomationService {
                             isDefault: true,
                             productFrame: req.frame,
                             notes: 'System Managed',
-                            systemTag: SYSTEM_TAG
+                            systemTag: SYSTEM_TAG,
+                            systemRuleType: req.sku.includes('LV429517') || req.sku.includes('LV432593') || req.sku.includes('33628')
+                                ? 'MCCB_ACCESSORY_SHIELD'
+                                : 'MCCB_ACCESSORY_HANDLE'
                         } as any
                     });
                 }
@@ -360,14 +430,15 @@ export class AutomationService {
                         data: {
                             quantity: qty,
                             cost: existing.unitPrice * qty,
-                            systemTag: SYSTEM_TAG // Backfill tag if missing
+                            systemTag: SYSTEM_TAG, // Backfill tag if missing
+                            systemRuleType: 'MCCB_TRIP_BASE'
                         } as any
                     });
                 } else if (!(existing as any).systemTag) {
                     // Just backfill tag if quantity match
                     await prisma.item.update({
                         where: { id: existing.id },
-                        data: { systemTag: SYSTEM_TAG } as any
+                        data: { systemTag: SYSTEM_TAG, systemRuleType: 'MCCB_TRIP_BASE' } as any
                     });
                 }
             } else {
@@ -393,7 +464,8 @@ export class AutomationService {
                             notes: `[SYS] - Do not edit`,
                             productFrame: 'MMC_BASE',
                             mccbVariant: catalogItem.mccbVariant,
-                            systemTag: SYSTEM_TAG
+                            systemTag: SYSTEM_TAG,
+                            systemRuleType: 'MCCB_TRIP_BASE'
                         } as any
                     });
                 } else {
@@ -714,7 +786,10 @@ export class AutomationService {
                         where: { id: existing.id },
                         data: {
                             quantity: qty,
-                            cost: existing.unitPrice * qty
+                            cost: existing.unitPrice * qty,
+                            systemRuleType: partNumber === ATS_ACCESSORIES.LOGIC_PANEL ? 'ATS_LOGIC_PANEL' :
+                                partNumber === ATS_ACCESSORIES.PFR ? 'ATS_PFR' :
+                                    'ATS_BUSBAR'
                         }
                     });
                 }
@@ -739,6 +814,9 @@ export class AutomationService {
                             cost: catalogItem.unitPrice * qty,
                             isSystemManaged: true,
                             systemTag: SYSTEM_TAG,
+                            systemRuleType: partNumber === ATS_ACCESSORIES.LOGIC_PANEL ? 'ATS_LOGIC_PANEL' :
+                                partNumber === ATS_ACCESSORIES.PFR ? 'ATS_PFR' :
+                                    'ATS_BUSBAR',
                             notes: '[SYS] ATS Accessory'
                         } as any
                     });
