@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock } from 'lucide-react';
+import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock, FileText } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
@@ -576,6 +576,16 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             Add Items
                         </button>
                     )}
+                    <button
+                        onClick={() => {
+                            window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom`, '_blank');
+                        }}
+                        className="text-[10px] font-medium text-gray-400 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                        title="Download Engineering BOM (CSV)"
+                    >
+                        <FileText size={10} />
+                        Export BOM
+                    </button>
                     <button
                         onClick={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
