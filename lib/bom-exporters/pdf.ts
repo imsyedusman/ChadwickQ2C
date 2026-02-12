@@ -1,15 +1,18 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const PdfPrinter = require('pdfmake');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const PdfPrinterModule = require('pdfmake/js/Printer');
+const PdfPrinter = PdfPrinterModule.default || PdfPrinterModule;
 import { TDocumentDefinitions, StyleDictionary, Content } from 'pdfmake/interfaces';
 import { CanonicalBOM } from '../bom-engine';
+import path from 'path';
 
-// Define fonts
+// Define fonts with absolute paths for Node runtime consistency
 const fonts = {
     Roboto: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
+        normal: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Regular.ttf'),
+        bold: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Medium.ttf'),
+        italics: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Italic.ttf'),
+        bolditalics: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-MediumItalic.ttf')
     }
 };
 
@@ -170,11 +173,12 @@ export function generatePDF(model: CanonicalBOM): Promise<Buffer> {
             }
         };
 
-        const doc = printer.createPdfKitDocument(docDefinition);
-        const chunks: Buffer[] = [];
-        doc.on('data', (chunk: any) => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', (err: any) => reject(err));
-        doc.end();
+        printer.createPdfKitDocument(docDefinition).then((doc: any) => {
+            const chunks: Buffer[] = [];
+            doc.on('data', (chunk: any) => chunks.push(chunk));
+            doc.on('end', () => resolve(Buffer.concat(chunks)));
+            doc.on('error', (err: any) => reject(err));
+            doc.end();
+        }).catch((err: any) => reject(err));
     });
 }
