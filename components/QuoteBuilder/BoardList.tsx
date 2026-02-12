@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Trash2, Settings, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Settings, AlertCircle, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import PreSelectionWizard from './PreSelectionWizard';
 import { BoardConfig } from '@/lib/board-item-service';
@@ -90,6 +90,30 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
             onUpdate();
         } catch (error) {
             console.error('Failed to delete board', error);
+        }
+    };
+
+    const handleDuplicateBoard = async (e: React.MouseEvent, boardId: string) => {
+        e.stopPropagation();
+        if (!confirm('Duplicate this board?')) return;
+
+        try {
+            const res = await fetch(`/api/quotes/${quoteId}/boards/${boardId}/duplicate`, {
+                method: 'POST'
+            });
+
+            const data = await res.json();
+
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || 'Failed to duplicate');
+            }
+
+            onUpdate();
+            // Optionally select the new board?
+            // if (data.board) onSelectBoard(data.board.id); 
+        } catch (error) {
+            console.error('Failed to duplicate board', error);
+            alert('Failed to duplicate board');
         }
     };
 
@@ -236,6 +260,13 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                                     title="Edit Configuration"
                                 >
                                     <Settings size={14} />
+                                </button>
+                                <button
+                                    onClick={(e) => handleDuplicateBoard(e, board.id)}
+                                    className="p-1.5 hover:bg-green-100 hover:text-green-600 rounded-md"
+                                    title="Duplicate Board"
+                                >
+                                    <Copy size={14} />
                                 </button>
                                 <button
                                     onClick={(e) => handleDeleteBoard(e, board.id)}

@@ -134,6 +134,45 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
 export class AutomationService {
 
     /**
+     * Centralized Automation Reconciliation Pipeline
+     * Orchestrates all board-level automation rules.
+     * Idempotent and safe for post-duplication scenarios.
+     */
+    static async runBoardAutomationReconciliation(boardId: string) {
+        console.log(`[Automation Pipeline] Starting reconciliation for board ${boardId}`);
+
+        try {
+            // 1. MCCB Trip/Base Pairing
+            console.log(`[Automation Pipeline] 1. Syncing MCCB Trip/Base Pairs`);
+            await this.syncMccbTripBasePairs(boardId);
+
+            // 2. Pairings (e.g. MCB Chassis -> Links)
+            console.log(`[Automation Pipeline] 2. Applying Generic Pairing Rules`);
+            // Add other pairing rules here as they are defined
+            const pairingResults = await this.applyPairingRules(boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
+            if (pairingResults.warnings.length) {
+                console.warn(`[Automation Pipeline] Pairing Warnings:`, pairingResults.warnings);
+            }
+
+            // 3. ATS Accessories
+            console.log(`[Automation Pipeline] 3. Applying ATS Rules`);
+            await this.applyAtsRules(boardId);
+
+            // 4. MCCB Accessories (Handles/Shields)
+            console.log(`[Automation Pipeline] 4. Syncing MCCB Accessories`);
+            await this.syncBoardAccessories(boardId);
+
+            console.log(`[Automation Pipeline] Reconciliation Complete for board ${boardId}`);
+        } catch (error) {
+            console.error(`[Automation Pipeline] FAILED for board ${boardId}:`, error);
+            // We log but do not throw to avoid crashing the request if part of a larger flow?
+            // Actually, for duplication, we probably want to know.
+            throw error;
+        }
+    }
+
+
+    /**
      * Syncs MCCB accessories for a given board based on selected breakers.
      * Call this whenever an ITEM is added/updated/deleted on a board.
      */
