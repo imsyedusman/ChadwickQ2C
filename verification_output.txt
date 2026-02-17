@@ -1,0 +1,13 @@
+--- MCCB Pairing Lifecycle Verification (Max Qty) ---
+[SETUP] Board Ready: 0e140573-1cf2-4c54-a8e8-254eef46128b (N3)
+[STEP 1] Adding Trip Unit A (Qty 1)...
+[PASS] Base Creation: Base found with Qty 1.
+[PASS] Trip Base State: Trip found with Qty 1.
+[STEP 2] Updating Trip Unit A Qty to 2 (Forward Sync)...
+[PASS] Base Update (Matches Trip): Base found with Qty 2.
+[PASS] Trip Update: Trip found with Qty 2.
+[STEP 3] Updating Base Qty to 5 (Reverse Sync)...
+[PASS] Base Preserved: Base found with Qty 5.
+[PASS] Trip Updated to Match Base: Trip found with Qty 5.
+[STEP 4] Deleting Trip Unit...
+[PASS] Base Cleanup: Base correctly removed.

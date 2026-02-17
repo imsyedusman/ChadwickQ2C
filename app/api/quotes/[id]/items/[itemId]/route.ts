@@ -85,6 +85,13 @@ export async function PUT(
             await AutomationService.applyAtsRules(freshItem.boardId);
         }
 
+        // Hook: MCCB Trip Base Pairing (Update)
+        // Run sync if item is Switchboard (covers Trip and Base) to ensure quantity sync
+        if (freshItem?.category === 'Switchboard') {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.syncMccbTripBasePairs(freshItem.boardId);
+        }
+
         // Return the full updated list of items to ensure frontend is in sync
         const boardId = item?.boardId || freshItem?.boardId;
         const allItems = await prisma.item.findMany({
