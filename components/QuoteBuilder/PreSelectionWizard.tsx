@@ -753,10 +753,17 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 onChange={e => {
                                     const val = e.target.value;
                                     let newMeters = config.wholeCurrentMeters || [];
-                                    // If turning ON and empty, add default
-                                    if (val === 'Yes' && newMeters.length === 0) {
-                                        newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+
+                                    if (val === 'Yes') {
+                                        // If turning ON and empty, add default
+                                        if (newMeters.length === 0) {
+                                            newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+                                        }
+                                    } else {
+                                        // If turning OFF, explicit clear
+                                        newMeters = [];
                                     }
+
                                     setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters });
                                 }}
                             >

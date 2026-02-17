@@ -434,11 +434,15 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // 1. Normalize Config
     let meterList: { type: string, quantity: number }[] = [];
 
-    if (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0) {
-        meterList = config.wholeCurrentMeters;
-    } else if (config.wholeCurrentMetering === 'Yes') {
-        // Legacy / Single mode
-        meterList = [{ type: config.wcType || '', quantity: config.wcQuantity || 1 }];
+    // DEFENSE IN DEPTH: Only populate meterList if the toggle is explicitly YES.
+    // If config.wholeCurrentMetering is 'No' (or falsy), we force meterList to be empty.
+    if (config.wholeCurrentMetering === 'Yes') {
+        if (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0) {
+            meterList = config.wholeCurrentMeters;
+        } else {
+            // Legacy / Single mode fallback (if array missing but Yes selected)
+            meterList = [{ type: config.wcType || '', quantity: config.wcQuantity || 1 }];
+        }
     }
 
     // 2. Check if WC Active
