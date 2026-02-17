@@ -354,26 +354,28 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // --- METERING LOGIC ---
-    // Refactored 2026-01-23 to enforce strict CT Mode & Mutual Exclusivity
+    // Refactored 2026-02-17 to allow Coexistence of CT and Whole Current Metering (Scoped Ownership)
 
-    // 1. Centralize CT Mode Decision
-    // Rule: CT Mode = (ctMetering === "Yes") OR (currentRating > 100)
+    // Helper: Tag Registry for this run
+    const itemTags = new Map<string, string>(); // PartNumber -> SystemTag
+
+    // 1. Centralize Mode Decisions
     // Note: ctMetering check is strictly case-insensitive "yes". Blanks/Undefined/No are FALSE.
-
     const amps = parseInt((config.currentRating || '0').replace(/[^0-9]/g, '')) || 0;
     const ctMeteringStrict = (config.ctMetering || '').toLowerCase() === 'yes';
     const isOver100A = amps > 100;
 
-    const isCtMode = ctMeteringStrict || isOver100A;
+    const isCtMode = ctMeteringStrict || isOver100A; // Keeps "Mode" concept for activation, but not exclusivity against WC
 
     // DEBUG LOGGING
-    console.log('--- CT DEBUG ---');
+    console.log('--- METERING DEBUG ---');
     console.log(`Config CT Metering: "${config.ctMetering}"`);
     console.log(`Config Current Rating: "${config.currentRating}"`);
     console.log(`Parsed Amps: ${amps}`);
     console.log(`Is Over 100A: ${isOver100A}`);
     console.log(`CT Strict (Yes?): ${ctMeteringStrict}`);
-    console.log(`FINAL CT MODE: ${isCtMode}`);
+    console.log(`CT MODE ACTIVE: ${isCtMode}`);
+    console.log(`WC METERING ACTIVE: ${config.wholeCurrentMetering === 'Yes' || (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0)}`);
     console.log('----------------');
 
     const ctQty = config.ctQuantity || 1;
@@ -382,12 +384,14 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // 2. APPLY LOGIC
 
     // D. CT Metering & Spare CT Provisioning (Additive Logic)
+    // Runs if CT Mode is ACTIVE OR Spare is requested.
 
-    // Helper accumulator for additive logic
+    // Helper accumulator for CT logic
     const ctTotals = new Map<string, number>();
     const addCtTarget = (part: string, qty: number) => {
         const current = ctTotals.get(part) || 0;
         ctTotals.set(part, current + qty);
+        itemTags.set(part, 'CT'); // Mark ownership
     };
 
     // 1. Active Metering
@@ -402,30 +406,51 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         addCtItems(addCtTarget, spareQty, false, config, existingItems);
     }
 
-    // 3. Apply Totals to Main Target Map
+    // 3. Apply Totals to Main Target Map & Scoped Cleanup
     ctTotals.forEach((qty, part) => {
         addTarget(part, qty);
     });
 
+    // SCOPED CLEANUP: CT
+    // Delete items OWNED by CT (systemTag='CT') that are NOT in current targets involved in CT logic.
+    // Note: We use 'ctTotals' keys to know what IS required. Anything else tagged 'CT' is not.
+    // Actually, 'targetItemPartNumbers' now includes ctTotals.
+    // We strictly look for items in DB that are tag='CT' but NOT in our new target set.
+    const ctItemsToRemove = existingItems.filter((i: Item) =>
+        i.systemTag === 'CT' &&
+        !ctTotals.has(i.name) // Strict: If it's not in the calculated CT totals, it's gone.
+    );
+
+    if (ctItemsToRemove.length > 0) {
+        console.log(`[Metering] Cleaning up ${ctItemsToRemove.length} orphaned CT items.`);
+        await prisma.item.deleteMany({
+            where: { id: { in: ctItemsToRemove.map(i => i.id) } }
+        });
+    }
+
     // E. Whole Current Metering
-    // Only if NOT in CT Mode
-    // We normalize legacy config to a list, then iterate and accumulate totals locally.
-    if (!isCtMode) {
-        // 1. Normalize Config
-        let meterList: { type: string, quantity: number }[] = [];
+    // Independent Logic Block. Can coexist with CT.
 
-        if (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0) {
-            meterList = config.wholeCurrentMeters;
-        } else if (config.wholeCurrentMetering === 'Yes') {
-            // Legacy / Single mode
-            meterList = [{ type: config.wcType || '', quantity: config.wcQuantity || 1 }];
-        }
+    // 1. Normalize Config
+    let meterList: { type: string, quantity: number }[] = [];
 
-        // 2. Local Accumulator (Preserve addTarget as distinct setter)
+    if (config.wholeCurrentMeters && config.wholeCurrentMeters.length > 0) {
+        meterList = config.wholeCurrentMeters;
+    } else if (config.wholeCurrentMetering === 'Yes') {
+        // Legacy / Single mode
+        meterList = [{ type: config.wcType || '', quantity: config.wcQuantity || 1 }];
+    }
+
+    // 2. Check if WC Active
+    const isWcActive = meterList.length > 0;
+
+    if (isWcActive) {
+        // Local Accumulator
         const wcTotals = new Map<string, number>();
         const addWc = (part: string, qty: number) => {
             const current = wcTotals.get(part) || 0;
             wcTotals.set(part, current + qty);
+            itemTags.set(part, 'WHOLE_CURRENT'); // Mark ownership
         };
 
         // 3. Automation Loop
@@ -450,6 +475,46 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         // 4. Apply Totals to Target
         wcTotals.forEach((qty, part) => {
             addTarget(part, qty);
+        });
+    }
+
+    // SCOPED CLEANUP: WHOLE_CURRENT
+    const wcItemsToRemove = existingItems.filter((i: Item) =>
+        i.systemTag === 'WHOLE_CURRENT' &&
+        !itemTags.has(i.name) // If we didn't just tag it as WHOLE_CURRENT (or it's not in targets), remove it.
+        // Wait, itemTags has BOTH CT and WC. 
+        // We should check if it is in the CURRENT WC requirements.
+        // We didn't keep 'wcTotals' exposed outside the block if inactive.
+        // Logic:
+        // If isWcActive is false, we want to remove ALL 'WHOLE_CURRENT' items.
+        // If isWcActive is true, we remove 'WHOLE_CURRENT' items NOT in our calculated set.
+    );
+
+    // Filter clarification:
+    // We want to delete i IF:
+    // i.systemTag === 'WHOLE_CURRENT' AND i.name is NOT effectively required by WC logic.
+    // If isWcActive is TRUE, we check against targets.
+    // If isWcActive is FALSE, we delete everything.
+
+    // Using targetItemPartNumbers is safe IF we assume no other logic adds these items.
+    // But better to be explicit about "Did WC logic add this?".
+    // Let's use a simpler check: 
+    // Is it in target list? AND is strict tag match?
+    // Note: if user manually added '100A-PANEL' (no tag), we don't touch it.
+    // If CT logic added '100A-PANEL' (tag='CT'), we don't touch it here.
+    // We only touch tag='WHOLE_CURRENT'.
+
+    const wcCleanupList = existingItems.filter((i: Item) => {
+        if (i.systemTag !== 'WHOLE_CURRENT') return false;
+        // It IS a WC item. Keep it ONLY if it is in current targets.
+        // (Since we just added all required WC items to targets)
+        return !targetItemPartNumbers.has(i.name);
+    });
+
+    if (wcCleanupList.length > 0) {
+        console.log(`[Metering] Cleaning up ${wcCleanupList.length} orphaned Whole Current items.`);
+        await prisma.item.deleteMany({
+            where: { id: { in: wcCleanupList.map(i => i.id) } }
         });
     }
 
@@ -806,7 +871,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const itemsToRemove = existingItems.filter((item: Item) =>
         (item.isDefault || CLEAT_ITEMS.includes(item.name)) && // Cleats must be removed if orphaned, even if released (isDefault=false)
         allManagedItems.includes(item.name) && // Cleats are always in here
-        !targetItemPartNumbers.has(item.name)
+        !targetItemPartNumbers.has(item.name) &&
+        // PROTECT METERING ITEMS (systemTag-based exclusion)
+        item.systemTag !== 'CT' &&
+        item.systemTag !== 'WHOLE_CURRENT'
         // If Out-of-Scope and user removed busbar, 'targetItemPartNumbers' will NOT have the cleat (logic above).
         // So this will correctly remove it.
         // If Out-of-Scope and busbar exists, 'targetItemPartNumbers' WILL have the cleat (logic above).
@@ -933,6 +1001,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         // Dynamic Locking
                         isDefault: isCleat ? managingCleats : true,
                         isSystemManaged: isCleat ? managingCleats : existingItem.isSystemManaged, // Don't touch others
+                        systemTag: itemTags.get(partNumber) || existingItem.systemTag || null, // Persist CT/WC tag
                         notes: newNotes
                     }
                 });
@@ -1001,7 +1070,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     quantity: targetQty,
                     cost: finalUnitPrice * targetQty,
                     isDefault: true,
-                    isSheetmetal: catalogItem?.isSheetmetal || false
+                    isSheetmetal: catalogItem?.isSheetmetal || false,
+                    systemTag: itemTags.get(partNumber) || null // Persist CT/WC tag
                 }
             });
         }
