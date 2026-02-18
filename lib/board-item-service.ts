@@ -723,6 +723,20 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     });
 
+    // 4. Manual Cleat Preservation (User Authority Catch-All)
+    // CRITICAL FIX: If !managingCleats, we must preserve ALL existing cleats,
+    // even if they are orphaned (no parent busbar) and thus not found in step 2.
+    if (!managingCleats) {
+        existingItems.forEach((item: Item) => {
+            if (CLEAT_ITEMS.includes(item.name)) {
+                // Ensure we don't overwrite if already processed (though quantity should be same)
+                if (!targetItemPartNumbers.has(item.name)) {
+                    addTarget(item.name, item.quantity);
+                }
+            }
+        });
+    }
+
     // --- 3. FETCH CATALOG DATA ---
     // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
 

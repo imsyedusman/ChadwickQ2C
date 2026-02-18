@@ -457,6 +457,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
 
     const fetchItems = async () => {
         setLoading(true);
+        console.log('[ItemSelection] Fetching items for category:', activeCategory, 'Subcats:', selectedL1, selectedL2, selectedL3);
         try {
             const params = new URLSearchParams();
             if (searchQuery) params.append('search', searchQuery);
@@ -490,12 +491,19 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             // Increase limit for specific views
             params.append('take', '500');
 
-            const res = await fetch(`/api/catalog?${params.toString()}`);
+            const queryString = params.toString();
+            console.log('[ItemSelection] Fetching items with params:', queryString);
+            const res = await fetch(`/api/catalog?${queryString}`);
             if (res.ok) {
                 const data = await res.json();
+                console.log('[ItemSelection] Item Fetch Response Length:', data.length);
+                if (data.length === 0) console.warn('[ItemSelection] WARNING: Empty response for params:', queryString);
 
                 // Filter out system-managed basics that shouldn't be added manually
                 const filteredData = data;
+
+                // Log first item if exists
+                if (data.length > 0) console.log('[ItemSelection] Sample Item:', data[0]);
 
                 // Apply Deterministic Sorting
                 const sortedData = [...filteredData].sort(compareItems);
@@ -520,10 +528,18 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
     }, [activeCategory]);
 
     const fetchCategoryTree = async (category: string = 'Switchboard') => {
+        console.log('[ItemSelection] fetchCategoryTree called for:', category);
         try {
-            const res = await fetch(`/api/catalog?mode=tree&category=${category}`);
+            const url = `/api/catalog?mode=tree&category=${category}`;
+            console.log('[ItemSelection] Fetching URL:', url);
+            const res = await fetch(url);
+            console.log('[ItemSelection] Response Status:', res.status, res.statusText);
+
             if (res.ok) {
-                const data = await res.json();
+                const data: string[] = await res.json();
+                console.log('[ItemSelection] Category Tree Data:', data);
+                const hasCleats = data.some(s => s.includes('Busbar Supports'));
+                console.log('[ItemSelection] Has Cleats Subcategory?', hasCleats);
                 setAllSubcategories(data);
             }
         } catch (error) {
@@ -545,10 +561,11 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
 
         if (existingItem) {
             // Update mode: Set exact quantity
+            console.log('[ItemSelection] Updating existing item:', existingItem.id, 'Qty:', qty);
             updateItem(existingItem.id, { quantity: qty });
         } else {
             // Add mode
-            addItemToBoard(selectedBoardId, {
+            const payload = {
                 category: item.category || activeCategory,
                 subcategory: item.subcategory,
                 name: item.partNumber || item.description,
@@ -557,7 +574,9 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                 unitPrice: item.unitPrice,
                 labourHours: item.labourHours,
                 quantity: qty
-            });
+            };
+            console.log('[ItemSelection] Adding new item to board:', selectedBoardId, 'Payload:', payload);
+            addItemToBoard(selectedBoardId, payload);
         }
     };
 

@@ -176,7 +176,7 @@ const basicsData = [
     // 1B1 - Busbar Supports
     {
         brand: null,
-        category: 'Basics',
+        category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-SMALL-1',
         description: 'Cleats - Permali (small-one bar/phase)',
@@ -187,7 +187,7 @@ const basicsData = [
     },
     {
         brand: null,
-        category: 'Basics',
+        category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-SMALL-2',
         description: 'Cleats - Permali (small-two bar/phase)',
@@ -198,7 +198,7 @@ const basicsData = [
     },
     {
         brand: null,
-        category: 'Basics',
+        category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-LARGE-2',
         description: 'Cleats - Permali (large-two bar/phase)',
@@ -209,7 +209,7 @@ const basicsData = [
     },
     {
         brand: null,
-        category: 'Basics',
+        category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-LARGE-3',
         description: 'Cleats - Permali (large-three bar/phase)',
@@ -524,26 +524,63 @@ const basicsData = [
 ];
 
 async function main() {
-    console.log('Starting Basics data import...');
+    console.log('Starting Basics data sync...');
 
     try {
-        // Clear existing Basics items
-        const deleted = await prisma.catalogItem.deleteMany({
-            where: { category: 'Basics' }
-        });
-        console.log(`Deleted ${deleted.count} existing Basics items.`);
+        let createdCount = 0;
+        let updatedCount = 0;
 
-        // Import new data
-        const result = await prisma.catalogItem.createMany({
-            data: basicsData
-        });
+        for (const item of basicsData) {
+            // Find existing item by partNumber (if it exists)
+            // Note: Schema does not enforce unique partNumber, but we assume it for this sync logic
+            // We use findFirst to handle potential existing duplicates gracefully (by updating one)
+            // Ideally should clean duplicates first if strictness was required
+            const existing = await prisma.catalogItem.findFirst({
+                where: {
+                    partNumber: item.partNumber
+                }
+            });
 
-        console.log(`Successfully imported ${result.count} Basics items.`);
-        console.log('\nItems with auto-add enabled:');
-        const autoAddItems = basicsData.filter(item => item.isAutoAdd);
-        autoAddItems.forEach(item => {
-            console.log(`  - ${item.partNumber}: ${item.description}`);
-        });
+            if (existing) {
+                // Update existing
+                await prisma.catalogItem.update({
+                    where: { id: existing.id },
+                    data: {
+                        brand: item.brand,
+                        category: item.category,
+                        subcategory: item.subcategory,
+                        description: item.description,
+                        unitPrice: item.unitPrice,
+                        labourHours: item.labourHours,
+                        isAutoAdd: item.isAutoAdd,
+                        defaultQuantity: item.defaultQuantity
+                    }
+                });
+                console.log(`Updated: ${item.partNumber} (${item.category})`);
+                updatedCount++;
+            } else {
+                // Create new
+                await prisma.catalogItem.create({
+                    data: {
+                        brand: item.brand,
+                        category: item.category,
+                        subcategory: item.subcategory,
+                        partNumber: item.partNumber,
+                        description: item.description,
+                        unitPrice: item.unitPrice,
+                        labourHours: item.labourHours,
+                        isAutoAdd: item.isAutoAdd,
+                        defaultQuantity: item.defaultQuantity
+                    }
+                });
+                console.log(`Created: ${item.partNumber} (${item.category})`);
+                createdCount++;
+            }
+        }
+
+        console.log(`\nSync complete.`);
+        console.log(`Created: ${createdCount}`);
+        console.log(`Updated: ${updatedCount}`);
 
     } catch (error) {
         console.error('Import failed:', error);

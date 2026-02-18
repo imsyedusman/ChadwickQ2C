@@ -14,6 +14,8 @@ export async function GET(request: Request) {
         const brand = searchParams.get('brand');
         const take = searchParams.get('take') ? parseInt(searchParams.get('take')!) : 200; // Default limit for performance
 
+        console.log('[API/Catalog] Request:', { mode, search, category, subcategory, take });
+
         // Mode: Stats (Get unique brands and counts)
         if (mode === 'stats') {
             const stats = await prisma.catalogItem.groupBy({
@@ -71,7 +73,9 @@ export async function GET(request: Request) {
             });
 
             // Return just the strings
-            return NextResponse.json(subcats.map((s: { subcategory: string | null }) => s.subcategory).filter(Boolean));
+            const response = NextResponse.json(subcats.map((s: { subcategory: string | null }) => s.subcategory).filter(Boolean));
+            response.headers.set('X-Debug-Count', subcats.length.toString());
+            return response;
         }
 
         // Standard Search with Filters
@@ -176,6 +180,8 @@ export async function GET(request: Request) {
         if (brand) {
             whereClause.AND.push({ brand: brand });
         }
+
+        console.log('[API/Catalog] Executing Query with Where:', JSON.stringify(whereClause, null, 2));
 
         const items = await prisma.catalogItem.findMany({
             where: whereClause,
