@@ -1,0 +1,9 @@
+--- Scanning for Invalid Cubic Boards ---
+Scanned 11 total boards.
+
+Found 1 Invalid Cubic Boards:
+---------------------------------------------------
+Quote Number | Board Name           | Board ID                             | Compartments
+---------------------------------------------------
+Q-1002       | MSB-New Board        | 87b86067-1af1-4d78-a235-4e4b06774178 | 0
+---------------------------------------------------

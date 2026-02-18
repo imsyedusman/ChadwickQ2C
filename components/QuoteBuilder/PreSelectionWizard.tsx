@@ -305,6 +305,11 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 return false;
             }
 
+            // Cubic Validation: Must have at least 1 compartment
+            if (config.enclosureType === 'Cubic' && (!config.totalCompartments || config.totalCompartments < 1)) {
+                return false;
+            }
+
             return true;
         }
         return true;
@@ -986,7 +991,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         ) : (
                             <button
                                 onClick={handleConfirm}
-                                className="px-6 py-2 text-sm font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm transition-all flex items-center gap-2"
+                                disabled={!canProceed()}
+                                className={cn(
+                                    "px-6 py-2 text-sm font-bold text-white rounded-lg shadow-sm transition-all flex items-center gap-2",
+                                    canProceed()
+                                        ? "bg-green-600 hover:bg-green-700"
+                                        : "bg-gray-400 cursor-not-allowed opacity-70"
+                                )}
                             >
                                 <Check size={16} />
                                 {initialConfig ? 'Save Changes' : 'Create Board'}

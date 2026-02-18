@@ -1,0 +1,21 @@
+--- Testing Cubic Validation Enforcement ---
+Created Test Quote: 4ade5d4f-37f6-46c9-806f-7d12fc87f00f
+
+[TEST A] POST Create Board
+   -> Attempting Invalid Cubic (0 compartments)...
+   ✅ BLOCKED (400 Bad Request) - Expected
+   -> Attempting Valid Cubic (5 compartments)...
+   ✅ ALLOWED (200 OK) - Expected
+   -> Attempting Invalid Cubic (Undefined compartments)...
+   ✅ BLOCKED (400 Bad Request) - Expected
+
+[TEST B] PUT Update Board
+   -> Updating Valid Board to 0 compartments...
+   ✅ BLOCKED (400 Bad Request) - Expected
+
+[TEST C] DUPLICATE Board
+   -> Created Manually Invalid Board: 9f5143d1-f3f5-4f7a-85e0-5c213f52097c
+   -> Attempting to Duplicate Invalid Board...
+   ✅ BLOCKED (400 Bad Request) - Expected
+
+Cleaning up test data...
