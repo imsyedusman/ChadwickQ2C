@@ -17,7 +17,7 @@ async function main() {
         where: { partNumber: { in: partNumbers } }
     });
 
-    items.forEach(i => {
+    items.forEach((i: any) => {
         console.log(`Part: ${i.partNumber.padEnd(20)} | Cat: [${i.category}] | Sub: [${i.subcategory}]`);
     });
 
@@ -35,7 +35,7 @@ async function main() {
         orderBy: { subcategory: 'asc' }
     });
 
-    const subcatList = subcats.map(s => s.subcategory).filter(Boolean);
+    const subcatList = subcats.map((s: any) => s.subcategory).filter(Boolean);
     console.log(`Found ${subcatList.length} subcategories.`);
     const cleatSubcat = 'Busbar Supports - Required for Custom Boards Only';
     const found = subcatList.includes(cleatSubcat);

@@ -10,10 +10,7 @@ export async function POST(
         const body = await request.json();
         const { boardId, category, subcategory, name, description, quantity, unitPrice, labourHours, notes, isDefault } = body;
 
-        console.log(`[API/Items] POST received for Board ${boardId}`, { category, subcategory, name });
-
         if (!boardId || !name) {
-            console.warn('[API/Items] Missing required fields');
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -83,8 +80,6 @@ export async function POST(
             } as any,
         });
 
-        console.log(`[API/Items] Created Item ID: ${newItem.id}, SystemManaged: ${newItem.isSystemManaged}`);
-
         // Debug / Validation Logging for Trip Units
         if (catalogItem && (catalogItem as any).mccbRole === 'TRIP_UNIT') {
             if (!(catalogItem as any).mccbVariant) {
@@ -99,7 +94,6 @@ export async function POST(
             (name && (name.startsWith('BB-') || name.startsWith('BBC-')));
 
         if (isBusbarItem) {
-            console.log('[API/Items] Triggering Busbar Sync...');
             const board = await prisma.board.findUnique({
                 where: { id: boardId },
                 select: { config: true }
@@ -110,9 +104,6 @@ export async function POST(
                 // Dynamically import to avoid circular dep if any (though unlikely here)
                 const { syncBoardItems } = await import('@/lib/board-item-service');
                 await syncBoardItems(boardId, config);
-                console.log('[API/Items] Busbar Sync Completed.');
-            } else {
-                console.log('[API/Items] Busbar Sync Skipped (No board/config).');
             }
         }
 

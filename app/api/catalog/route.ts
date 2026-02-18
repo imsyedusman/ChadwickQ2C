@@ -181,7 +181,7 @@ export async function GET(request: Request) {
             whereClause.AND.push({ brand: brand });
         }
 
-        console.log('[API/Catalog] Executing Query with Where:', JSON.stringify(whereClause, null, 2));
+
 
         const items = await prisma.catalogItem.findMany({
             where: whereClause,
