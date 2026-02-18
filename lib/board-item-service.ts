@@ -1,5 +1,5 @@
 
-import prisma from '@/lib/prisma';
+import prisma from './prisma';
 import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
 
 export interface BoardConfig {
@@ -60,7 +60,12 @@ const WC_KIT_ITEMS = [
     '100A-PANEL',
     '100A-NEUTRAL-LINK',
     '100A-MCB-1PH',
-    '100A-MCB-3PH'
+    '100A-MCB-3PH',
+    '100A-WIRING-1PH',
+    '100A-WIRING-3PH',
+    '100A-CHASSIS-18',
+    '100A-CHASSIS-24',
+    '100A-CHASSIS-30'
 ];
 
 const BUSBAR_INSULATION_ITEM = 'Busbar Insulation';
@@ -457,22 +462,60 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             itemTags.set(part, 'WHOLE_CURRENT'); // Mark ownership
         };
 
-        // 3. Automation Loop
+        // 3. Aggregation Loop (Step 1)
+        let total1phMeters = 0;
+        let total3phMeters = 0;
+
         for (const meter of meterList) {
-            const wcQty = meter.quantity || 1;
-            const wcType = meter.type;
+            const qty = Number(meter.quantity) || 0;
+            if (meter.type === '100A wiring 3-phase') {
+                total3phMeters += qty;
+            } else if (meter.type === '100A wiring 1-phase') {
+                total1phMeters += qty;
+            }
+        }
 
-            // Add 100A Meter Panel & Kit items
-            addWc('100A-PANEL', wcQty);
+        // 4. Deterministic Derivation (Step 2)
+        const totalMeters = total1phMeters + total3phMeters;
+        const totalFuseQty = (total1phMeters * 1) + (total3phMeters * 3);
 
-            if (wcType === '100A wiring 3-phase') {
-                addWc('100A-FUSE', wcQty * 3);
-                addWc('100A-NEUTRAL-LINK', wcQty);
-                addWc('100A-MCB-3PH', wcQty);
-            } else if (wcType === '100A wiring 1-phase') {
-                addWc('100A-FUSE', wcQty);
-                addWc('100A-NEUTRAL-LINK', wcQty);
-                addWc('100A-MCB-1PH', wcQty);
+        if (totalMeters > 0) {
+            // Apply Derived Quantities
+            // Panel & Links allow 1 per meter
+            addWc('100A-PANEL', totalMeters);
+            addWc('100A-NEUTRAL-LINK', totalMeters);
+
+            // Fuses
+            if (totalFuseQty > 0) addWc('100A-FUSE', totalFuseQty);
+
+            // MCBs & Wiring (1ph)
+            if (total1phMeters > 0) {
+                addWc('100A-MCB-1PH', total1phMeters);
+                addWc('100A-WIRING-1PH', total1phMeters);
+            }
+
+            // MCBs & Wiring (3ph)
+            if (total3phMeters > 0) {
+                addWc('100A-MCB-3PH', total3phMeters);
+                addWc('100A-WIRING-3PH', total3phMeters);
+            }
+        }
+
+        // 3a. Derived Chassis Logic (Step 3)
+        // totalFuseQty is already calculated above
+
+        if (totalFuseQty > 30) {
+            throw new Error(`100A Series Metering exceeds maximum 30 fuse capacity (Current: ${totalFuseQty})`);
+        }
+
+        if (totalFuseQty > 0) {
+            let chassisPart = '';
+            if (totalFuseQty <= 18) chassisPart = '100A-CHASSIS-18';
+            else if (totalFuseQty <= 24) chassisPart = '100A-CHASSIS-24';
+            else if (totalFuseQty <= 30) chassisPart = '100A-CHASSIS-30';
+
+            if (chassisPart) {
+                addWc(chassisPart, 1);
             }
         }
 
