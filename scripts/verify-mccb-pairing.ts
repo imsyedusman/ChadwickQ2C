@@ -48,7 +48,7 @@ async function main() {
         if (baseItem) {
             console.log('PASS: Base Item C10B3 found.');
             console.log(`Qty: ${baseItem.quantity} (Expected: 2)`);
-            if (baseItem.quantity !== 2) throw new Error('Qty Mismatch');
+            if (baseItem.quantity.toNumber() !== 2) throw new Error('Qty Mismatch');
         } else {
             console.error('FAIL: Base Item C10B3 NOT found.');
             items.forEach(i => console.log(` - ${i.name} (${i.partNumber}) [${i.isSystemManaged ? 'SYS' : 'USER'}]`));
@@ -67,7 +67,7 @@ async function main() {
 
             const updatedBase = await prisma.item.findFirst({ where: { id: baseItem.id } });
             console.log(`Updated Base Qty: ${updatedBase?.quantity} (Expected: 5)`);
-            if (updatedBase?.quantity !== 5) throw new Error('Update Qty Verification Failed');
+            if (updatedBase?.quantity.toNumber() !== 5) throw new Error('Update Qty Verification Failed');
         }
 
         // 6. Delete Trip

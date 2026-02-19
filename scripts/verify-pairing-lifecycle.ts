@@ -29,7 +29,7 @@ async function main() {
             if (!base) console.log(`[PASS] ${label}: Base correctly removed.`);
             else console.error(`[FAIL] ${label}: Base still exists! Qty: ${base.quantity}`);
         } else {
-            if (base && base.quantity === expectedQty) {
+            if (base && base.quantity.toNumber() === expectedQty) {
                 console.log(`[PASS] ${label}: Base found with Qty ${base.quantity}.`);
                 // Check metadata
                 if (base.category === 'Switchboard' && base.subcategory !== 'MCCB Base' && base.name === 'C10N3') {
@@ -38,7 +38,7 @@ async function main() {
                     console.warn(`       Metadata Warning: Cat=${base.category}, Sub=${base.subcategory}, Name=${base.name}`);
                 }
             } else {
-                console.error(`[FAIL] ${label}: Base missing or wrong qty. Found: ${base?.quantity}`);
+                console.error(`[FAIL] ${label}: Base missing or wrong qty. Found: ${base?.quantity.toNumber()}`);
             }
         }
     };

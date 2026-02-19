@@ -70,7 +70,7 @@ async function runTest() {
         const iColour = items.find(i => i.name === '1A-COLOUR');
 
         // Check 1A-COMPARTMENTS
-        if (iCompartments && iCompartments.quantity === 10) {
+        if (iCompartments && iCompartments.quantity.toNumber() === 10) {
             console.log('PASS: 1A-COMPARTMENTS added with Qty 10');
         } else {
             console.error('FAIL: 1A-COMPARTMENTS missing or wrong qty', iCompartments);
@@ -79,7 +79,7 @@ async function runTest() {
         // Check 1A-50KA
         // Expected Cost = (10 * unitPrice) / 4
         const expected50kACost = (10 * catalogItem.unitPrice) / 4;
-        if (i50kA && Math.abs(i50kA.unitPrice - expected50kACost) < 0.01 && i50kA.quantity === 1) {
+        if (i50kA && Math.abs(i50kA.unitPrice - expected50kACost) < 0.01 && i50kA.quantity.toNumber() === 1) {
             console.log(`PASS: 1A-50KA added with Price $${i50kA.unitPrice} (Expected $${expected50kACost})`);
         } else {
             console.error(`FAIL: 1A-50KA mismatch. Got Price $${i50kA?.unitPrice}, Qty ${i50kA?.quantity}. Expected $${expected50kACost}`);
@@ -87,7 +87,7 @@ async function runTest() {
 
         // Check 1A-COLOUR
         // Expected: Qty 10, Price 80
-        if (iColour && iColour.quantity === 10 && iColour.unitPrice === 80) {
+        if (iColour && iColour.quantity.toNumber() === 10 && iColour.unitPrice === 80) {
             console.log('PASS: 1A-COLOUR added with Qty 10, Price $80');
         } else {
             console.error('FAIL: 1A-COLOUR mismatch', iColour);

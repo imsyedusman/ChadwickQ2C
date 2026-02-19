@@ -68,7 +68,7 @@ async function main() {
 
         const check = (name: string, expected: number) => {
             const item = items.find(i => i.name === name);
-            const actual = item?.quantity || 0;
+            const actual = item?.quantity ? item.quantity.toNumber() : 0;
             if (actual === expected) {
                 console.log(`PASS: ${name} = ${actual}`);
             } else {

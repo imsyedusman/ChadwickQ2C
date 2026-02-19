@@ -47,7 +47,7 @@ async function main() {
     const handle = bAccessories.find(a => a.name === 'LV429338T');
     const shield = bAccessories.find(a => a.name === 'LV429517');
 
-    if (handle?.quantity !== 3 || shield?.quantity !== 6) {
+    if (handle?.quantity.toNumber() !== 3 || shield?.quantity.toNumber() !== 6) {
         console.error('FAIL: Multi-kA aggregation incorrect.');
     } else {
         console.log('PASS: Aggregation correct.');
@@ -70,7 +70,7 @@ async function main() {
     cAccessories.forEach(a => console.log(`- ${a.name} (Qty: ${a.quantity}) Frame: ${a.productFrame}`));
 
     const handle400 = cAccessories.find(a => a.name === 'LV432598T');
-    if (handle400?.quantity !== 2) {
+    if (handle400?.quantity.toNumber() !== 2) {
         console.error('FAIL: Mixed frame logic incorrect.');
     } else {
         console.log('PASS: Mixed frames handled correctly.');
@@ -90,7 +90,7 @@ async function main() {
     let sShield = sAcc.find(a => a.name === 'LV429517');
     console.log(`Initial: Breaker Qty=2 -> Shield Qty=${sShield?.quantity} (Expect 4)`);
 
-    if (sShield?.quantity !== 4) console.error('FAIL: Initial calculation wrong');
+    if (sShield?.quantity.toNumber() !== 4) console.error('FAIL: Initial calculation wrong');
 
     // Run sync AGAIN without changes. Should not increase.
     await AutomationService.syncBoardAccessories(boardId);
@@ -98,7 +98,7 @@ async function main() {
     sShield = sAcc.find(a => a.name === 'LV429517');
     console.log(`Re-run: Breaker Qty=2 -> Shield Qty=${sShield?.quantity} (Expect 4)`);
 
-    if (sShield?.quantity !== 4) console.error('FAIL: Re-run increased quantity (Runaway loop!)');
+    if (sShield?.quantity.toNumber() !== 4) console.error('FAIL: Re-run increased quantity (Runaway loop!)');
 
     // Decrease Breaker
     console.log('Decreasing Breaker Qty to 1...');
@@ -109,7 +109,7 @@ async function main() {
     sShield = sAcc.find(a => a.name === 'LV429517');
     console.log(`Decrease: Breaker Qty=1 -> Shield Qty=${sShield?.quantity} (Expect 2)`);
 
-    if (sShield?.quantity !== 2) console.error('FAIL: Decrease failed to update accessories');
+    if (sShield?.quantity.toNumber() !== 2) console.error('FAIL: Decrease failed to update accessories');
     else console.log('PASS: Stability confirmed.');
 
 

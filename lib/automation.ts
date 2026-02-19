@@ -227,7 +227,7 @@ export class AutomationService {
                 && item.subcategory !== 'MCCB Accessories';
 
             if (isBreaker && item.productFrame && item.productFrame in frameCounts) {
-                frameCounts[item.productFrame as FrameType] += item.quantity;
+                frameCounts[item.productFrame as FrameType] += item.quantity.toNumber();
             }
         }
 
@@ -288,7 +288,7 @@ export class AutomationService {
             }
 
             if (primaryItem) {
-                if (primaryItem.quantity !== req.quantity) {
+                if (primaryItem.quantity.toNumber() !== req.quantity) {
                     await prisma.item.update({
                         where: { id: primaryItem.id },
                         data: {
@@ -435,7 +435,7 @@ export class AutomationService {
 
                 if (basePart) {
                     const current = requiredBases.get(basePart) || 0;
-                    requiredBases.set(basePart, current + item.quantity);
+                    requiredBases.set(basePart, current + item.quantity.toNumber());
                 } else {
                     console.warn(`[MCCB Sync] No rule found for Trip ${partNum} + Variant ${variant}`);
                 }
@@ -463,7 +463,7 @@ export class AutomationService {
             const existing = systemItems.find(i => (i as any).partNumber === basePart);
 
             if (existing) {
-                if (existing.quantity !== qty) {
+                if (existing.quantity.toNumber() !== qty) {
                     await prisma.item.update({
                         where: { id: existing.id },
                         data: {
@@ -591,7 +591,7 @@ export class AutomationService {
                     console.log(`[Automation] Rule Match: ${inputNorm} -> ${outputPart}`);
 
                     const current = requirements.get(outputPart) || 0;
-                    requirements.set(outputPart, current + item.quantity);
+                    requirements.set(outputPart, current + item.quantity.toNumber());
                 }
             }
 
@@ -786,7 +786,7 @@ export class AutomationService {
             const part = item.partNumber;
             if (!part) continue;
 
-            const qty = item.quantity;
+            const qty = item.quantity.toNumber();
 
             // Group 1 (100-250A)
             if (ATS_BREAKER_GROUPS.GROUP_1_100_250.includes(part as any)) {
@@ -820,7 +820,7 @@ export class AutomationService {
             const existing = systemItems.find(i => (i as any).partNumber === partNumber);
 
             if (existing) {
-                if (existing.quantity !== qty) {
+                if (existing.quantity.toNumber() !== qty) {
                     await prisma.item.update({
                         where: { id: existing.id },
                         data: {

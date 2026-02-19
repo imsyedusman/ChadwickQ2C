@@ -18,7 +18,7 @@ export async function GET() {
                     targetMarginPct: 0.18,
                     gstPct: 0.10,
                     roundingIncrement: 100,
-                    roundingIncrement: 100,
+
                     minMarginAlertPct: 0.05,
                     copperPricePerKg: 15.0,
                 },

@@ -1040,7 +1040,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
             const forcedSubcategory = isCubicExtra ? CUBIC_SUBCATEGORY : undefined;
 
-            if (existingItem.quantity !== newQty ||
+            if (existingItem.quantity.toNumber() !== newQty ||
                 (Math.abs(existingItem.unitPrice - newUnitPrice) > 0.01) ||
                 (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
                 (forcedCategory && existingItem.category !== forcedCategory) ||

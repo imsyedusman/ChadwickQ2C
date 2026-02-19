@@ -52,6 +52,12 @@ const cleanPart = (p: string | null) => (p || '').trim();
  * Aggregates Board Items by PartNumber + UnitPrice.
  * @param items List of raw Prisma Items
  */
+const toNum = (val: any): number => {
+    if (typeof val === 'number') return val;
+    if (val && typeof val.toNumber === 'function') return val.toNumber();
+    return Number(val) || 0;
+};
+
 export const aggregateBoardItems = (items: Item[]): Map<string, AggregateItem> => {
     const map = new Map<string, AggregateItem>();
 
@@ -70,7 +76,7 @@ export const aggregateBoardItems = (items: Item[]): Map<string, AggregateItem> =
         // 2. Aggregate
         const current = map.get(key);
 
-        const qty = item.quantity || 0;
+        const qty = toNum(item.quantity);
         const cost = item.cost || 0; // Use stored extended cost
         const labour = item.labourHours || 0;
         // Capture category (prefer existing, but will settle for first found)

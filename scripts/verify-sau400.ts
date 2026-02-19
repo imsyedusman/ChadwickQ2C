@@ -72,7 +72,7 @@ async function main() {
         where: { boardId, systemTag: 'MCB_CHASSIS_LINK' }
     });
 
-    if (links.length === 1 && links[0].partNumber === 'enb12' && links[0].quantity === 4) {
+    if (links.length === 1 && links[0].partNumber === 'enb12' && links[0].quantity.toNumber() === 4) {
         console.log('PASSED: enb12 created with qty 4');
     } else {
         console.error('FAILED: Link creation mismatch.');

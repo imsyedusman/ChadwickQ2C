@@ -78,10 +78,10 @@ async function checkItem(boardId: string, expectedQty: number) {
             console.error(`❌ Failure: Expected 0 items, found ${items.length} with qty ${items[0].quantity}`);
         }
     } else {
-        if (items.length === 1 && items[0].quantity === expectedQty) {
+        if (items.length === 1 && items[0].quantity.toNumber() === expectedQty) {
             console.log(`✅ Success: Found item with quantity ${expectedQty}.`);
         } else {
-            console.error(`❌ Failure: Expected qty ${expectedQty}, found ${items.length > 0 ? items[0].quantity : 'None'}.`);
+            console.error(`❌ Failure: Expected qty ${expectedQty}, found ${items.length > 0 ? items[0].quantity.toNumber() : 'None'}.`);
         }
     }
 }

@@ -91,7 +91,7 @@ async function testSpareCt(quoteId: string) {
 
 function checkItem(items: any[], partNumber: string, expectedQty: number) {
     const item = items.find(i => i.name === partNumber);
-    const qty = item ? item.quantity : 0;
+    const qty = item ? item.quantity.toNumber() : 0;
     if (qty === expectedQty) {
         console.log(`[PASS] ${partNumber}: Expected ${expectedQty}, Found ${qty}`);
     } else {

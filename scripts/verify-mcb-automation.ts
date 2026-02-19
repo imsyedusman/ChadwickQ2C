@@ -106,7 +106,7 @@ async function verify() {
             console.log(JSON.stringify(links, null, 2));
         } else {
             const link = links[0];
-            console.log('Link Item:', link.partNumber, 'Qty:', link.quantity);
+            console.log('Link Item:', link.partNumber, 'Qty:', link.quantity.toNumber());
 
             // Checks
             let passed = true;
@@ -114,7 +114,7 @@ async function verify() {
                 console.error('FAILED: PartNumber mismatch. Expected enb12');
                 passed = false;
             }
-            if (link.quantity !== 5) {
+            if (link.quantity.toNumber() !== 5) {
                 console.error('FAILED: Quantity mismatch. Expected 5 (4+1)');
                 passed = false;
             }
