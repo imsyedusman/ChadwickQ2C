@@ -18,7 +18,9 @@ export async function GET() {
                     targetMarginPct: 0.18,
                     gstPct: 0.10,
                     roundingIncrement: 100,
+                    roundingIncrement: 100,
                     minMarginAlertPct: 0.05,
+                    copperPricePerKg: 15.0,
                 },
             });
         }
@@ -46,6 +48,7 @@ export async function PUT(request: Request) {
                 minMarginAlertPct: body.minMarginAlertPct,
                 companyName: body.companyName,
                 companyAddress: body.companyAddress,
+                copperPricePerKg: body.copperPricePerKg,
             },
             create: {
                 id: 'global',
@@ -59,6 +62,7 @@ export async function PUT(request: Request) {
                 minMarginAlertPct: body.minMarginAlertPct || 0.05,
                 companyName: body.companyName,
                 companyAddress: body.companyAddress,
+                copperPricePerKg: body.copperPricePerKg || 15.0,
             },
         });
 

@@ -1,6 +1,8 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
+// 2026-02-19: Added Dynamic Copper Pricing & Decimal Quantities
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -27,6 +29,9 @@ model Quote {
   // Global Commercial Adjustments
   globalDiscount    Float @default(0) // Percentage or Fixed amount? Let's assume % for now or handle both in logic
   globalContingency Float @default(0) // Percentage
+
+  // Dynamic Copper Pricing Overrides
+  overrideCopperPricePerKg Float?
 
   // Per-Quote Costing Overrides (Optional - falls back to Global Settings if null)
   overrideLabourRate        Float?
@@ -68,7 +73,7 @@ model Item {
   name        String
   description String?
   
-  quantity    Int      @default(1)
+  quantity    Decimal  @default(1) @db.Decimal(10, 3) // Changed from Int to Decimal for meters
   unitPrice   Float    @default(0)
   labourHours Float    @default(0)
   cost        Float    @default(0) // Calculated: unitPrice * quantity
@@ -106,6 +111,11 @@ model CatalogItem {
   imageUrl        String?
   isAutoAdd       Boolean  @default(false) // For Basics: Auto-add to new boards?
   defaultQuantity Int      @default(1)
+  
+  // Dynamic Pricing Fields
+  totalCopperWeightKgPerMeter Float?
+  isCopperPriced              Boolean @default(false)
+
   notes           String?  // Vendor catalog: auto-add logic rules
   meterType       String?  // Direct, CT, NMI, Special
   isSheetmetal    Boolean  @default(false)
@@ -134,6 +144,7 @@ model MccbTripBaseRule {
 model Settings {
   id                    String   @id @default("global")
   labourRate            Float    @default(100)
+  copperPricePerKg      Float    @default(15.0) // New Global Setting
   consumablesPct        Float    @default(0.03)
   overheadPct           Float    @default(0.20)
   engineeringPct        Float    @default(0.20)

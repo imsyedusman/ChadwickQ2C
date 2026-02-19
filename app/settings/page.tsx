@@ -18,7 +18,8 @@ export default function SettingsPage() {
         roundingIncrement: 100,
         minMarginAlertPct: 5,
         companyName: '',
-        companyAddress: ''
+        companyAddress: '',
+        copperPricePerKg: 15.0
     });
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -46,6 +47,7 @@ export default function SettingsPage() {
                     minMarginAlertPct: (data.minMarginAlertPct || 0.05) * 100,
                     companyName: data.companyName || '',
                     companyAddress: data.companyAddress || '',
+                    copperPricePerKg: data.copperPricePerKg || 15.0,
                 });
             }
         } catch (error) {
@@ -186,6 +188,22 @@ export default function SettingsPage() {
                                                         step="0.01"
                                                         value={settings.labourRate}
                                                         onChange={(e) => setSettings({ ...settings, labourRate: parseFloat(e.target.value) || 0 })}
+                                                        className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Copper Base Price ($/kg)
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.10"
+                                                        value={settings.copperPricePerKg}
+                                                        onChange={(e) => setSettings({ ...settings, copperPricePerKg: parseFloat(e.target.value) || 0 })}
                                                         className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-500"
                                                     />
                                                 </div>

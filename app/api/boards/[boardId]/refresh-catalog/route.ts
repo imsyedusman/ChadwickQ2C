@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma';
 import { Item, CatalogItem } from '@prisma/client';
 
 import { isFormulaPriced } from '@/lib/system-definitions';
+import { calculateBusbarUnitPrice } from '@/lib/pricing';
+import { Prisma } from '@prisma/client';
 
 export async function POST(
     request: Request,
@@ -27,9 +29,22 @@ export async function POST(
             return NextResponse.json({ error: `Cannot refresh items. Quote is ${board.quote.status}.` }, { status: 403 });
         }
 
-        // 3. Identify items to process
-        // Skip formula items
-        // We want to process CUSTOM/MANUAL items primarily, but we can also catch any drift in managed items that aren't formulaic (like hardware)
+        // 3. Prepare Pricing Context (Effective Copper Price)
+        // Similar logic to board-item-service
+        let effectiveCopperPrice = 15.0;
+        const globalSettings = await prisma.settings.findUnique({ where: { id: 'global' } });
+
+        if (board.quote.overrideCopperPricePerKg != null) {
+            effectiveCopperPrice = board.quote.overrideCopperPricePerKg;
+        } else if (globalSettings?.copperPricePerKg != null) {
+            effectiveCopperPrice = globalSettings.copperPricePerKg;
+        }
+
+        const pricingContext = { copperPrice: effectiveCopperPrice };
+
+        // 4. Identify items to process
+        // Skip formula items -> We want to process CUSTOM/MANUAL items primarily
+        // AND BUSBAR items (even if they were auto-added, we want to refresh their price now)
         const itemsToProcess = board.items.filter((item: Item) => !isFormulaPriced(item.name));
 
         if (itemsToProcess.length === 0) {
@@ -103,8 +118,27 @@ export async function POST(
             const match = catalogMap.get(partNumber);
 
             if (match) {
+                // Determine Info from Catalog
+
+                let newUnitPrice = match.unitPrice;
+
+                // DYNAMIC PRICING CHECK
+                // We must cast match to compatible type for helper
+                // CatalogItem in Prisma has the fields we added.
+                if (match.isCopperPriced) {
+                    const calculated = calculateBusbarUnitPrice({
+                        category: match.category,
+                        subcategory: match.subcategory,
+                        partNumber: match.partNumber,
+                        totalCopperWeightKgPerMeter: match.totalCopperWeightKgPerMeter || null,
+                        isCopperPriced: true,
+                        unitPrice: match.unitPrice
+                    }, pricingContext);
+                    newUnitPrice = calculated.toNumber();
+                }
+
                 // Check if meaningful change
-                const priceChanged = Math.abs(item.unitPrice - match.unitPrice) > 0.001;
+                const priceChanged = Math.abs(item.unitPrice - newUnitPrice) > 0.001;
                 const labourChanged = Math.abs(item.labourHours - match.labourHours) > 0.001;
 
                 // Also Metadata sync (Description, Category, Notes?) 
@@ -119,9 +153,9 @@ export async function POST(
                     updates.push(prisma.item.update({
                         where: { id: item.id },
                         data: {
-                            unitPrice: match.unitPrice,
+                            unitPrice: newUnitPrice,
                             labourHours: match.labourHours,
-                            cost: match.unitPrice * item.quantity, // Recalc cost
+                            cost: newUnitPrice * Number(item.quantity), // Recalc cost (Handle Decimal/Number)
                             description: match.description,
                             subcategory: match.subcategory,
                             // category: match.category // Optional: Decide if we overwrite category. Probably safe for manual items.

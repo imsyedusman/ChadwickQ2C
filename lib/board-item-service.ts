@@ -1,6 +1,7 @@
-
 import prisma from './prisma';
 import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
+import { calculateBusbarUnitPrice } from './pricing';
+import { Prisma } from '@prisma/client'; // For Decimal
 
 export interface BoardConfig {
     ctMetering: string;
@@ -38,7 +39,11 @@ interface CatalogItem {
     unitPrice: number;
     labourHours: number;
     isSheetmetal?: boolean;
+    // Dynamic Pricing Support
+    totalCopperWeightKgPerMeter?: number | null;
+    isCopperPriced?: boolean;
 }
+
 
 
 
@@ -257,14 +262,17 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const cubicTierItem = existingItems.find((i: Item) => i.name === '1A-TIERS');
         const customTierItem = existingItems.find((i: Item) => i.name === '1B-TIERS-400');
 
+        // Helper to safely get number from Decimal or Int
+        const getQty = (item: Item) => Number(item.quantity) || 0;
+
         if (config.enclosureType === 'Cubic' && cubicTierItem) {
-            tierCount = cubicTierItem.quantity;
+            tierCount = getQty(cubicTierItem);
         } else if (config.enclosureType === 'Custom' && customTierItem) {
-            tierCount = customTierItem.quantity;
+            tierCount = getQty(customTierItem);
         } else {
             // Fallback to whichever exists if enclosure type isn't strict match or switching
-            if (cubicTierItem) tierCount = cubicTierItem.quantity;
-            else if (customTierItem) tierCount = customTierItem.quantity;
+            if (cubicTierItem) tierCount = getQty(cubicTierItem);
+            else if (customTierItem) tierCount = getQty(customTierItem);
         }
     }
 
@@ -600,12 +608,14 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
             (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
         if (isBusbar) {
-            effectiveBusbarItems.set(item.name, {
-                qty: item.quantity,
-                price: item.unitPrice,
-                labour: item.labourHours,
-                category: item.category
-            });
+            if (isBusbar) {
+                effectiveBusbarItems.set(item.name, {
+                    qty: Number(item.quantity), // Convert Decimal to Number for logic math
+                    price: item.unitPrice,
+                    labour: item.labourHours,
+                    category: item.category
+                });
+            }
         }
     });
 
@@ -699,7 +709,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
                         // If we haven't processed this cleatType yet, grab existing qty.
                         if (!cleatTargets.has(cleatType)) {
-                            cleatTargets.set(cleatType, existing.quantity);
+                            cleatTargets.set(cleatType, Number(existing.quantity));
                         }
                     }
                     // If not existing, we do NOTHING (don't auto-add).
@@ -731,7 +741,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             if (CLEAT_ITEMS.includes(item.name)) {
                 // Ensure we don't overwrite if already processed (though quantity should be same)
                 if (!targetItemPartNumbers.has(item.name)) {
-                    addTarget(item.name, item.quantity);
+                    addTarget(item.name, Number(item.quantity));
                 }
             }
         });
@@ -784,7 +794,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const existing = existingItems.find((i: Item) => i.name === itemPn);
 
             // Priority for Qty: Target > Existing > 0
-            const qty = targetQty !== undefined ? targetQty : (existing?.quantity || 0);
+            const qty = targetQty !== undefined ? targetQty : (Number(existing?.quantity) || 0);
 
             if (qty <= 0) continue;
 

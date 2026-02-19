@@ -18,6 +18,7 @@ interface CatalogItem {
     unitPrice: number;
     labourHours: number;
     meterType?: string | null;
+    isCopperPriced?: boolean;
 }
 
 interface ItemSelectionProps {
@@ -137,7 +138,8 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                         onClick={(e) => {
                             if (autoManaged) { handleManagedClick(e); return; }
                             e.stopPropagation();
-                            setQty(Math.max(1, qty - 1));
+                            const step = item.isCopperPriced ? 0.001 : 1;
+                            setQty(Math.max(item.isCopperPriced ? 0.001 : 1, qty - step));
                         }}
                         className={cn(
                             "w-9 h-full flex items-center justify-center transition-colors border-r border-gray-200 active:bg-gray-100",
@@ -148,12 +150,14 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     </button>
                     <input
                         type="number"
-                        min="1"
+                        min={item.isCopperPriced ? "0.001" : "1"}
+                        step={item.isCopperPriced ? "0.001" : "1"}
                         value={qty}
                         readOnly={!!autoManaged}
                         onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            setQty(isNaN(val) || val < 1 ? 1 : val);
+                            const val = parseFloat(e.target.value);
+                            const minVal = item.isCopperPriced ? 0.001 : 1;
+                            setQty(isNaN(val) || val < minVal ? minVal : val);
                         }}
                         onClick={(e) => {
                             if (autoManaged) { handleManagedClick(e as any); return; }
@@ -169,7 +173,8 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                         onClick={(e) => {
                             if (autoManaged) { handleManagedClick(e); return; }
                             e.stopPropagation();
-                            setQty(qty + 1);
+                            const step = item.isCopperPriced ? 0.001 : 1;
+                            setQty(qty + step);
                         }}
                         className={cn(
                             "w-9 h-full flex items-center justify-center transition-colors border-l border-gray-200 active:bg-gray-100",

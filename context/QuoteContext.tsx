@@ -12,6 +12,7 @@ export interface QuoteSettings {
     gstPct: number;
     roundingIncrement: number;
     minMarginAlertPct: number;
+    copperPricePerKg: number; // New setting
 }
 
 export interface QuoteOverrides {
@@ -22,6 +23,7 @@ export interface QuoteOverrides {
     overrideConsumablesPct?: number | null;
     overrideGstPct?: number | null;
     overrideRoundingIncrement?: number | null;
+    overrideCopperPricePerKg?: number | null; // New override
 }
 
 export interface Item {
@@ -42,6 +44,10 @@ export interface Item {
     systemTag?: string | null;
     partNumber?: string | null;
     systemRuleType?: string | null; // Provenance Rule ID
+
+    // Dynamic Pricing (Optional)
+    totalCopperWeightKgPerMeter?: number | null;
+    isCopperPriced?: boolean;
 }
 
 // ...
@@ -163,6 +169,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         gstPct: 0.10,
         roundingIncrement: 100,
         minMarginAlertPct: 0.05,
+        copperPricePerKg: 15.0,
     });
     const [overrides, setOverrides] = useState<QuoteOverrides>({});
     const [loading, setLoading] = useState(true);
@@ -192,6 +199,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     overrideConsumablesPct: data.overrideConsumablesPct,
                     overrideGstPct: data.overrideGstPct,
                     overrideRoundingIncrement: data.overrideRoundingIncrement,
+                    overrideCopperPricePerKg: data.overrideCopperPricePerKg,
                 });
             }
 
@@ -284,7 +292,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         targetMarginPct: overrides.overrideTargetMarginPct ?? settings.targetMarginPct,
         gstPct: overrides.overrideGstPct ?? settings.gstPct,
         roundingIncrement: overrides.overrideRoundingIncrement ?? settings.roundingIncrement,
-        minMarginAlertPct: settings.minMarginAlertPct, // No override for this yet
+        minMarginAlertPct: settings.minMarginAlertPct,
+        copperPricePerKg: overrides.overrideCopperPricePerKg ?? settings.copperPricePerKg
     };
 
     const calculateTotals = () => {
@@ -305,13 +314,16 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
         const calculateForItems = (items: Item[], applySheetmetalUplift: boolean): BoardTotals => {
             // 1. Base Costs
-            const baseMaterialCost = items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-            const labourHours = items.reduce((sum, item) => sum + (item.labourHours * item.quantity), 0);
+            // Safeguard: item.quantity might be string if coming from Decimal serialization in some APIs/JSON
+            const getQty = (i: Item) => Number(i.quantity) || 0;
+
+            const baseMaterialCost = items.reduce((sum, item) => sum + (item.unitPrice * getQty(item)), 0);
+            const labourHours = items.reduce((sum, item) => sum + (item.labourHours * getQty(item)), 0);
 
             // Sheetmetal Logic
             const sheetmetalSubtotal = items.reduce((sum, item) => {
                 if (item.isSheetmetal) {
-                    return sum + (item.unitPrice * item.quantity);
+                    return sum + (item.unitPrice * getQty(item));
                 }
                 return sum;
             }, 0);
@@ -320,7 +332,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
             const cubicSubtotal = items.reduce((sum, item) => {
                 if (item.subcategory === CUBIC_SUBCATEGORY) {
-                    return sum + (item.unitPrice * item.quantity);
+                    return sum + (item.unitPrice * getQty(item));
                 }
                 return sum;
             }, 0);

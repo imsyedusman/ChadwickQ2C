@@ -114,7 +114,10 @@ export default function QuoteCostingOverrides() {
                     </div>
 
                     <div className="space-y-3">
-                        {renderInput("Labour Rate ($/hr)", "overrideLabourRate", settings.labourRate, false, 1)}
+                        <div className="grid grid-cols-2 gap-3">
+                            {renderInput("Labour Rate ($/hr)", "overrideLabourRate", settings.labourRate, false, 1)}
+                            {renderInput("Copper ($/kg)", "overrideCopperPricePerKg", settings.copperPricePerKg || 15.0, false, 0.1)}
+                        </div>
 
                         <div className="grid grid-cols-2 gap-3">
                             {renderInput("Overhead", "overrideOverheadPct", settings.overheadPct, true, 0.01)}
