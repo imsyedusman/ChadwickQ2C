@@ -305,8 +305,8 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 return false;
             }
 
-            // Cubic Validation: Must have at least 1 compartment
-            if (config.enclosureType === 'Cubic' && (!config.totalCompartments || config.totalCompartments < 1)) {
+            // Cubic & Custom Validation: Must have at least 1 compartment
+            if (['Cubic', 'Custom'].includes(config.enclosureType || '') && (!config.totalCompartments || config.totalCompartments < 1)) {
                 return false;
             }
 
@@ -443,7 +443,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Total No. of Tiers</label>
+                        <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Total No. of Tiers <span className="text-red-500">*</span></label>
                         <input
                             type="number"
                             min="0"
@@ -455,6 +455,22 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         />
                         <p className="text-xs text-gray-500 mt-1">Includes cable zones + equipment tiers</p>
                     </div>
+
+                    {/* Total Compartments - NOW ALWAYS VISIBLE for Cubic & Custom (Updated 2026-02-20) */}
+                    {['Cubic', 'Custom'].includes(config.enclosureType || '') && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Total No. of Compartments <span className="text-red-500">*</span></label>
+                            <input
+                                type="number"
+                                min="1"
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.totalCompartments || ''}
+                                onChange={e => setConfig({ ...config, totalCompartments: parseInt(e.target.value) || 0 })}
+                                placeholder="e.g. 5"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Required for {config.enclosureType} pricing calculations</p>
+                        </div>
+                    )}
 
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Base Required</label>
@@ -558,19 +574,6 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 {/* Cubic Options */}
                 {config.enclosureType === 'Cubic' && (
                     <div className="mt-6 border-t border-gray-100 pt-4 space-y-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Total No. of Compartments</label>
-                            <input
-                                type="number"
-                                min="0"
-                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                value={config.totalCompartments || ''}
-                                onChange={e => setConfig({ ...config, totalCompartments: parseInt(e.target.value) || 0 })}
-                                placeholder="0"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Required for Cubic pricing calculations</p>
-                        </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-1">
                                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Is Switchboard Over 50kA?</label>

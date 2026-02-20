@@ -755,6 +755,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         targetItemPartNumbers.add('1A-COMPARTMENTS');
     }
 
+    // New 2026-02-20: Ensure 1B-COMPARTMENTS is targeted for Custom before fetch
+    if (config.enclosureType === 'Custom' && (config.totalCompartments || 0) > 0) {
+        targetItemPartNumbers.add('1B-COMPARTMENTS');
+    }
+
     // Ensure SS Items are targeted before fetch so we get their Catalog Description
     if (config.enclosureType === 'Custom' && config.material === 'Powder 316 Stainless Steel') {
         targetItemPartNumbers.add('1B-SS-2B');
@@ -827,6 +832,20 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         console.log(`Stainless Uplift: TotalBase=${S}, Factor=${factor}, Item=${upliftItemName}, Uplift=${upliftCost}`);
 
         addTarget(upliftItemName, 1, upliftCost);
+    }
+
+    // --- 4.5 CUSTOM COMPARTMENTS LOGIC (New 2026-02-20) ---
+    // If Custom board has compartments, add 1B-COMPARTMENTS with Qty = totalCompartments
+    if (config.enclosureType === 'Custom' && (config.totalCompartments || 0) > 0) {
+        const totalCompartments = config.totalCompartments || 0;
+        const compartmentsItem = catalogMap.get('1B-COMPARTMENTS');
+        const compartmentUnitPrice = compartmentsItem?.unitPrice || 0;
+
+        if (compartmentsItem) {
+            addTarget('1B-COMPARTMENTS', totalCompartments, compartmentUnitPrice);
+        } else {
+            console.warn('1B-COMPARTMENTS missing from catalog. Cannot price Custom compartments correctly.');
+        }
     }
 
     // --- 5. CUBIC OPTIONS LOGIC (Post-Catalog Fetch) ---
@@ -924,6 +943,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         '1B-DOORS',
         '1B-600MM',
         '1B-800MM',
+        '1B-COMPARTMENTS', // Explicitly managed now
         '1B-SS-2B', '1B-SS-NO4',
         ...CUBIC_OPTIONS_ITEMS,
         BUSBAR_INSULATION_ITEM,
