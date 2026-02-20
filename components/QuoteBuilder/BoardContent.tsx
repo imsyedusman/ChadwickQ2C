@@ -288,7 +288,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     title={autoManaged ? "Quantity is controlled by board configuration" : undefined}
                 >
                     <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - 1)}
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
@@ -326,7 +326,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         )}
                     />
                     <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) + 1)}
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
