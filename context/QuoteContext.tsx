@@ -2,7 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// Updated interfaces to match new settings structure
+import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
+import { isAutoManaged } from '@/lib/system-definitions';
 export interface QuoteSettings {
     labourRate: number;
     consumablesPct: number;
@@ -317,13 +318,28 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             // Safeguard: item.quantity might be string if coming from Decimal serialization in some APIs/JSON
             const getQty = (i: Item) => Number(i.quantity) || 0;
 
-            const baseMaterialCost = items.reduce((sum, item) => sum + (item.unitPrice * getQty(item)), 0);
+            // Helper to get total price of an item (Dynamic Copper or Static)
+            const getItemTotalPrice = (item: Item) => {
+                const qty = getQty(item);
+                if (item.isCopperPriced && item.totalCopperWeightKgPerMeter) {
+                    const copperResult = computeBusbarPrice({
+                        copperWeightKgPerMeter: item.totalCopperWeightKgPerMeter,
+                        isCopperPriced: true,
+                        length: qty,
+                        copperPricePerKg: effectiveSettings.copperPricePerKg
+                    });
+                    return copperResult.totalPrice;
+                }
+                return item.unitPrice * qty;
+            };
+
+            const baseMaterialCost = items.reduce((sum, item) => sum + getItemTotalPrice(item), 0);
             const labourHours = items.reduce((sum, item) => sum + (item.labourHours * getQty(item)), 0);
 
             // Sheetmetal Logic
             const sheetmetalSubtotal = items.reduce((sum, item) => {
                 if (item.isSheetmetal) {
-                    return sum + (item.unitPrice * getQty(item));
+                    return sum + getItemTotalPrice(item);
                 }
                 return sum;
             }, 0);
@@ -332,7 +348,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
             const cubicSubtotal = items.reduce((sum, item) => {
                 if (item.subcategory === CUBIC_SUBCATEGORY) {
-                    return sum + (item.unitPrice * getQty(item));
+                    return sum + getItemTotalPrice(item);
                 }
                 return sum;
             }, 0);

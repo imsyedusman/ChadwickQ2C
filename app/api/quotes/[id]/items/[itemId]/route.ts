@@ -94,11 +94,16 @@ export async function PUT(
         }
 
         // Return the full updated list of items to ensure frontend is in sync
+        // Return the full updated list of items to ensure frontend is in sync
         const boardId = item?.boardId || freshItem?.boardId;
-        const allItems = await prisma.item.findMany({
-            where: { boardId },
-            orderBy: { createdAt: 'asc' }
-        });
+
+        // Safety check for boardId
+        if (!boardId) {
+            return NextResponse.json({ error: 'Board ID not found' }, { status: 500 });
+        }
+
+        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
+        const allItems = await fetchEnrichedBoardItems(boardId);
 
         return NextResponse.json(allItems);
     } catch (error) {

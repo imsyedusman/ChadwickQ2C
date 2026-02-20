@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock, FileText } from 'lucide-react';
+import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock, FileText, Zap } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
+import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
 import BoardSummary from './BoardSummary';
@@ -238,6 +239,28 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         else if (isOtherHandle) lockTooltip = "Auto included. Quantity = 1 per breaker. Required for this breaker frame.";
         else if (isNSX100Handle) lockTooltip = "Optional for this breaker range. Can be excluded if not required."; // Though this won't show lock icon, we put it on Auto badge
 
+        // Determine Pricing Method
+        // 1. Dynamic Copper Pricing (Highest Priority for Busbars)
+        // 2. Formula Pricing (Legacy)
+        // 3. Stored Unit Price (Standard)
+
+        let displayUnitPrice = item.unitPrice;
+        let displayTotalPrice = item.unitPrice * item.quantity;
+        let isCopper = false;
+
+        if (item.totalCopperWeightKgPerMeter && item.isCopperPriced) {
+            const copperResult = computeBusbarPrice({
+                copperWeightKgPerMeter: item.totalCopperWeightKgPerMeter,
+                isCopperPriced: true,
+                length: item.quantity, // For busbars, quantity is length in meters
+                copperPricePerKg: effectiveSettings.copperPricePerKg
+            });
+
+            displayUnitPrice = copperResult.unitPrice;
+            displayTotalPrice = copperResult.totalPrice;
+            isCopper = true;
+        }
+
         return (
             <div
                 key={item.id}
@@ -252,7 +275,15 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
                             {item.description || item.name}
                         </div>
-                        {formulaPriced && (
+                        {isCopper && (
+                            <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
+                                    <Zap size={8} className="text-orange-700" />
+                                    Cu
+                                </span>
+                            </div>
+                        )}
+                        {formulaPriced && !isCopper && (
                             <div className="flex items-center gap-1">
                                 <SystemItemHoverCard item={{ ...item, isFormulaPriced: true } as any} boardItems={items}>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100 transition-colors cursor-help" title="">
@@ -262,7 +293,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 </SystemItemHoverCard>
                             </div>
                         )}
-                        {autoManaged && !formulaPriced && (
+                        {autoManaged && !formulaPriced && !isCopper && (
                             <div className="flex items-center gap-1">
                                 <SystemItemHoverCard item={item} boardItems={items}>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 hover:bg-blue-100 transition-colors">
@@ -288,7 +319,16 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     title={autoManaged ? "Quantity is controlled by board configuration" : undefined}
                 >
                     <button
-                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - 1)}
+                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - (isCopper ? 0.1 : 1))}
+                        // Note: Busbars might need decimal decrement. 
+                        // But wait, the original code had `- 1`.
+                        // I should probably make the step context aware or just use input.
+                        // I'll leave the button as -1 for now unless user asked for step change on buttons?
+                        // User: "Decimal qty supported (parseFloat)".
+                        // "Change Busbar length (decimal)".
+                        // Buttons usually do integer steps, but for busbars 0.1 might be better?
+                        // The prompt didn't strictly specify button step, but `ItemSelection` has specific logic.
+                        // I will assume the input is the primary method for decimals.
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
@@ -317,7 +357,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 e.currentTarget.blur();
                             }
                         }}
-                        step="0.01"
+                        step={isCopper ? "0.001" : "1"}
                         min="0"
                         readOnly={isQtyLocked}
                         className={cn(
@@ -326,7 +366,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         )}
                     />
                     <button
-                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) + 1)}
+                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) + (isCopper ? 0.1 : 1))}
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
@@ -339,18 +379,18 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
 
                 {/* Price & Total (Lock if Formula-Priced - though price edit UI not fully exposed here anyway) */}
                 <div className="text-right w-20">
-                    <div className="font-medium text-gray-900">{formatCurrency(item.unitPrice * item.quantity)}</div>
+                    <div className="font-medium text-gray-900">{formatCurrency(displayTotalPrice)}</div>
                     <div className="flex justify-end gap-1">
                         <div
                             className="text-[10px] text-gray-400 cursor-help"
-                            title={formulaPriced ? "Price is formula-driven" : "Unit Price"}
+                            title={isCopper ? `Live Copper: ${item.totalCopperWeightKgPerMeter?.toFixed(2)}kg/m * ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg` : formulaPriced ? "Price is formula-driven" : "Unit Price"}
                         >
-                            {formatCurrency(item.unitPrice)} ea
+                            {formatCurrency(displayUnitPrice)} {isCopper ? '/m' : 'ea'}
                         </div>
                         {item.labourHours > 0 && (
                             <div
                                 className="text-gray-400 cursor-help flex items-center"
-                                title={`Material: ${formatCurrency(item.unitPrice)} ea\nLabor: ${item.quantity} x ${item.labourHours}hr = ${item.quantity * item.labourHours}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((item.unitPrice * item.quantity) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
+                                title={`Material: ${formatCurrency(displayUnitPrice)} ${isCopper ? '/m' : 'ea'}\nLabor: ${item.quantity} x ${item.labourHours}hr = ${(item.quantity * item.labourHours).toFixed(2)}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((displayTotalPrice) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
                             >
                                 <Clock size={12} />
                             </div>

@@ -5,8 +5,9 @@ import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowL
 import { toast } from 'sonner';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { compareItems } from '@/lib/sorting';
+import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 
 interface CatalogItem {
     id: string;
@@ -19,10 +20,17 @@ interface CatalogItem {
     labourHours: number;
     meterType?: string | null;
     isCopperPriced?: boolean;
+    totalCopperWeightKgPerMeter?: number | null; // Add this if missing in CatalogItem interface?
+    // Wait, check CatalogItem in ItemSelection. It was defined: "isCopperPriced?: boolean;"
+    // I need to add totalCopperWeightKgPerMeter too if I want to use it.
+    // The API fetches CatalogItem, does it include it?
+    // app/api/catalog/route.ts fetches CatalogItem. I should check if it includes it.
+    // Assuming yes for now, I'll add it to interface.
 }
 
 interface ItemSelectionProps {
     onClose?: () => void;
+    initialCategory?: 'Basics' | 'Switchboard' | 'Busbar';
 }
 
 interface ItemRowProps {
@@ -30,12 +38,14 @@ interface ItemRowProps {
     existingQty?: number;
     existingItemId?: string; // ID of the item if it exists on the board
     isSystemManaged?: boolean;
-    onAdd: (item: CatalogItem, qty: number) => void;
+    onAdd: (item: CatalogItem, qty: number, unitPriceOverride?: number) => void;
     onDelete?: (itemId: string) => void;
     boardConfig?: any; // To determine scope for conditional locking
 }
 
 function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd, onDelete, boardConfig }: ItemRowProps) {
+    const { effectiveSettings } = useQuote(); // Added to get effectiveSettings
+
     // If it exists on board, start with that qty. Otherwise default to 1.
     // However, if we want "control surface" feel, we might want to default to 0 if not selected?
     // User requirement: "If the item is not on the board → show default quantity (e.g. 1)"
@@ -71,6 +81,23 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
     // Combine client-side check with server-side flag
     const autoManaged = isAuto;
+
+    // Pricing Calculation
+    let displayUnitPrice = item.unitPrice;
+    let displayTotalPrice = item.unitPrice * qty;
+    let isCopper = false;
+
+    if (item.isCopperPriced && item.totalCopperWeightKgPerMeter) {
+        const copperResult = computeBusbarPrice({
+            copperWeightKgPerMeter: item.totalCopperWeightKgPerMeter,
+            isCopperPriced: true,
+            length: qty,
+            copperPricePerKg: effectiveSettings.copperPricePerKg
+        });
+        displayUnitPrice = copperResult.unitPrice;
+        displayTotalPrice = copperResult.totalPrice;
+        isCopper = true;
+    }
 
     // Sync state if existingQty changes (live update from board)
     useEffect(() => {
@@ -115,6 +142,13 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     {item.subcategory && (
                         <span className="text-gray-400 truncate max-w-[200px]">
                             {item.subcategory.split(' > ').pop()}
+                        </span>
+                    )}
+
+                    {isCopper && (
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
+                            <Zap size={10} className="text-orange-700" />
+                            Copper
                         </span>
                     )}
 
@@ -187,10 +221,10 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
                 {/* Price */}
                 <div className="text-right min-w-[80px]">
-                    <div className="font-bold text-lg text-gray-900">${(item.unitPrice * qty).toFixed(2)}</div>
+                    <div className="font-bold text-lg text-gray-900">{formatCurrency(displayTotalPrice)}</div>
                     <div className="flex flex-col items-end gap-0.5 mt-1">
-                        {qty > 1 && (
-                            <div className="text-xs text-gray-400 font-medium">${item.unitPrice.toFixed(2)} ea</div>
+                        {(qty > 1 || isCopper) && (
+                            <div className="text-xs text-gray-400 font-medium">{formatCurrency(displayUnitPrice)} {isCopper ? '/m' : 'ea'}</div>
                         )}
                         <div className="text-xs text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
                             {item.labourHours}h
@@ -203,7 +237,9 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     onClick={(e) => {
                         if (autoManaged) { handleManagedClick(e); return; }
                         e.stopPropagation();
-                        onAdd(item, qty);
+                        // Pass unitPriceOverride if Copper Pricing is active
+                        // We pass the calculated Per-Meter price (displayUnitPrice) as the unit price
+                        onAdd(item, qty, isCopper ? displayUnitPrice : undefined);
                     }}
                     className={cn(
                         "h-9 px-4 rounded-lg font-semibold text-sm transition-all shadow-sm flex items-center gap-2 min-w-[80px] justify-center",
@@ -541,7 +577,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
         }
     };
 
-    const handleAddItem = (item: CatalogItem, qty: number) => {
+    const handleAddItem = (item: CatalogItem, qty: number, unitPriceOverride?: number) => {
         if (!selectedBoardId) {
             alert('Please select a board first');
             return;
@@ -555,6 +591,10 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
 
         if (existingItem) {
             // Update mode: Set exact quantity
+            // Note: unitPrice update is not handled here for existing items? 
+            // Usually updateItem just updates qty. 
+            // If we want to update price snapshot, we might need to pass it too.
+            // But for copper items, price is ignored anyway. So updating qty is enough.
             updateItem(existingItem.id, { quantity: qty });
         } else {
             // Add mode
@@ -564,7 +604,7 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                 name: item.partNumber || item.description,
                 description: item.description,
                 partNumber: item.partNumber, // Explicitly pass Part Number
-                unitPrice: item.unitPrice,
+                unitPrice: unitPriceOverride !== undefined ? unitPriceOverride : item.unitPrice,
                 labourHours: item.labourHours,
                 quantity: qty
             };

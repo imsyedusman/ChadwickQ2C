@@ -169,10 +169,8 @@ export async function POST(
         }
 
         // Return the full updated list of items for the board to ensure frontend is in sync
-        const allItems = await prisma.item.findMany({
-            where: { boardId },
-            orderBy: { createdAt: 'asc' } // Or order by 'order' if implemented
-        });
+        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
+        const allItems = await fetchEnrichedBoardItems(boardId);
 
         return NextResponse.json(allItems);
     } catch (error) {
