@@ -36,8 +36,9 @@ export async function PUT(
         ].includes(item.name);
 
         const isBusbarItem = item && ((item.category && item.category.toLowerCase() === 'busbar') || (item.name && (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))));
+        const isCleat = item && item.name && item.name.startsWith('1B1-CLEAT');
 
-        if ((isTierItem || isSheetMetalItem || isBusbarItem) && quantity !== undefined) {
+        if ((isTierItem || isSheetMetalItem || (isBusbarItem && !isCleat)) && quantity !== undefined) {
             // Fetch board config
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },

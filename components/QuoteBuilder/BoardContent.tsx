@@ -229,8 +229,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const isNSX100Handle = item.name === 'LV429338T';
         const isOtherHandle = ['LV432598T', '33873'].includes(item.name);
 
-        const isQtyLocked = !!autoManaged;
-        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle);
+        const isQtyLocked = !!autoManaged && !isCleat;
+        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle && !isCleat);
 
         // Determine Tooltip Text
         let lockTooltip = "";
@@ -283,7 +283,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 <div
                     className={cn(
                         "flex items-center gap-1 border rounded px-1 h-6",
-                        autoManaged ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
+                        isQtyLocked ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
                     )}
                     title={autoManaged ? "Quantity is controlled by board configuration" : undefined}
                 >
@@ -291,7 +291,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                         className={cn(
                             "transition-colors",
-                            autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
+                            isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
                         )}
                         disabled={isQtyLocked}
                     >
@@ -302,7 +302,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         defaultValue={item.quantity}
                         key={`qty-${item.id}-${item.quantity}`}
                         onBlur={(e) => {
-                            if (autoManaged) return;
+                            if (isQtyLocked) return;
                             // On blur, validate and update
                             const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
                             if (isNaN(val) || val < 0) {
@@ -322,14 +322,14 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         readOnly={isQtyLocked}
                         className={cn(
                             "w-12 text-center text-xs font-medium bg-transparent border-0 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
-                            autoManaged ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
+                            isQtyLocked ? "text-gray-500 cursor-not-allowed" : "text-gray-700"
                         )}
                     />
                     <button
                         onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                         className={cn(
                             "transition-colors",
-                            autoManaged ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
+                            isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-blue-600"
                         )}
                         disabled={isQtyLocked}
                     >
