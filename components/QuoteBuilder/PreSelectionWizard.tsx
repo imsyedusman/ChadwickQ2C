@@ -125,6 +125,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
     // Config State
     const [config, setConfig] = useState<Partial<BoardConfig>>(DEFAULT_BOARD_CONFIG);
+    const [isBakeliteOverridden, setIsBakeliteOverridden] = useState(false);
 
     const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -132,6 +133,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     useEffect(() => {
         if (isOpen) {
             setStep(1); // Always start at step 1 on open
+            setIsBakeliteOverridden(false);
             if (initialConfig && Object.keys(initialConfig).length > 0) {
                 const newConfig = { ...initialConfig };
                 // Migration: legacy enclosureType cleanup
@@ -146,6 +148,13 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         type: newConfig.wcType || '100A wiring 3-phase',
                         quantity: newConfig.wcQuantity || 1
                     }];
+                }
+
+                if (newConfig.wholeCurrentMetering === 'Yes' && newConfig.bakeliteQty !== undefined) {
+                    const total = (newConfig.wholeCurrentMeters || []).reduce((a, b) => a + (b.quantity || 1), 0);
+                    if (newConfig.bakeliteQty !== total) {
+                        setIsBakeliteOverridden(true);
+                    }
                 }
 
                 // Merge on top of defaults to ensure no missing fields
@@ -767,12 +776,15 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                         if (newMeters.length === 0) {
                                             newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
                                         }
+                                        const total = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
+                                        setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: total });
+                                        setIsBakeliteOverridden(false);
                                     } else {
                                         // If turning OFF, explicit clear
                                         newMeters = [];
+                                        setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: undefined });
+                                        setIsBakeliteOverridden(false);
                                     }
-
-                                    setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters });
                                 }}
                             >
                                 {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
@@ -817,7 +829,11 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                                 onChange={e => {
                                                     const newMeters = [...(config.wholeCurrentMeters || [])];
                                                     newMeters[index] = { ...meter, quantity: parseInt(e.target.value) || 1 };
-                                                    setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                                    const updates: any = { wholeCurrentMeters: newMeters };
+                                                    if (!isBakeliteOverridden) {
+                                                        updates.bakeliteQty = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
+                                                    }
+                                                    setConfig({ ...config, ...updates });
                                                 }}
                                             />
                                         </div>
@@ -825,7 +841,11 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                             onClick={() => {
                                                 const newMeters = [...(config.wholeCurrentMeters || [])];
                                                 newMeters.splice(index, 1);
-                                                setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                                const updates: any = { wholeCurrentMeters: newMeters };
+                                                if (!isBakeliteOverridden) {
+                                                    updates.bakeliteQty = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
+                                                }
+                                                setConfig({ ...config, ...updates });
                                             }}
                                             className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors mb-0.5"
                                             title="Remove Meter"
@@ -839,13 +859,32 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                     onClick={() => {
                                         const newMeters = [...(config.wholeCurrentMeters || [])];
                                         newMeters.push({ type: '100A wiring 3-phase', quantity: 1 });
-                                        setConfig({ ...config, wholeCurrentMeters: newMeters });
+                                        const updates: any = { wholeCurrentMeters: newMeters };
+                                        if (!isBakeliteOverridden) {
+                                            updates.bakeliteQty = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
+                                        }
+                                        setConfig({ ...config, ...updates });
                                     }}
                                     className="w-full py-2 flex items-center justify-center gap-2 text-xs font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"
                                 >
                                     <Plus size={14} />
                                     Add Meter Type
                                 </button>
+
+                                <div className="pt-2 border-t border-gray-100 mt-2">
+                                    <label className="text-[10px] text-gray-500 block mb-1">Bakelite Gland Plate Qty</label>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                        value={config.bakeliteQty ?? ''}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setIsBakeliteOverridden(true);
+                                            setConfig({ ...config, bakeliteQty: val === '' ? 0 : parseInt(val) });
+                                        }}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>

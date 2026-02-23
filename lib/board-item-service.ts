@@ -28,6 +28,7 @@ export interface BoardConfig {
     ctSpareProvision?: string; // 'Yes' | 'No'
     ctSpareQuantity?: number;
     wholeCurrentMeters?: { type: string; quantity: number }[];
+    bakeliteQty?: number;
     [key: string]: any;
 }
 
@@ -487,11 +488,15 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const totalMeters = total1phMeters + total3phMeters;
         const totalFuseQty = (total1phMeters * 1) + (total3phMeters * 3);
 
-        if (totalMeters > 0) {
+        const panelQty = config.bakeliteQty ?? totalMeters;
+
+        if (totalMeters > 0 || panelQty > 0) {
             // Apply Derived Quantities
             // Panel & Links allow 1 per meter
-            addWc('100A-PANEL', totalMeters);
-            addWc('100A-NEUTRAL-LINK', totalMeters);
+            if (panelQty > 0) {
+                addWc('100A-PANEL', panelQty);
+                addWc('100A-NEUTRAL-LINK', panelQty);
+            }
 
             // Fuses
             if (totalFuseQty > 0) addWc('100A-FUSE', totalFuseQty);
