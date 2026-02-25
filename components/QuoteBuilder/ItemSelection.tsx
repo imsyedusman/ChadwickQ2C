@@ -361,7 +361,13 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
         // Standard Navigation Logic (unchanged)
         allSubcategories.forEach(sub => {
             if (!sub) return;
-            const parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
+            let parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
+
+            if (activeCategory === 'Busbar') {
+                if (parts.length > 0 && !parts[0].startsWith('Main Bars')) {
+                    parts = ['Miscellaneous', parts[0]];
+                }
+            }
 
             if (parts.length > 0) l1.add(parts[0]);
 
@@ -513,12 +519,19 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                         const fullPath = [selectedL1, selectedL2, selectedL3].join(' > ');
                         params.append('subcategory', fullPath);
                     } else if (selectedL2) {
-                        // 2-level hierarchy (e.g. Main Bars > Custom Busbar)
-                        const fullPath = [selectedL1, selectedL2].join(' > ');
+                        // 2-level hierarchy
+                        let fullPath = [selectedL1, selectedL2].join(' > ');
+                        if (activeCategory === 'Busbar' && selectedL1 === 'Miscellaneous') {
+                            fullPath = selectedL2; // The DB doesn't have "Miscellaneous >" prefix
+                        }
                         params.append('subcategory', fullPath);
                     } else if (selectedL1 && l2Options.length === 0) {
                         // 1-level hierarchy
-                        params.append('subcategory', selectedL1);
+                        let fullPath = selectedL1;
+                        if (activeCategory === 'Busbar' && selectedL1 === 'Miscellaneous') {
+                            fullPath = selectedL1; // Just in case, though l2Options shouldn't be 0
+                        }
+                        params.append('subcategory', fullPath);
                     }
                 } else if (activeCategory === 'Basics') {
                     // For Basics: filter by selected level
