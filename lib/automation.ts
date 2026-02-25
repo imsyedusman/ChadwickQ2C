@@ -128,6 +128,14 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
         handler: 'applyPairingRules',
         reason: 'Neutral/Earth Link required for MCB Chassis.',
         quantityExplanation: 'Links provisioned based on Chassis pole capacity.'
+    },
+
+    // Digital Meter Automation
+    'DIGITAL_METER_AUTOMATION': {
+        id: 'DIGITAL_METER_AUTOMATION',
+        handler: 'syncBoardItems',
+        reason: 'Required for Digital Metering.',
+        quantityExplanation: 'Scaled strictly based on the number of Digital Meters on the board.'
     }
 };
 

@@ -157,6 +157,28 @@ export function getSystemItemExplanation(item: Item, allItems: Item[]): SystemEx
         };
     }
 
-    // 5. GENERIC FALLBACK for any other system managed item
+    // 4.5 DIGITAL METERING
+    if (tag === 'DIGITAL_METER') {
+        return {
+            reason: "Digital Metering is active on this board.",
+            calculation: "Derived from total number of digital meters.",
+            ruleName: "DIGITAL_METER_AUTOMATION",
+            handler: "syncBoardItems"
+        };
+    }
+
+    // 5. COMPOSITE ITEMS
+    if (tag === 'COMPOSITE' || (item as any).source === 'composite') {
+        const metadata = (item as any).metadata;
+        const reason = metadata?.autoReason || "Added automatically as a component.";
+        return {
+            reason,
+            calculation: "Quantity is derived from parent item multiplier.",
+            ruleName: "COMPOSITE_SYNC",
+            handler: "syncBoardItems"
+        };
+    }
+
+    // 6. GENERIC FALLBACK for any other system managed item
     return defaultExplanation;
 }

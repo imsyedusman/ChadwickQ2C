@@ -183,12 +183,9 @@ export async function DELETE(
             where: { id: itemId },
         });
 
-        // If this was a tier item, trigger MISC items sync to remove delivery/labels/hardware
-        const isTierItem = item && (item.name === '1A-TIERS' || item.name === '1B-TIERS-400');
-        const isBusbarItem = item && ((item.category && item.category.toLowerCase() === 'busbar') || (item.name && (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))));
-
-        if (isTierItem || isBusbarItem) {
-            // Fetch board config to pass to syncBoardItems
+        // Trigger general Board Sync Lifecycle (Automations like Composites and Digital Meters)
+        // This ensures if a parent item is removed, children adjust properly
+        if (item) {
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },
                 select: { config: true }

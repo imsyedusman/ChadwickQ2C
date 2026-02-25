@@ -45,9 +45,21 @@ interface CatalogItem {
     isCopperPriced?: boolean;
 }
 
+const DIGITAL_METER_PARTS = [
+    'A9MEM3155', 'A9MEM3355', 'A9MEM3255', 'METSEPM3250', 'METSEPM5110',
+    'METSEPM5350', 'METSEPM5560', 'METSEPM8240', 'EM2172RVV53XOSX',
+    'EM24DINAV93XISX', 'EM24DINAV53DISX', 'MF72421', 'NEMO96HD1000',
+    'NEMO96HD1300', 'EM27072DMV53X2SN', '48250402', '48250500', '48250501'
+];
 
+const CT_PARTS = [
+    'TAS127B40005A', 'TAS127B30005A', 'TAS102H25005A', 'TAS102H20005A',
+    'TAS6512005A', 'TAS6510005A', 'TAS656005A', 'TAIBB405A'
+];
 
-
+const FUSE_20A_DIN = 'CHD-FUSE-20A-DIN';
+const WIRING_DIGITAL = 'CHD-WIRING-DIGITAL';
+const TEST_LINKS = 'NHP-TEST-LINK';
 const CT_BASE_ITEMS = [
     'CT-COMPARTMENTS',
     'CT-PANEL',
@@ -236,7 +248,228 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     if (!boardData) return;
 
-    const existingItems = boardData.items;
+    let existingItems = boardData.items;
+
+    // --- COMPOSITE SYNC BLOCK ---
+    // Execute before other automation blocks.
+    const partNumbers = Array.from(new Set(existingItems.map((i: any) => i.partNumber).filter(Boolean) as string[]));
+    if (partNumbers.length > 0) {
+        // Bulk fetch catalog items to avoid N+1 queries
+        const catalogItems = await prisma.catalogItem.findMany({
+            where: { partNumber: { in: partNumbers } }
+        });
+        const catalogMap = new Map((catalogItems as any[]).map(c => [c.partNumber, c]));
+
+        const compositeRequirements = new Map<string, number>();
+
+        // 1. Calculate Requirements
+        for (const item of existingItems) {
+            if (!item.partNumber) continue;
+            // Only non-composite items generate children (no resurrection loops)
+            if ((item as any).systemTag === 'COMPOSITE') continue;
+
+            const catItem = catalogMap.get(item.partNumber);
+            if (catItem && (catItem as any).components) {
+                let comps: any[] = [];
+                try {
+                    comps = typeof (catItem as any).components === 'string' ? JSON.parse((catItem as any).components) : (catItem as any).components;
+                } catch (e) {
+                    // Ignore parse error
+                }
+
+                if (Array.isArray(comps)) {
+                    for (const comp of comps) {
+                        if (comp.partNumber && comp.quantity) {
+                            const desiredQty = Number(item.quantity) * Number(comp.quantity);
+                            const currentQty = compositeRequirements.get(comp.partNumber) || 0;
+                            compositeRequirements.set(comp.partNumber, currentQty + desiredQty);
+                        }
+                    }
+                }
+            }
+        }
+
+        let compositesChanged = false;
+
+        // 2. Cleanup orphaned composites
+        // Only remove items where systemTag === 'COMPOSITE'
+        // Only remove if no parent in current board selection references them
+        for (const item of existingItems) {
+            if (item.isSystemManaged === true && (item as any).systemTag === 'COMPOSITE' && item.partNumber) {
+                if (!compositeRequirements.has(item.partNumber)) {
+                    await prisma.item.delete({ where: { id: item.id } });
+                    compositesChanged = true;
+                }
+            }
+        }
+
+        // 3. Upsert required composites
+        for (const [compPart, reqQty] of compositeRequirements.entries()) {
+            const existingChild = existingItems.find((i: any) => i.partNumber === compPart && i.systemTag === 'COMPOSITE' && i.isSystemManaged === true);
+
+            if (existingChild) {
+                if (Number(existingChild.quantity) !== reqQty || (existingChild as any).systemRuleType !== 'COMPOSITE_SYNC') {
+                    await prisma.item.update({
+                        where: { id: existingChild.id },
+                        data: {
+                            quantity: reqQty,
+                            cost: existingChild.unitPrice * reqQty,
+                            isSystemManaged: true,
+                            systemTag: 'COMPOSITE',
+                            systemRuleType: 'COMPOSITE_SYNC'
+                        } as any
+                    });
+                    compositesChanged = true;
+                }
+            } else {
+                const childCatItem = await prisma.catalogItem.findFirst({
+                    where: { partNumber: compPart }
+                });
+
+                if (childCatItem) {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: childCatItem.category || 'Switchboard',
+                            subcategory: childCatItem.subcategory || 'Miscellaneous',
+                            name: childCatItem.partNumber || 'Composite Component',
+                            partNumber: compPart,
+                            description: childCatItem.description || 'Composite Component',
+                            quantity: reqQty,
+                            unitPrice: childCatItem.unitPrice,
+                            labourHours: childCatItem.labourHours,
+                            cost: childCatItem.unitPrice * reqQty,
+                            isSystemManaged: true,
+                            systemTag: 'COMPOSITE',
+                            systemRuleType: 'COMPOSITE_SYNC',
+                            isDefault: true,
+                            notes: 'System Managed'
+                        } as any
+                    });
+                    compositesChanged = true;
+                }
+            }
+        }
+
+        // 4. Re-fetch board items once so downstream logic uses updated state
+        if (compositesChanged) {
+            const refreshedBoard = await prisma.board.findUnique({
+                where: { id: boardId },
+                include: { items: true }
+            });
+            if (refreshedBoard) {
+                existingItems = refreshedBoard.items;
+            }
+        }
+    }
+    // --- END COMPOSITE SYNC BLOCK ---
+
+    // --- DIGITAL METER AUTOMATION ---
+    console.log('\n--- DIGITAL METER SYNC STARTED ---');
+    console.log('DIGITAL_METER_PARTS length:', DIGITAL_METER_PARTS.length);
+    console.log('existingItems length:', existingItems.length);
+    console.log('existingItems contents:', existingItems.map(i => `${i.name} (sysTag: ${i.systemTag}, qty: ${Number(i.quantity)})`));
+
+    // Extract `totalMeters` strictly excluding composite children
+    let totalMeters = 0;
+    for (const item of existingItems) {
+        if (DIGITAL_METER_PARTS.includes(item.name) && item.systemTag !== 'COMPOSITE') {
+            totalMeters += Number(item.quantity) || 0;
+        }
+    }
+
+    console.log('totalMeters found:', totalMeters);
+
+    // 1. Compute and Apply Derived Quantities 
+    const dmTargets = new Map<string, number>();
+    if (totalMeters > 0) {
+        dmTargets.set(WIRING_DIGITAL, totalMeters);
+        dmTargets.set(FUSE_20A_DIN, totalMeters * 3);
+        dmTargets.set(TEST_LINKS, totalMeters);
+    }
+
+    // 2. CT Balancing logic
+    let expectedCT = totalMeters * 3;
+    let selectedCT = 0;
+    for (const item of existingItems) {
+        if (CT_PARTS.includes(item.name)) {
+            selectedCT += Number(item.quantity) || 0;
+        }
+    }
+
+    let remainingCT = Math.max(0, expectedCT - selectedCT);
+    if (remainingCT > 0) {
+        dmTargets.set('TAIBB405A', remainingCT);
+    }
+
+    // Apply creation / updates to targets natively
+    for (const [part, qty] of dmTargets.entries()) {
+        const existing = existingItems.find(i => i.name === part && i.systemTag === 'DIGITAL_METER');
+        if (existing) {
+            if (Number(existing.quantity) !== qty) {
+                await prisma.item.update({
+                    where: { id: existing.id },
+                    data: { quantity: qty, cost: existing.unitPrice * qty }
+                });
+            }
+        } else {
+            // Find manually added item to avoid overwriting? Request said: "Do NOT touch manually added CTs. Never override manually added items."
+            // If user manually added FUSE_20A_DIN, do we override it or consider it separate?
+            // The safest is to only touch items we create.
+            // Wait, if it's NOT system managed, we shouldn't create a new conflicting one or we should create a new line item?
+            // The composite logic creates a new item if not found. Let's do the same here unless a system managed one exists.
+            const catItem = await prisma.catalogItem.findFirst({
+                where: { partNumber: part }
+            });
+            if (catItem) {
+                await prisma.item.create({
+                    data: {
+                        boardId,
+                        category: catItem.category || 'Switchboard',
+                        subcategory: catItem.subcategory || 'Control',
+                        name: catItem.partNumber || part,
+                        partNumber: part,
+                        description: catItem.description || 'Digital Meter Accessory',
+                        quantity: qty,
+                        unitPrice: catItem.unitPrice,
+                        labourHours: catItem.labourHours,
+                        cost: catItem.unitPrice * qty,
+                        isSystemManaged: true,
+                        isDefault: true,
+                        systemTag: 'DIGITAL_METER',
+                        systemRuleType: 'DIGITAL_METER_AUTOMATION',
+                        notes: 'System Managed'
+                    } as any
+                });
+            }
+        }
+    }
+
+    // 3. Scoped Deletions
+    // Only delete items where systemTag === 'DIGITAL_METER' AND isSystemManaged === true AND qty is 0.
+    const dmItemsToRemove = existingItems.filter(i =>
+        i.systemTag === 'DIGITAL_METER' &&
+        i.isSystemManaged === true &&
+        !dmTargets.has(i.name)
+    );
+
+    if (dmItemsToRemove.length > 0) {
+        await prisma.item.deleteMany({
+            where: { id: { in: dmItemsToRemove.map(i => i.id) } }
+        });
+    }
+
+    // 4. Re-fetch board items for downstream processing
+    if (dmTargets.size > 0 || dmItemsToRemove.length > 0) {
+        const refreshedBoard = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+        if (refreshedBoard) {
+            existingItems = refreshedBoard.items;
+        }
+    }
+    // --- END DIGITAL METER AUTOMATION ---
 
     // Parse Settings/Overrides
     let cleatOverrides: Record<string, number> = {};

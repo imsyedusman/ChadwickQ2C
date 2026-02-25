@@ -16,9 +16,43 @@ export async function GET(
             ],
         });
 
+        // --- ATTACH COMPOSITE METADATA AT RUNTIME ---
+        const partNumbers = Array.from(new Set(items.map(i => i.partNumber).filter(Boolean) as string[]));
+        const catalogItems = await prisma.catalogItem.findMany({
+            where: { partNumber: { in: partNumbers } }
+        });
+        const catalogMap = new Map((catalogItems as any[]).map(c => [c.partNumber, c]));
+
+        const enrichedItems = items.map(item => {
+            let enriched = { ...item };
+
+            if (item.systemTag === 'COMPOSITE' && item.partNumber) {
+                // Find parent who specifies this partNumber in components
+                const parent = items.find(p => {
+                    if ((p as any).systemTag === 'COMPOSITE' || !p.partNumber) return false;
+                    const cItem = catalogMap.get(p.partNumber);
+                    if (cItem && (cItem as any).components) {
+                        try {
+                            const comps = typeof (cItem as any).components === 'string' ? JSON.parse((cItem as any).components) : (cItem as any).components;
+                            return Array.isArray(comps) && comps.some((c: any) => c.partNumber === item.partNumber);
+                        } catch (e) { return false; }
+                    }
+                    return false;
+                });
+
+                if (parent) {
+                    (enriched as any).source = 'composite';
+                    (enriched as any).metadata = {
+                        autoReason: `Added automatically as component of ${parent.partNumber}`
+                    };
+                }
+            }
+            return enriched;
+        });
+
         // Custom sort order
         const categoryOrder = { 'BASICS': 1, 'SWITCHBOARD': 2, 'BUSBAR': 3 };
-        const sortedItems = items.sort((a: Item, b: Item) => {
+        const sortedItems = enrichedItems.sort((a: Item, b: Item) => {
             const catA = categoryOrder[a.category as keyof typeof categoryOrder] || 99;
             const catB = categoryOrder[b.category as keyof typeof categoryOrder] || 99;
             return catA - catB;
