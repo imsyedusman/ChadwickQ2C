@@ -12,7 +12,7 @@ async function main() {
             ]
         },
         select: {
-            sku: true,
+            name: true,
             partNumber: true,
             description: true,
             category: true,
