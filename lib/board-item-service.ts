@@ -743,7 +743,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const ctMeteringStrict = (config.ctMetering || '').toLowerCase() === 'yes';
     const isOver100A = amps > 100;
 
-    const isCtMode = ctMeteringStrict || isOver100A; // Keeps "Mode" concept for activation, but not exclusivity against WC
+    const isCtMode = ctMeteringStrict; // STRICTLY user choice only
+    const isWcMode = config.wholeCurrentMetering === 'Yes';
 
     // DEBUG LOGGING
     console.log('--- METERING DEBUG ---');
@@ -758,6 +759,62 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     const ctQty = config.ctQuantity || 1;
     const meterPanelSelected = config.meterPanel === 'Yes';
+
+    // --- 1.5 HARD METERING CLEANUP PHASE ---
+    let cleanupOccurred = false;
+
+    // Hard Delete CT
+    if (!isCtMode) {
+        const ctItemsToPurge = existingItems.filter((i: Item) =>
+            i.systemTag === 'CT' || (i as any).systemRuleType === 'CT_AUTOMATION'
+        );
+        if (ctItemsToPurge.length > 0) {
+            console.log(`[Metering] Hard Cleanup: Removing ${ctItemsToPurge.length} CT items because CT mode is OFF.`);
+            await prisma.item.deleteMany({
+                where: { id: { in: ctItemsToPurge.map(i => i.id) } }
+            });
+            cleanupOccurred = true;
+        }
+    }
+
+    // Hard Delete WC
+    if (!isWcMode) {
+        const wcItemsToPurge = existingItems.filter((i: Item) =>
+            i.systemTag === 'WHOLE_CURRENT' || (i as any).systemRuleType === 'WHOLE_CURRENT_AUTOMATION'
+        );
+        if (wcItemsToPurge.length > 0) {
+            console.log(`[Metering] Hard Cleanup: Removing ${wcItemsToPurge.length} WC items because WC mode is OFF.`);
+            await prisma.item.deleteMany({
+                where: { id: { in: wcItemsToPurge.map(i => i.id) } }
+            });
+            cleanupOccurred = true;
+        }
+    }
+
+    // Hard Delete Fallback Meter Panel
+    if (isCtMode || isWcMode) {
+        const fallbackPanelsToPurge = existingItems.filter((i: Item) =>
+            i.systemTag === 'METER_PANEL_FALLBACK' || (i as any).systemRuleType === 'METER_PANEL_FALLBACK'
+        );
+        if (fallbackPanelsToPurge.length > 0) {
+            console.log(`[Metering] Hard Cleanup: Removing ${fallbackPanelsToPurge.length} Fallback Panels because an active metering mode exists.`);
+            await prisma.item.deleteMany({
+                where: { id: { in: fallbackPanelsToPurge.map(i => i.id) } }
+            });
+            cleanupOccurred = true;
+        }
+    }
+
+    // Reload existing items if mutated before applying logic
+    if (cleanupOccurred) {
+        const refreshedBoard = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+        if (refreshedBoard) {
+            existingItems = refreshedBoard.items;
+        }
+    }
 
     // 2. APPLY LOGIC
 
@@ -943,11 +1000,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // F. "Meter Panel" Checkbox Legacy/Helper
-    // If user clicked "Meter Panel" but is NOT in CT mode (so didn't get CT-PANEL)
-    // AND didn't select WC Metering (so didn't get 100A-PANEL).
-    // This allows a standalone panel if explicitly requested.
-    if (meterPanelSelected && !isCtMode && !config.wholeCurrentMeters?.length && config.wholeCurrentMetering !== 'Yes') {
+    // If user clicked "Meter Panel" but is NOT in CT mode AND didn't select WC Metering.
+    // This allows a standalone panel if explicitly requested as a pure fallback.
+    // If either CT or WC is active, this must not exist.
+    if (meterPanelSelected && !isCtMode && !isWcMode) {
         addTarget('100A-PANEL', ctQty); // Default to smaller panel if no rating/mode implies otherwise
+        itemTags.set('100A-PANEL', 'METER_PANEL_FALLBACK'); // Explicit tag to allow deterministic cleanup
     }
 
     // G. Site Reconnection (Auto-Add)
