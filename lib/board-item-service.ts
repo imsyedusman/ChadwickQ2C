@@ -368,7 +368,19 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     console.log('\n--- DIGITAL METER SYNC STARTED ---');
     console.log('DIGITAL_METER_PARTS length:', DIGITAL_METER_PARTS.length);
     console.log('existingItems length:', existingItems.length);
-    console.log('existingItems contents:', existingItems.map(i => `${i.name} (sysTag: ${i.systemTag}, qty: ${Number(i.quantity)})`));
+
+    // Enforce strict existence:
+    const requiredDM = [WIRING_DIGITAL, FUSE_20A_DIN, TEST_LINKS];
+    const catCheck = await prisma.catalogItem.findMany({
+        where: { partNumber: { in: requiredDM } },
+        select: { partNumber: true }
+    });
+    const foundCatParts = catCheck.map(c => c.partNumber);
+    for (const req of requiredDM) {
+        if (!foundCatParts.includes(req)) {
+            console.warn(`[WARNING] Digital Meter Auto: CatalogItem missing for part '${req}'. Auto-add might fail.`);
+        }
+    }
 
     // Extract `totalMeters` strictly excluding composite children
     let totalMeters = 0;
@@ -403,16 +415,25 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     }
 
     // Apply creation / updates to targets natively
-    for (const [part, qty] of dmTargets.entries()) {
-        const existing = existingItems.find(i => i.name === part && i.systemTag === 'DIGITAL_METER');
-        if (existing) {
-            if (Number(existing.quantity) !== qty) {
+    let digitalMetersChanged = false;
+
+    for (const [part, requiredQty] of dmTargets.entries()) {
+        const existingChild = existingItems.find(i => i.name === part && i.systemTag === 'DIGITAL_METER');
+
+        console.log(`[DM Auto] Target: ${part}, requiredQty: ${requiredQty}, existing: ${existingChild ? Number(existingChild.quantity) : 'none'}`);
+
+        if (existingChild) {
+            // Always update quantity to requiredQty. Use Decimal-safe comparison.
+            if (Number(existingChild.quantity) !== requiredQty) {
+                console.log(`[DM Auto] Updating ${part} from ${Number(existingChild.quantity)} to ${requiredQty}`);
                 await prisma.item.update({
-                    where: { id: existing.id },
-                    data: { quantity: qty, cost: existing.unitPrice * qty }
+                    where: { id: existingChild.id },
+                    data: { quantity: requiredQty, cost: Number(existingChild.unitPrice || 0) * requiredQty }
                 });
+                digitalMetersChanged = true;
             }
         } else {
+            console.log(`[DM Auto] Creating new item for ${part} with qty ${requiredQty}`);
             // Find manually added item to avoid overwriting? Request said: "Do NOT touch manually added CTs. Never override manually added items."
             // If user manually added FUSE_20A_DIN, do we override it or consider it separate?
             // The safest is to only touch items we create.
@@ -430,10 +451,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         name: catItem.partNumber || part,
                         partNumber: part,
                         description: catItem.description || 'Digital Meter Accessory',
-                        quantity: qty,
+                        quantity: requiredQty,
                         unitPrice: catItem.unitPrice,
                         labourHours: catItem.labourHours,
-                        cost: catItem.unitPrice * qty,
+                        cost: Number(catItem.unitPrice || 0) * requiredQty,
                         isSystemManaged: true,
                         isDefault: true,
                         systemTag: 'DIGITAL_METER',
@@ -441,6 +462,9 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         notes: 'System Managed'
                     } as any
                 });
+                digitalMetersChanged = true;
+            } else {
+                console.warn(`[DM Auto Error] Could not create ${part}. Catalog item not found.`)
             }
         }
     }
@@ -457,10 +481,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         await prisma.item.deleteMany({
             where: { id: { in: dmItemsToRemove.map(i => i.id) } }
         });
+        digitalMetersChanged = true;
     }
 
     // 4. Re-fetch board items for downstream processing
-    if (dmTargets.size > 0 || dmItemsToRemove.length > 0) {
+    if (digitalMetersChanged) {
+        console.log('[DM Auto] State mutated. Re-fetching existingItems from database.');
         const refreshedBoard = await prisma.board.findUnique({
             where: { id: boardId },
             include: { items: true }

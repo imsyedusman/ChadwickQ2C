@@ -24,21 +24,8 @@ export async function PUT(
             },
         });
 
-        // Check if item update should trigger a board sync
-        // Triggers: Tier Items (affects Base/Misc) OR Sheet Metal Items (affects SS Uplift)
-        const isTierItem = item && (item.name === '1A-TIERS' || item.name === '1B-TIERS-400');
-        const isSheetMetalItem = item && [
-            '1B-COMPARTMENTS',
-            '1B-BASE',
-            '1B-DOORS',
-            '1B-600MM',
-            '1B-800MM'
-        ].includes(item.name);
-
-        const isBusbarItem = item && ((item.category && item.category.toLowerCase() === 'busbar') || (item.name && (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))));
-        const isCleat = item && item.name && item.name.startsWith('1B1-CLEAT');
-
-        if ((isTierItem || isSheetMetalItem || (isBusbarItem && !isCleat)) && quantity !== undefined) {
+        // Trigger board sync if quantity was updated (required for automations like composite, digital meters, etc.)
+        if (quantity !== undefined && item?.boardId) {
             // Fetch board config
             const board = await prisma.board.findUnique({
                 where: { id: item.boardId },
