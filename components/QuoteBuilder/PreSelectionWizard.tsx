@@ -117,7 +117,8 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     cableZoneCount: 0,
     includesAcbs: 'No',
     ctSpareProvision: 'No',
-    ctSpareQuantity: 1
+    ctSpareQuantity: 1,
+    extraForDoorsOver: false
 };
 
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
@@ -492,6 +493,21 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </select>
                         <p className="text-xs text-gray-500 mt-1">Adds base implementation charge</p>
                     </div>
+
+                    {/* Extra for Doors Over - ONLY for Custom boards */}
+                    {config.enclosureType === 'Custom' && (
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Extra for Doors Over</label>
+                            <select
+                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                value={config.extraForDoorsOver ? 'Yes' : 'No'}
+                                onChange={e => setConfig({ ...config, extraForDoorsOver: e.target.value === 'Yes' })}
+                            >
+                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">Adds doors over the equipment tiers</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Enclosure Depth - NOW ALWAYS VISIBLE (Updated 2026-01-22) */}

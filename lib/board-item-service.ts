@@ -29,6 +29,7 @@ export interface BoardConfig {
     ctSpareQuantity?: number;
     wholeCurrentMeters?: { type: string; quantity: number }[];
     bakeliteQty?: number;
+    extraForDoorsOver?: boolean;
     [key: string]: any;
 }
 
@@ -709,10 +710,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // Applies to all Custom boards with tiers > 0
     if (config.enclosureType === 'Custom' && tierCount > 0) {
 
-        // 1. Outdoor Doors (Strictly Outdoor)
-        if (config.location === 'Outdoor') {
-            addTarget('1B-DOORS', tierCount);
-        }
+        // 1. Outdoor Doors (Legacy implicitly added, now explicitly managed via extraForDoorsOver)
+        // Removed legacy: if (config.location === 'Outdoor') addTarget('1B-DOORS', tierCount);
 
         // 2. Depth Logic (All Custom Boards - Indoor & Outdoor)
         // Rule: If 600mm -> 1B-600MM @ $500/tier
@@ -1297,7 +1296,80 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // --- 5. EXECUTE DB OPERATIONS ---
 
+    // --- EXTRA DOORS AUTOMATION ---
+    console.log('\n--- EXTRA DOORS SYNC STARTED ---');
+    let doorsChanged = false;
+    if (config.enclosureType === 'Custom' && config.extraForDoorsOver === true && tierCount > 0) {
+        const targetDoorQty = tierCount;
+        const doorPart = '1B-DOORS';
 
+        const existingDoor = existingItems.find(
+            (i: Item) => i.partNumber === doorPart && (i as any).systemRuleType === 'EXTRA_DOORS'
+        );
+
+        if (existingDoor) {
+            if (Number(existingDoor.quantity) !== targetDoorQty) {
+                console.log(`[Extra Doors] Updating ${doorPart} qty to ${targetDoorQty}`);
+                await prisma.item.update({
+                    where: { id: existingDoor.id },
+                    data: { quantity: targetDoorQty, cost: Number(existingDoor.unitPrice || 0) * targetDoorQty }
+                });
+                doorsChanged = true;
+            }
+        } else {
+            console.log(`[Extra Doors] Creating new system-managed item for ${doorPart} with qty ${targetDoorQty}`);
+            const catItem = await prisma.catalogItem.findFirst({
+                where: { partNumber: doorPart }
+            });
+            if (catItem) {
+                await prisma.item.create({
+                    data: {
+                        boardId,
+                        category: catItem.category || 'Switchboard',
+                        subcategory: catItem.subcategory || 'Sheetmetal',
+                        name: catItem.partNumber || doorPart,
+                        partNumber: doorPart,
+                        description: catItem.description || 'Extra for Doors Over',
+                        quantity: targetDoorQty,
+                        unitPrice: catItem.unitPrice,
+                        labourHours: catItem.labourHours,
+                        cost: Number(catItem.unitPrice || 0) * targetDoorQty,
+                        isSystemManaged: true,
+                        isDefault: true,
+                        systemTag: 'SHEETMETAL',
+                        systemRuleType: 'EXTRA_DOORS',
+                        notes: 'System Managed'
+                    } as any
+                });
+                doorsChanged = true;
+            } else {
+                console.warn(`[Extra Doors] Missing catalog item for ${doorPart}`);
+            }
+        }
+    } else {
+        const doorsToRemove = existingItems.filter(
+            (i: Item) => i.partNumber === '1B-DOORS' && (i as any).systemRuleType === 'EXTRA_DOORS'
+        );
+        if (doorsToRemove.length > 0) {
+            console.log(`[Extra Doors] Removing ${doorsToRemove.length} orphaned rows`);
+            await prisma.item.deleteMany({
+                where: { id: { in: doorsToRemove.map((i: Item) => i.id) } }
+            });
+            doorsChanged = true;
+        }
+    }
+
+    if (doorsChanged) {
+        console.log('[Extra Doors] State mutated. Re-fetching existingItems from database.');
+        const refreshedBoard = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+        if (refreshedBoard) {
+            existingItems = refreshedBoard.items;
+        }
+    }
+    // --- END EXTRA DOORS AUTOMATION ---
     // A. Remove Items
     // Remove items that are isDefault=true AND in our "Managed Lists" but NOT in current targets
     // Managed lists = arrays of potential auto-items
@@ -1310,7 +1382,6 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         ...MISC_DELIVERY_ITEMS,
         ...TIER_ITEMS,
         '1B-BASE',
-        '1B-DOORS',
         '1B-600MM',
         '1B-800MM',
         '1B-COMPARTMENTS', // Explicitly managed now
