@@ -45,6 +45,23 @@ interface CatalogItem {
     isCopperPriced?: boolean;
 }
 
+const SURGE_DIVERTER_PARTS = [
+    'TDS-MPM-277',
+    'TDX100C-277/480',
+    'TDX100M-277/480TT',
+    'TDX200M-277/480TT',
+    'TDS-MT-277',
+    'SDN3-100-275',
+    'SD3-200',
+    'TDS350-TT-277',
+    'DSD340-TNS-275A',
+    'DSD140-1SR-275',
+    'SD3-40N'
+];
+
+const FUSE_63A_PART = 'IPD-FUSE-63A';
+const WIRING_SURGE_PART = 'IPD-WIRING-SURGE';
+
 const DIGITAL_METER_PARTS = [
     'A9MEM3155', 'A9MEM3355', 'A9MEM3255', 'METSEPM3250', 'METSEPM5110',
     'METSEPM5350', 'METSEPM5560', 'METSEPM8240', 'EM2172RVV53XOSX',
@@ -496,6 +513,95 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
     // --- END DIGITAL METER AUTOMATION ---
+
+    // --- SURGE DIVERTER AUTOMATION ---
+    console.log('\n--- SURGE DIVERTER SYNC STARTED ---');
+    let totalSurgeQty = 0;
+    for (const item of existingItems) {
+        if (SURGE_DIVERTER_PARTS.includes(item.name) && item.systemTag !== 'COMPOSITE') {
+            totalSurgeQty += Number(item.quantity) || 0;
+        }
+    }
+
+    const requiredFuseQty = totalSurgeQty * 3;
+    const requiredWiringQty = totalSurgeQty * 1;
+    let surgeChanged = false;
+
+    if (totalSurgeQty > 0) {
+        const surgeTargets = [
+            { part: FUSE_63A_PART, qty: requiredFuseQty },
+            { part: WIRING_SURGE_PART, qty: requiredWiringQty }
+        ];
+
+        for (const target of surgeTargets) {
+            if (target.qty === 0) continue;
+
+            const existingChild = existingItems.find(
+                i => i.name === target.part && (i as any).systemRuleType === 'SURGE_AUTOMATION'
+            );
+
+            if (existingChild) {
+                if (Number(existingChild.quantity) !== target.qty) {
+                    console.log(`[Surge Auto] Updating ${target.part} qty to ${target.qty}`);
+                    await prisma.item.update({
+                        where: { id: existingChild.id },
+                        data: { quantity: target.qty, cost: Number(existingChild.unitPrice || 0) * target.qty }
+                    });
+                    surgeChanged = true;
+                }
+            } else {
+                console.log(`[Surge Auto] Creating new item for ${target.part} with qty ${target.qty}`);
+                const catItem = await prisma.catalogItem.findFirst({
+                    where: { partNumber: target.part }
+                });
+                if (catItem) {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: catItem.category || 'Switchboard',
+                            subcategory: catItem.subcategory || 'Control',
+                            name: catItem.partNumber || target.part,
+                            partNumber: target.part,
+                            description: catItem.description || 'Surge Diverter Accessory',
+                            quantity: target.qty,
+                            unitPrice: catItem.unitPrice,
+                            labourHours: catItem.labourHours,
+                            cost: Number(catItem.unitPrice || 0) * target.qty,
+                            isSystemManaged: true,
+                            isDefault: true,
+                            systemTag: 'SURGE_PROTECTION',
+                            systemRuleType: 'SURGE_AUTOMATION',
+                            notes: 'System Managed'
+                        } as any
+                    });
+                    surgeChanged = true;
+                } else {
+                    console.warn(`[Surge Auto] Missing catalog item for ${target.part}`);
+                }
+            }
+        }
+    } else {
+        const surgeItemsToRemove = existingItems.filter(i => (i as any).systemRuleType === 'SURGE_AUTOMATION');
+        if (surgeItemsToRemove.length > 0) {
+            console.log(`[Surge Auto] Removing ${surgeItemsToRemove.length} orphaned items`);
+            await prisma.item.deleteMany({
+                where: { id: { in: surgeItemsToRemove.map(i => i.id) } }
+            });
+            surgeChanged = true;
+        }
+    }
+
+    if (surgeChanged) {
+        console.log('[Surge Auto] State mutated. Re-fetching existingItems from database.');
+        const refreshedBoard = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+        if (refreshedBoard) {
+            existingItems = refreshedBoard.items;
+        }
+    }
+    // --- END SURGE DIVERTER AUTOMATION ---
 
     // Parse Settings/Overrides
     let cleatOverrides: Record<string, number> = {};

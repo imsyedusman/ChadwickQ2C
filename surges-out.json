@@ -1,0 +1,289 @@
+[
+  {
+    "id": "07c4ea0e-5403-4fe3-b5ff-128f756872e5",
+    "sku": null,
+    "desc": "Wiring - surge protection device",
+    "cat": "Switchboard",
+    "sub": "Wiring"
+  },
+  {
+    "id": "1a42ef0b-94c6-4ad3-b26c-ccd3715d5813",
+    "sku": null,
+    "desc": "Erico/Critec     TDS-MPM-277 (N)     -     3P     100kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "e0c89c3f-3828-4980-8952-c1eeed41d02d",
+    "sku": null,
+    "desc": "Erico/Critec     TDX100C-277/480     -     3P     100kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "88f395ea-3e88-4fe2-841d-a6f3c511906e",
+    "sku": null,
+    "desc": "Erico/Critec     TDX100M-277/480TT     -     3P     100kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "8ce3b10b-2f10-49c7-891a-e6b5e4d13026",
+    "sku": null,
+    "desc": "Erico/Critec     TDX200M-277/480TT     -     3P     200kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "b2121f2b-4b8c-4b09-bf0d-942c9d5e4b3f",
+    "sku": null,
+    "desc": "Erico/Critec     TDS-MT-277     -     1P     100kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "7d8455f2-837c-4875-806e-2a5cfa2da689",
+    "sku": null,
+    "desc": "Novaris     SDN3-100-275     -     3P     100kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "beed2c11-ed36-4f6d-ade3-7e6df3578803",
+    "sku": null,
+    "desc": "Novaris     SD3-200     -     3P     200kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "2d688be4-11fd-46de-84ba-5088bd8205ac",
+    "sku": null,
+    "desc": "Erico/Critec     TDS350-TT-277     -     3P     50kA     MCC/Comm",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "c401cda2-08ba-4854-9240-0dffdb305bff",
+    "sku": null,
+    "desc": "Erico/Critec     DSD340-TNS-275A     -     3P     40kA     General",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "d449c0b8-b38c-4191-a1e1-ea362180f53c",
+    "sku": null,
+    "desc": "Erico/Critec     DSD140-1SR-275     -     1P     40kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "55d05986-d20e-4750-85c6-49f341197312",
+    "sku": null,
+    "desc": "Novaris     SD3-40N     -     3P     40kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "5cd01a79-7e4e-47dd-bea5-ac660ecfe8e7",
+    "sku": null,
+    "desc": "Erico/Critec     DSF-6A-275V     -     1P     6A     16kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "a519db2e-5c5f-4bea-96ce-beb70c73608a",
+    "sku": null,
+    "desc": "Erico/Critec     DSF-20A-275V     -     1P     20A     15kA",
+    "cat": "Switchboard",
+    "sub": "Surge Diverter"
+  },
+  {
+    "id": "c20f6d10-de66-45fb-9960-d9d0d9b8ac9c",
+    "sku": "2025SF-WE",
+    "desc": "SOCK SWT TWIN SURGE FILTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "5017dc9c-fea2-483a-831f-5a8fe5b67b19",
+    "sku": "30SFM-OP",
+    "desc": "SURGE FILTER MECH 30SERIES",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "a9a2d0c2-1f5d-45cb-90fd-f4ad7f016bc2",
+    "sku": "50170",
+    "desc": "Del Nov 25: SURGE LIMITER CARDEW 250V AC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "2327b6ad-a38f-4a82-9a58-2505aa7ab144",
+    "sku": "50171",
+    "desc": "14 WK DEL: SURGE LIMITER CARDEW 440V AC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "7d3cce64-6c94-4146-bee3-0643d88257a0",
+    "sku": "50172",
+    "desc": "14 WK DEL: SURGE LIMITER CARDEW 660V AC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "0f77312a-412a-4df6-a5f1-eb9ddf3f5a35",
+    "sku": "50183",
+    "desc": "14 WK DEL: SURGE LIMITER CARDEW 1000V AC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "5e060d5f-3979-4026-bb95-0346e36e25a2",
+    "sku": "920RM/1",
+    "desc": "ResiMax Surge arrestor 1P Imax 20kA",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "ea3051df-1e9d-4cd3-a279-87607b5e8376",
+    "sku": "A9L00002",
+    "desc": "CARTRIDGE C NEUTRAL FOR IPRD SURGE ARRES",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "fed79ec6-0d50-47bc-9e90-c90e72d6a80e",
+    "sku": "A9L08100",
+    "desc": "IPRD 8 8 KA 350V 1P SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "54cfdbef-ff01-4d54-b6d1-abf782b272fb",
+    "sku": "A9L08102",
+    "desc": "CARTRIDGE C8 350 FOR IPRD SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "e714e095-ffdd-4ba1-8c18-4326765036b9",
+    "sku": "A9L08300",
+    "desc": "IPRD 8 8 KA 350V 3P SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "4e71a071-f718-4bf4-8be6-97c7a25f83da",
+    "sku": "A9L08500",
+    "desc": "IPRD 8 8 KA 350V 1PN SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "c431ae02-f7d8-437d-9a7b-79ecafa24e85",
+    "sku": "A9L20102",
+    "desc": "CARTRIDGE C20 350 FOR IPRD SURGE ARRESTE",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "44346860-b336-4224-a6b0-d3e62a0ab0dc",
+    "sku": "A9L20300",
+    "desc": "IPRD 20 20 KA 350V 3P SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "74e016f2-d3cd-47f9-89f7-91713324703a",
+    "sku": "A9L20600",
+    "desc": "IPRD 20 20 KA 350V 3PN SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "139ca2eb-679c-45a4-b783-c61cadb5b58b",
+    "sku": "A9L40100",
+    "desc": "IPRD 40 40 KA 350V 1P SURGE ARRESTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "16fb7f9e-2de5-46d9-bbb6-48d0728f857c",
+    "sku": "A9L40102",
+    "desc": "CARTRIDGE C 40 350 FOR IPRD SURGE ARREST",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "b63f93bd-cf5f-4c49-a708-b634fc7e89a5",
+    "sku": "C2025SF-WE",
+    "desc": "SOCKET SWT TWIN SURGE FILTER",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "24a63221-818d-4c55-9fda-6d22df998d62",
+    "sku": "EMS59518",
+    "desc": "Outdoor 4G antenna surge protection",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "59382bf6-a76d-4e37-9365-644957cf78a2",
+    "sku": "LAERCE",
+    "desc": "Easy TeSys RC SURGE BLOCK 24-48 VAC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "d5f7fd70-c8d3-4edd-a868-145c4a808f55",
+    "sku": "LAERCG",
+    "desc": "Easy TeSys RC SURGE BLOCK 50-127 VAC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "262f1e65-1148-4592-ac48-7872d9126335",
+    "sku": "LAERCN",
+    "desc": "Easy TeSys RC SURGE BLOCK 380-415VAC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "d3177ff6-cb23-46ee-b9ba-724e66d628b8",
+    "sku": "LAERCU",
+    "desc": "Easy TeSys RC SURGE BLOCK 110-240VAC",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "89ea602a-aa53-4247-991d-017501176b3d",
+    "sku": "MX9SP140",
+    "desc": "MAX9 SPD 1P 40kA Surge Protection Device",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "eb4ee04c-da10-4aac-95a9-2a440e16e040",
+    "sku": "MX9SP340",
+    "desc": "MAX9 SPD 3P 40kA Surge Protection Device",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "297b729a-3039-43d3-a64c-11a5ad10fdc8",
+    "sku": "TBUMLT-ARRES-TYPEA",
+    "desc": "Surge Arrestor In-line NF/NF <1000MHz",
+    "cat": "Switchboard",
+    "sub": ""
+  },
+  {
+    "id": "f30c7832-a458-4dc1-9bef-72fa5d62b6db",
+    "sku": "TBUMLT-ARRES-TYPEB",
+    "desc": "Surge Arrestor In-line NF/NF 2 to 6GHz",
+    "cat": "Switchboard",
+    "sub": ""
+  }
+]
