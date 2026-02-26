@@ -5,6 +5,17 @@ import { cn } from '@/lib/utils';
 import { BoardConfig } from '@/lib/board-item-service';
 import { applyBoardPrefix } from '@/lib/board-naming';
 
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Button } from "@/components/ui/button";
+import { ChevronsUpDown } from "lucide-react";
+
 interface PreSelectionWizardProps {
     isOpen: boolean;
     onClose: () => void;
@@ -119,6 +130,138 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     ctSpareProvision: 'No',
     ctSpareQuantity: 1,
     extraForDoorsOver: false
+};
+
+const SegmentedControl = ({ value, onChange, options = ['No', 'Yes'], disabled }: { value: string, onChange: (val: string) => void, options?: string[], disabled?: boolean }) => (
+    <div className={cn("flex bg-gray-100/80 p-1 rounded-lg border border-gray-200 w-full", disabled && "opacity-60 cursor-not-allowed")}>
+        {options.map(option => {
+            const isSelected = value === option;
+            return (
+                <button
+                    key={option}
+                    type="button"
+                    disabled={disabled}
+                    className={cn(
+                        "flex-1 py-1.5 text-xs text-center font-semibold rounded-md transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                        isSelected
+                            ? "bg-white text-blue-700 shadow-sm ring-1 ring-gray-200"
+                            : "text-gray-500 hover:text-gray-800 hover:bg-gray-200/50"
+                    )}
+                    onClick={(e) => {
+                        e.preventDefault();
+                        if (!disabled) onChange(option);
+                    }}
+                >
+                    {option}
+                </button>
+            );
+        })}
+    </div>
+);
+
+type SearchOption = string | { value: string; label: string };
+
+const SearchableSelect = ({
+    value,
+    onChange,
+    options,
+    placeholder = "Select...",
+    disabled = false
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    options: SearchOption[];
+    placeholder?: string;
+    disabled?: boolean;
+}) => {
+    const [open, setOpen] = useState(false);
+
+    const normalizedOptions = options.map(opt =>
+        typeof opt === 'string' ? { value: opt, label: opt } : opt
+    );
+
+    const selectedLabel = normalizedOptions.find(opt => opt.value === value)?.label || value;
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    disabled={disabled}
+                    className="w-full justify-between font-normal bg-white border-gray-300 text-gray-900 focus:ring-2 focus:ring-green-500 h-[38px] px-3 py-2 text-sm"
+                >
+                    {selectedLabel ? selectedLabel : <span className="text-gray-500">{placeholder}</span>}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                    <CommandInput placeholder="Search..." />
+                    <CommandList>
+                        <CommandEmpty>No results found.</CommandEmpty>
+                        <CommandGroup>
+                            {normalizedOptions.map((option) => (
+                                <CommandItem
+                                    key={option.value}
+                                    value={option.label}
+                                    onSelect={() => {
+                                        onChange(value === option.value ? "" : option.value);
+                                        setOpen(false);
+                                    }}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "mr-2 h-4 w-4",
+                                            value === option.value ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {option.label}
+                                </CommandItem>
+                            ))}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
+    );
+};
+
+const SelectableCards = ({
+    value,
+    onChange,
+    options
+}: {
+    value: string,
+    onChange: (val: string) => void,
+    options: { value: string, label: string }[]
+}) => {
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full">
+            {options.map(opt => {
+                const isSelected = value === opt.value;
+                return (
+                    <button
+                        key={opt.value}
+                        type="button"
+                        className={cn(
+                            "flex items-center justify-center p-3 h-full min-h-[60px] text-xs text-center font-medium rounded-lg border transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                            isSelected
+                                ? "bg-blue-50 border-blue-500 text-blue-800 shadow-sm ring-1 ring-blue-500"
+                                : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 hover:-translate-y-0.5"
+                        )}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            onChange(opt.value);
+                        }}
+                    >
+                        <span className="line-clamp-2">{opt.label}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
 };
 
 export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initialConfig }: PreSelectionWizardProps) {
@@ -388,56 +531,67 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Location <span className="text-red-500">*</span></label>
-                    <select
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900"
-                        value={config.location}
-                        onChange={e => setConfig({ ...config, location: e.target.value, ipRating: '' })} // Reset IP on location change
-                    >
-                        {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
+                    <SegmentedControl
+                        value={config.location || ''}
+                        onChange={v => setConfig({ ...config, location: v, ipRating: '' })}
+                        options={LOCATIONS}
+                    />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Enclosure Type <span className="text-red-500">*</span></label>
-                    <select
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900"
-                        value={config.enclosureType}
-                        onChange={e => setConfig({ ...config, enclosureType: e.target.value, material: '', ipRating: '' })}
-                    >
-                        <option value="">Select Enclosure...</option>
-                        {getEnclosureOptions().map(e => <option key={e} value={e}>{e}</option>)}
-                    </select>
+                    <SegmentedControl
+                        value={config.enclosureType || ''}
+                        onChange={v => setConfig({ ...config, enclosureType: v, material: '', ipRating: '' })}
+                        options={getEnclosureOptions()}
+                    />
                     {config.location === 'Outdoor' && (
                         <p className="text-[10px] text-orange-600 font-medium mt-1">Outdoor boards must be Custom.</p>
                     )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-3">
                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Material <span className="text-red-500">*</span></label>
-                    <select
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900"
-                        value={config.material}
-                        onChange={e => setConfig({ ...config, material: e.target.value })}
-                        disabled={!config.enclosureType}
-                    >
-                        <option value="">Select Material...</option>
-                        {getMaterialOptions().map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    {(() => {
+                        const opts = getMaterialOptions();
+                        if (opts.length === 0) {
+                            return (
+                                <select disabled className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900 opacity-60">
+                                    <option value="">Select Enclosure First...</option>
+                                </select>
+                            );
+                        }
+                        if (opts.length <= 6) { // Expanded to 6 items to handle the requested cluttered indoor view via grid
+                            return (
+                                <SelectableCards
+                                    value={config.material || ''}
+                                    onChange={v => setConfig({ ...config, material: v })}
+                                    options={opts.map(m => ({ value: m, label: m }))}
+                                />
+                            );
+                        }
+                        return (
+                            <SearchableSelect
+                                value={config.material || ''}
+                                onChange={v => setConfig({ ...config, material: v })}
+                                options={opts}
+                                placeholder="Select Material..."
+                            />
+                        );
+                    })()}
                 </div>
 
                 <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">IP Rating</label>
-                    <select
-                        className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900"
-                        value={config.ipRating}
-                        onChange={e => setConfig({ ...config, ipRating: e.target.value })}
+                    <SearchableSelect
+                        value={config.ipRating || ''}
+                        onChange={v => setConfig({ ...config, ipRating: v })}
+                        options={getIpOptions()}
                         disabled={!config.enclosureType}
-                    >
-                        <option value="">Select IP...</option>
-                        {getIpOptions().map(ip => <option key={ip} value={ip}>{ip}</option>)}
-                    </select>
+                        placeholder="Select IP..."
+                    />
                 </div>
 
             </div>
@@ -482,29 +636,23 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </div>
                     )}
 
-                    <div className="space-y-1">
+                    <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Base Required</label>
-                        <select
-                            className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                            value={config.baseRequired}
-                            onChange={e => setConfig({ ...config, baseRequired: e.target.value })}
-                        >
-                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        <SegmentedControl
+                            value={config.baseRequired || 'No'}
+                            onChange={v => setConfig({ ...config, baseRequired: v })}
+                        />
                         <p className="text-xs text-gray-500 mt-1">Adds base implementation charge</p>
                     </div>
 
                     {/* Extra for Doors Over - ONLY for Custom boards */}
                     {config.enclosureType === 'Custom' && (
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Extra for Doors Over</label>
-                            <select
-                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                            <SegmentedControl
                                 value={config.extraForDoorsOver ? 'Yes' : 'No'}
-                                onChange={e => setConfig({ ...config, extraForDoorsOver: e.target.value === 'Yes' })}
-                            >
-                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                                onChange={v => setConfig({ ...config, extraForDoorsOver: v === 'Yes' })}
+                            />
                             <p className="text-xs text-gray-500 mt-1">Adds doors over the equipment tiers</p>
                         </div>
                     )}
@@ -512,17 +660,17 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
                 {/* Enclosure Depth - NOW ALWAYS VISIBLE (Updated 2026-01-22) */}
                 <div className="mt-6 border-t border-gray-100 pt-4">
-                    <div className="space-y-1 w-full md:w-1/2">
+                    <div className="space-y-2 w-full">
                         <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Enclosure Depth</label>
-                        <select
-                            className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                        <SelectableCards
                             value={config.enclosureDepth || '400'}
-                            onChange={e => setConfig({ ...config, enclosureDepth: e.target.value })}
-                        >
-                            <option value="400">400 mm (Standard)</option>
-                            <option value="600">600 mm</option>
-                            <option value="800">800 mm</option>
-                        </select>
+                            onChange={v => setConfig({ ...config, enclosureDepth: v })}
+                            options={[
+                                { value: '400', label: '400mm (Standard)' },
+                                { value: '600', label: '600mm' },
+                                { value: '800', label: '800mm' },
+                            ]}
+                        />
                         <p className="text-xs text-gray-500 mt-1">Automatically selected based on rating, but can be manually overridden. Deeper enclosures effect cost.</p>
                     </div>
                 </div>
@@ -569,15 +717,12 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 {/* Cable Zones (Added 2025-12-23) */}
                 <div className="mt-6 border-t border-gray-100 pt-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-1">
+                        <div className="space-y-2">
                             <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Cable Zones?</label>
-                            <select
-                                className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                            <SegmentedControl
                                 value={config.cableZones || 'No'}
-                                onChange={e => setConfig({ ...config, cableZones: e.target.value })}
-                            >
-                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                                onChange={v => setConfig({ ...config, cableZones: v })}
+                            />
                         </div>
 
                         {config.cableZones === 'Yes' && (
@@ -600,26 +745,20 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                 {config.enclosureType === 'Cubic' && (
                     <div className="mt-6 border-t border-gray-100 pt-4 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Is Switchboard Over 50kA?</label>
-                                <select
-                                    className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                <SegmentedControl
                                     value={config.isOver50kA || 'No'}
-                                    onChange={e => setConfig({ ...config, isOver50kA: e.target.value })}
-                                >
-                                    {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                                </select>
+                                    onChange={v => setConfig({ ...config, isOver50kA: v })}
+                                />
                             </div>
 
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Non-standard Colour?</label>
-                                <select
-                                    className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
+                                <SegmentedControl
                                     value={config.isNonStandardColour || 'No'}
-                                    onChange={e => setConfig({ ...config, isNonStandardColour: e.target.value })}
-                                >
-                                    {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                                </select>
+                                    onChange={v => setConfig({ ...config, isNonStandardColour: v })}
+                                />
                             </div>
                         </div>
                     </div>
@@ -636,66 +775,52 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     );
 
     const renderStep3 = () => (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 max-h-[60vh] overflow-visible pr-2 pb-10">
             {/* Electrical Specs */}
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 relative z-50">
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <div className="w-1 h-4 bg-green-500 rounded-full"></div>
                     Electrical & Functional
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 relative z-50">
+                    <div className="relative z-40">
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Current Rating</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                            value={config.currentRating}
-                            onChange={e => setConfig({ ...config, currentRating: e.target.value })}
-                        >
-                            <option value="">Select...</option>
-                            {getCurrentOptions().map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <SearchableSelect
+                            value={config.currentRating || ''}
+                            onChange={v => setConfig({ ...config, currentRating: v })}
+                            options={getCurrentOptions()}
+                        />
                     </div>
-                    <div>
+                    <div className="relative z-30">
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Fault Rating</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                            value={config.faultRating}
-                            onChange={e => setConfig({ ...config, faultRating: e.target.value })}
-                        >
-                            <option value="">Select...</option>
-                            {FAULT_RATINGS.map(f => <option key={f} value={f}>{f}</option>)}
-                        </select>
+                        <SearchableSelect
+                            value={config.faultRating || ''}
+                            onChange={v => setConfig({ ...config, faultRating: v })}
+                            options={FAULT_RATINGS}
+                        />
                     </div>
-                    <div>
+                    <div className="relative z-50">
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Form of Segregation</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                            value={config.form}
-                            onChange={e => setConfig({ ...config, form: e.target.value })}
-                        >
-                            <option value="">Select...</option>
-                            {getFormOptions().map(f => <option key={f} value={f}>Form {f}</option>)}
-                        </select>
+                        <SearchableSelect
+                            value={config.form || ''}
+                            onChange={v => setConfig({ ...config, form: v })}
+                            options={getFormOptions().map(f => ({ value: f, label: `Form ${f}` }))}
+                            placeholder="Select..."
+                        />
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Include SPD?</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
-                            value={config.spd}
-                            onChange={e => setConfig({ ...config, spd: e.target.value })}
-                        >
-                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Include SPD?</label>
+                        <SegmentedControl
+                            value={config.spd || 'No'}
+                            onChange={v => setConfig({ ...config, spd: v })}
+                        />
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Includes ACBs?</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-green-500 outline-none"
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Includes ACBs?</label>
+                        <SegmentedControl
                             value={config.includesAcbs || 'No'}
-                            onChange={e => setConfig({ ...config, includesAcbs: e.target.value })}
-                        >
-                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                            onChange={v => setConfig({ ...config, includesAcbs: v })}
+                        />
                     </div>
                 </div>
             </div>
@@ -711,13 +836,12 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     <div className="bg-white p-3 rounded border border-gray-200 space-y-3">
                         <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-gray-700">CT Metering</label>
-                            <select
-                                className="p-1 px-2 bg-white border border-gray-200 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                value={config.ctMetering}
-                                onChange={e => setConfig({ ...config, ctMetering: e.target.value })}
-                            >
-                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                            <div className="w-28">
+                                <SegmentedControl
+                                    value={config.ctMetering || 'No'}
+                                    onChange={v => setConfig({ ...config, ctMetering: v })}
+                                />
+                            </div>
                         </div>
                         {config.ctMetering === 'Yes' && (
                             <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
@@ -749,13 +873,12 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     <div className="bg-white p-3 rounded border border-gray-200 space-y-3">
                         <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-gray-700">Spare CT / Space</label>
-                            <select
-                                className="p-1 px-2 bg-white border border-gray-200 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                value={config.ctSpareProvision || 'No'}
-                                onChange={e => setConfig({ ...config, ctSpareProvision: e.target.value })}
-                            >
-                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                            <div className="w-28">
+                                <SegmentedControl
+                                    value={config.ctSpareProvision || 'No'}
+                                    onChange={v => setConfig({ ...config, ctSpareProvision: v })}
+                                />
+                            </div>
                         </div>
                         {config.ctSpareProvision === 'Yes' && (
                             <div className="pt-2 border-t border-gray-100">
@@ -780,31 +903,29 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     <div className="bg-white p-3 rounded border border-gray-200 space-y-3">
                         <div className="flex justify-between items-center">
                             <label className="text-xs font-bold text-gray-700">Whole-Current</label>
-                            <select
-                                className="p-1 px-2 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                value={config.wholeCurrentMetering}
-                                onChange={e => {
-                                    const val = e.target.value;
-                                    let newMeters = config.wholeCurrentMeters || [];
+                            <div className="w-28">
+                                <SegmentedControl
+                                    value={config.wholeCurrentMetering || 'No'}
+                                    onChange={val => {
+                                        let newMeters = config.wholeCurrentMeters || [];
 
-                                    if (val === 'Yes') {
-                                        // If turning ON and empty, add default
-                                        if (newMeters.length === 0) {
-                                            newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+                                        if (val === 'Yes') {
+                                            // If turning ON and empty, add default
+                                            if (newMeters.length === 0) {
+                                                newMeters = [{ type: config.wcType || '100A wiring 3-phase', quantity: config.wcQuantity || 1 }];
+                                            }
+                                            const total = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
+                                            setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: total });
+                                            setIsBakeliteOverridden(false);
+                                        } else {
+                                            // If turning OFF, explicit clear
+                                            newMeters = [];
+                                            setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: undefined });
+                                            setIsBakeliteOverridden(false);
                                         }
-                                        const total = newMeters.reduce((a, m) => a + (m.quantity || 1), 0);
-                                        setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: total });
-                                        setIsBakeliteOverridden(false);
-                                    } else {
-                                        // If turning OFF, explicit clear
-                                        newMeters = [];
-                                        setConfig({ ...config, wholeCurrentMetering: val, wholeCurrentMeters: newMeters, bakeliteQty: undefined });
-                                        setIsBakeliteOverridden(false);
-                                    }
-                                }}
-                            >
-                                {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                            </select>
+                                    }}
+                                />
+                            </div>
                         </div>
                         {config.wholeCurrentMetering === 'Yes' && (
                             <div className="pt-2 border-t border-gray-100 space-y-3">
@@ -908,24 +1029,18 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Meter Panel Included</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                            value={config.meterPanel}
-                            onChange={e => setConfig({ ...config, meterPanel: e.target.value })}
-                        >
-                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Meter Panel Included</label>
+                        <SegmentedControl
+                            value={config.meterPanel || 'No'}
+                            onChange={v => setConfig({ ...config, meterPanel: v })}
+                        />
                     </div>
                     <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Drawing Ref</label>
-                        <select
-                            className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                            value={config.drawingRef}
-                            onChange={e => setConfig({ ...config, drawingRef: e.target.value })}
-                        >
-                            {YES_NO.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        <label className="block text-xs font-semibold text-gray-600 mb-2">Drawing Ref</label>
+                        <SegmentedControl
+                            value={config.drawingRef || 'No'}
+                            onChange={v => setConfig({ ...config, drawingRef: v })}
+                        />
                         {config.drawingRef === 'Yes' && (
                             <input
                                 type="text"
