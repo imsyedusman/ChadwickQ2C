@@ -95,10 +95,10 @@ async function main() {
         console.log(`Deleted ${deleted.count} existing vendor catalog items.`);
 
         // Import vendor catalog
-        const result = await prisma.catalogItem.createMany({
-            data: vendorCatalog.map(item => ({
+        let imported = 0;
+        for (const item of vendorCatalog) {
+            const data = {
                 brand: item.brand,
-                partNumber: item.partNo || null,
                 category: 'Switchboard', // All vendor items belong to Switchboard master category
                 subcategory: item.category, // Original category becomes subcategory for UI grouping
                 description: item.description,
@@ -107,10 +107,34 @@ async function main() {
                 unitPrice: item.cost,
                 notes: item.notes || null,
                 isAutoAdd: false, // Vendor items are never auto-added to boards
-            }))
-        });
+            };
 
-        console.log(`Successfully imported ${result.count} vendor catalog items.`);
+            if (!item.partNo) {
+                await prisma.catalogItem.create({ data: { ...data, partNumber: null } });
+                imported++;
+                continue;
+            }
+
+            const existing = await prisma.catalogItem.findUnique({
+                where: { partNumber: item.partNo }
+            });
+            if (existing) {
+                await prisma.catalogItem.update({
+                    where: { id: existing.id },
+                    data: {
+                        unitPrice: typeof data.unitPrice === 'number' ? data.unitPrice : 0,
+                        labourHours: typeof data.labourHours === 'number' ? data.labourHours : 0,
+                        description: data.description
+                    }
+                });
+                imported++;
+            } else {
+                await prisma.catalogItem.create({ data: { ...data, partNumber: item.partNo } });
+                imported++;
+            }
+        }
+
+        console.log(`Successfully imported ${imported} vendor catalog items.`);
         console.log('\nVendor items organized by brand:');
         console.log('- MERCS: 2 items');
         console.log('- NHP: 18 items');

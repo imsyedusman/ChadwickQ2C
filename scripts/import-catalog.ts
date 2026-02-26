@@ -36,18 +36,32 @@ async function main() {
             }
 
             console.log('Importing items...');
-            const itemsToCreate = items.map((item: any) => {
+            for (const item of items) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const { id, createdAt, updatedAt, ...rest } = item;
-                return rest;
-            });
+                if (!rest.partNumber) {
+                    await tx.catalogItem.create({ data: rest });
+                    continue;
+                }
+                const existing = await tx.catalogItem.findUnique({
+                    where: { partNumber: rest.partNumber }
+                });
+                if (existing) {
+                    await tx.catalogItem.update({
+                        where: { id: existing.id },
+                        data: {
+                            unitPrice: typeof rest.unitPrice === 'number' ? rest.unitPrice : 0,
+                            labourHours: typeof rest.labourHours === 'number' ? rest.labourHours : 0,
+                            description: rest.description
+                        }
+                    });
+                } else {
+                    await tx.catalogItem.create({ data: rest });
+                }
+            }
 
-            const result = await tx.catalogItem.createMany({
-                data: itemsToCreate
-            });
-
-            console.log(`Imported ${result.count} items.`);
-        });
+            console.log(`Import finished!`);
+        }, { timeout: 300000 });
 
         console.log('Import successful!');
 

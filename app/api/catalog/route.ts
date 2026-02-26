@@ -234,24 +234,64 @@ export async function POST(request: Request) {
 
         console.log(`Attempting to import ${items.length} items...`);
 
-        // Use createMany for better performance with SQLite/Postgres
-        const result = await prisma.catalogItem.createMany({
-            data: items.map((item: any) => ({
-                brand: item.brand,
-                category: item.category,
-                subcategory: item.subcategory,
-                partNumber: item.partNumber,
-                description: item.description,
-                unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
-                labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
-                notes: item.notes,
-                meterType: item.meterType // Persist meterType
-            }))
+        let createdCount = 0;
+        let updatedCount = 0;
+
+        await prisma.$transaction(async (tx) => {
+            for (const item of items) {
+                if (!item.partNumber) {
+                    await tx.catalogItem.create({
+                        data: {
+                            brand: item.brand,
+                            category: item.category,
+                            subcategory: item.subcategory,
+                            description: item.description,
+                            unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
+                            labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
+                            notes: item.notes,
+                            meterType: item.meterType,
+                        }
+                    });
+                    createdCount++;
+                    continue;
+                }
+
+                const existing = await tx.catalogItem.findUnique({
+                    where: { partNumber: item.partNumber }
+                });
+
+                if (existing) {
+                    await tx.catalogItem.update({
+                        where: { id: existing.id },
+                        data: {
+                            unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
+                            labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
+                            description: item.description, // Allow description updates
+                        }
+                    });
+                    updatedCount++;
+                } else {
+                    await tx.catalogItem.create({
+                        data: {
+                            brand: item.brand,
+                            category: item.category,
+                            subcategory: item.subcategory,
+                            partNumber: item.partNumber,
+                            description: item.description,
+                            unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
+                            labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
+                            notes: item.notes,
+                            meterType: item.meterType
+                        }
+                    });
+                    createdCount++;
+                }
+            }
         });
 
-        console.log(`Successfully imported ${result.count} items.`);
+        console.log(`Successfully imported. Created: ${createdCount}, Updated: ${updatedCount}.`);
 
-        return NextResponse.json({ count: result.count });
+        return NextResponse.json({ count: createdCount + updatedCount, created: createdCount, updated: updatedCount });
     } catch (error) {
         console.error('Catalog Import Error:', error);
         return NextResponse.json({ error: 'Failed to import catalog', details: String(error) }, { status: 500 });
