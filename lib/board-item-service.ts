@@ -266,6 +266,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     if (!boardData) return;
 
+    // Calculate global pricing context
+    let effectiveCopperPrice = 15.0;
+    const globalSettings = await prisma.settings.findUnique({ where: { id: 'global' } });
+
+    if (boardData.quote?.overrideCopperPricePerKg != null) {
+        effectiveCopperPrice = Number(boardData.quote.overrideCopperPricePerKg);
+    } else if (globalSettings?.copperPricePerKg != null) {
+        effectiveCopperPrice = Number(globalSettings.copperPricePerKg);
+    }
+
+    const pricingContext = { copperPrice: effectiveCopperPrice };
+
     let existingItems = boardData.items;
 
     // --- COMPOSITE SYNC BLOCK ---
@@ -1577,6 +1589,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     newNotes = (newNotes || '') + '\n[INFO] Cleat automation applies up to 50kA. Above this rating, cleats are fully manual and must be reviewed by engineering.';
                 }
 
+                if (catalogItem && catalogItem.isCopperPriced) {
+                    const dynamicCalc = calculateBusbarUnitPrice(catalogItem as any, pricingContext);
+                    newUnitPrice = Number(dynamicCalc);
+                }
+
                 await prisma.item.update({
                     where: { id: existingItem.id },
                     data: {
@@ -1646,6 +1663,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     finalUnitPrice = targetPrice !== undefined ? targetPrice : 0;
                     finalLabourHours = targetLabour !== undefined ? targetLabour : 0;
                 }
+            }
+
+            if (catalogItem && catalogItem.isCopperPriced) {
+                const dynamicCalc = calculateBusbarUnitPrice(catalogItem as any, pricingContext);
+                finalUnitPrice = Number(dynamicCalc);
             }
 
             await prisma.item.create({
