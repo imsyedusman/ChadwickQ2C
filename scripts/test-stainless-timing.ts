@@ -30,6 +30,7 @@ async function runTest() {
         material: 'Powder 316 Stainless Steel',
         // Minimal required fields to prevent errors
         ctMetering: 'No',
+        meterPanel: 'No',
         wholeCurrentMetering: 'No',
         surgeProtection: 'No'
     };
