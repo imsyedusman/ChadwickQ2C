@@ -1,0 +1,154 @@
+﻿node.exe : PrismaClient
+ValidationError: 
+At line:1 char:1
++ & "C:\Program 
+Files\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (PrismaClientV   
+ alidationError: :S    
+tring) [], RemoteE    
+xception
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Invalid `prisma.quote.c
+reate()` invocation in
+D:\Work\1. Projects\3. 
+My Projects\Chadwick\Qu
+otes\My Workings\Web Ap
+p\test-ss-fix.ts:10:38
+
+   7 
+console.log("Setting 
+up test quote and 
+board...");
+   8 
+   9 // 1. Create a 
+dummy quote
+→ 10 const quote = 
+await 
+prisma.quote.create({
+       data: {
+         title: "SS 
+Calculation Test 
+Quote",
+         ~~~~~
+         status: 
+"Draft",
+         quoteNumber: 
+"TEST-SS-001",
+     ?   id?: String,
+     ?   clientName?: 
+String | Null,
+     ?   
+clientCompany?: String 
+| Null,
+     ?   projectRef?: 
+String | Null,
+     ?   description?: 
+String | Null,
+     ?   createdAt?: 
+DateTime,
+     ?   updatedAt?: 
+DateTime,
+     ?   
+settingsSnapshot?: 
+String | Null,
+     ?   
+globalDiscount?: Float,
+     ?   
+globalContingency?: 
+Float,
+     ?   overrideCopper
+PricePerKg?: Float | 
+Null,
+     ?   
+overrideLabourRate?: 
+Float | Null,
+     ?   
+overrideOverheadPct?: 
+Float | Null,
+     ?   overrideEngine
+eringPct?: Float | 
+Null,
+     ?   overrideTarget
+MarginPct?: Float | 
+Null,
+     ?   overrideConsum
+ablesPct?: Float | 
+Null,
+     ?   
+overrideGstPct?: Float 
+| Null,
+     ?   overrideRoundi
+ngIncrement?: Int | 
+Null,
+     ?   boards?: Board
+CreateNestedManyWithout
+QuoteInput
+       }
+     })
+
+Unknown argument 
+`title`. Available 
+options are marked 
+with ?.
+    at wn (D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\node_m
+odules\@prisma\client\r
+untime\library.js:29:13
+63)
+    at 
+$n.handleRequestError 
+(D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\node_m
+odules\@prisma\client\r
+untime\library.js:121:6
+958)
+    at $n.handleAndLogR
+equestError 
+(D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\node_m
+odules\@prisma\client\r
+untime\library.js:121:6
+623)
+    at $n.request 
+(D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\node_m
+odules\@prisma\client\r
+untime\library.js:121:6
+307)
+    at async l 
+(D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\node_m
+odules\@prisma\client\r
+untime\library.js:130:9
+633)
+    at async run 
+(D:\Work\1. 
+Projects\3. My Projects
+\Chadwick\Quotes\My 
+Workings\Web App\test-s
+s-fix.ts:10:19) {
+  clientVersion: 
+'5.22.0'
+}

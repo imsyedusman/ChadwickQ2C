@@ -1222,56 +1222,6 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     catalogItems.forEach((i: PrismaCatalogItem) => { if (i.partNumber) catalogMap.set(i.partNumber, i as any); });
 
 
-    // --- 4. STAINLESS UPLIFT CALCULATION ---
-    // Zero-Tier Check: If tierCount == 0, we don't do uplift (Misc/Base/Tiers are gone).
-    // Requirement: "If tiers go to 0... Stainless uplift should be removed"
-
-    if (tierCount > 0 && config.enclosureType === 'Custom' &&
-        (config.material === 'Powder 316 Stainless Steel' || config.material === '316 Stainless Steel Natural Finish')) {
-
-        // Calculate S = Sum of material costs for Sheet Metal Base Items
-        let S = 0;
-
-        for (const itemPn of SHEET_METAL_BASE_ITEMS) {
-            // Determine Qty
-            const targetQty = itemQuantities.get(itemPn);
-            const existing = existingItems.find((i: Item) => i.name === itemPn);
-
-            // Priority for Qty: Target > Existing > 0
-            const qty = targetQty !== undefined ? targetQty : (Number(existing?.quantity) || 0);
-
-            if (qty <= 0) continue;
-
-            // Determine Unit Price
-            // Priority: Custom Target Price > Existing Price > Catalog Price > 0
-            let unitPrice = 0;
-
-            if (customPricing.has(itemPn)) {
-                unitPrice = customPricing.get(itemPn)!;
-            } else if (existing) {
-                unitPrice = existing.unitPrice;
-            } else {
-                // Determine form catalog
-                const catParams = catalogMap.get(itemPn);
-                unitPrice = catParams?.unitPrice || 0;
-            }
-
-            const itemCost = qty * unitPrice;
-
-            console.log(`[SS Uplift] Item: ${itemPn}, Qty: ${qty}, Price: ${unitPrice}, Cost: ${itemCost}`);
-
-            S += itemCost;
-        }
-
-        // Apply Factor
-        const factor = config.material === 'Powder 316 Stainless Steel' ? 0.65 : 0.75;
-        const upliftCost = S * factor;
-        const upliftItemName = config.material === 'Powder 316 Stainless Steel' ? '1B-SS-2B' : '1B-SS-NO4';
-
-        console.log(`Stainless Uplift: TotalBase=${S}, Factor=${factor}, Item=${upliftItemName}, Uplift=${upliftCost}`);
-
-        addTarget(upliftItemName, 1, upliftCost);
-    }
 
     // --- 4.5 CUSTOM COMPARTMENTS LOGIC (New 2026-02-20) ---
     // If Custom board has compartments, add 1B-COMPARTMENTS with Qty = totalCompartments
@@ -1440,6 +1390,57 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     }
     // --- END EXTRA DOORS AUTOMATION ---
+
+    // --- 4. STAINLESS UPLIFT CALCULATION ---
+    // Zero-Tier Check: If tierCount == 0, we don't do uplift (Misc/Base/Tiers are gone).
+    // Requirement: "If tiers go to 0... Stainless uplift should be removed"
+
+    if (tierCount > 0 && config.enclosureType === 'Custom' &&
+        (config.material === 'Powder 316 Stainless Steel' || config.material === '316 Stainless Steel Natural Finish')) {
+
+        // Calculate S = Sum of material costs for Sheet Metal Base Items
+        let S = 0;
+
+        for (const itemPn of SHEET_METAL_BASE_ITEMS) {
+            // Determine Qty
+            const targetQty = itemQuantities.get(itemPn);
+            const existing = existingItems.find((i: Item) => i.name === itemPn);
+
+            // Priority for Qty: Target > Existing > 0
+            const qty = targetQty !== undefined ? targetQty : (Number(existing?.quantity) || 0);
+
+            if (qty <= 0) continue;
+
+            // Determine Unit Price
+            // Priority: Custom Target Price > Existing Price > Catalog Price > 0
+            let unitPrice = 0;
+
+            if (customPricing.has(itemPn)) {
+                unitPrice = customPricing.get(itemPn)!;
+            } else if (existing) {
+                unitPrice = existing.unitPrice;
+            } else {
+                // Determine form catalog
+                const catParams = catalogMap.get(itemPn);
+                unitPrice = catParams?.unitPrice || 0;
+            }
+
+            const itemCost = qty * unitPrice;
+
+            console.log(`[SS Uplift] Item: ${itemPn}, Qty: ${qty}, Price: ${unitPrice}, Cost: ${itemCost}`);
+
+            S += itemCost;
+        }
+
+        // Apply Factor
+        const factor = config.material === 'Powder 316 Stainless Steel' ? 0.65 : 0.75;
+        const upliftCost = S * factor;
+        const upliftItemName = config.material === 'Powder 316 Stainless Steel' ? '1B-SS-2B' : '1B-SS-NO4';
+
+        console.log(`Stainless Uplift: TotalBase=${S}, Factor=${factor}, Item=${upliftItemName}, Uplift=${upliftCost}`);
+
+        addTarget(upliftItemName, 1, upliftCost);
+    }
     // A. Remove Items
     // Remove items that are isDefault=true AND in our "Managed Lists" but NOT in current targets
     // Managed lists = arrays of potential auto-items

@@ -1,0 +1,106 @@
+﻿--- STAINLESS TIMING FIX TEST ---
+Using quote 5905a96a-0819-4d4d-82f8-ae76eff0ae42 and created board b7513419-01c0-4cba-801e-98fa64927d41
+
+>>> RUNNING FIRST SYNC (Fresh Board) <<<
+Syncing items for board b7513419-01c0-4cba-801e-98fa64927d41 with config: {
+  "tierCount": 1,
+  "totalCompartments": 4,
+  "baseRequired": "Yes",
+  "extraForDoorsOver": true,
+  "enclosureDepth": "400",
+  "enclosureType": "Custom",
+  "material": "Powder 316 Stainless Steel",
+  "ctMetering": "No",
+  "wholeCurrentMetering": "No",
+  "surgeProtection": "No"
+}
+
+--- DIGITAL METER SYNC STARTED ---
+DIGITAL_METER_PARTS length: 18
+existingItems length: 0
+totalMeters found: 0
+
+--- SURGE DIVERTER SYNC STARTED ---
+Effective Tier Count: 1 (Source: Config (Forced))
+Base Calculation: Tiers=1, Total=400, Unit=400
+--- METERING DEBUG ---
+Config CT Metering: "No"
+Config Current Rating: "undefined"
+Parsed Amps: 0
+Is Over 100A: false
+CT Strict (Yes?): false
+CT MODE ACTIVE: false
+WC METERING ACTIVE: undefined
+----------------
+[Cleats] Out of Scope (User Managed). Custom=true, Form3B=false, Fault=999kA
+
+--- EXTRA DOORS SYNC STARTED ---
+[Extra Doors] Creating new system-managed item for 1B-DOORS with qty 1
+[Extra Doors] State mutated. Re-fetching existingItems from database.
+[SS Uplift] Item: 1B-TIERS-400, Qty: 1, Price: 1800, Cost: 1800
+[SS Uplift] Item: 1B-COMPARTMENTS, Qty: 4, Price: 350, Cost: 1400
+[SS Uplift] Item: 1B-BASE, Qty: 1, Price: 400, Cost: 400
+[SS Uplift] Item: 1B-DOORS, Qty: 1, Price: 600, Cost: 600
+Stainless Uplift: TotalBase=4200, Factor=0.65, Item=1B-SS-2B, Uplift=2730
+
+--- Pass 1 Final State ---
+- Base Item: 1B-DOORS | Qty: 1 | Unit: $600 | Ext: $600
+- Base Item: 1B-TIERS-400 | Qty: 1 | Unit: $1800 | Ext: $1800
+- Base Item: 1B-COMPARTMENTS | Qty: 4 | Unit: $350 | Ext: $1400
+- Base Item: 1B-BASE | Qty: 1 | Unit: $400 | Ext: $400
+- SS Uplift: 1B-SS-2B | Qty: 1 | Unit: $2730 | Ext: $2730
+
+Pass 1 Verification:
+Expected Base String: $4200.00 | Actual Base Sum: $4200.00
+Expected SS Uplift: $2730.00 | Actual SS Uplift: $2730.00
+✅ PASS 1 SUCCESS: Stainless correctly calculated on initial sync!
+
+>>> RUNNING SECOND SYNC (Existing Board) <<<
+Syncing items for board b7513419-01c0-4cba-801e-98fa64927d41 with config: {
+  "tierCount": 1,
+  "totalCompartments": 4,
+  "baseRequired": "Yes",
+  "extraForDoorsOver": true,
+  "enclosureDepth": "400",
+  "enclosureType": "Custom",
+  "material": "Powder 316 Stainless Steel",
+  "ctMetering": "No",
+  "wholeCurrentMetering": "No",
+  "surgeProtection": "No"
+}
+
+--- DIGITAL METER SYNC STARTED ---
+DIGITAL_METER_PARTS length: 18
+existingItems length: 9
+totalMeters found: 0
+
+--- SURGE DIVERTER SYNC STARTED ---
+Effective Tier Count: 1 (Source: Config (Forced))
+Base Calculation: Tiers=1, Total=400, Unit=400
+--- METERING DEBUG ---
+Config CT Metering: "No"
+Config Current Rating: "undefined"
+Parsed Amps: 0
+Is Over 100A: false
+CT Strict (Yes?): false
+CT MODE ACTIVE: false
+WC METERING ACTIVE: undefined
+----------------
+[Cleats] Out of Scope (User Managed). Custom=true, Form3B=false, Fault=999kA
+
+--- EXTRA DOORS SYNC STARTED ---
+[SS Uplift] Item: 1B-TIERS-400, Qty: 1, Price: 1800, Cost: 1800
+[SS Uplift] Item: 1B-COMPARTMENTS, Qty: 4, Price: 350, Cost: 1400
+[SS Uplift] Item: 1B-BASE, Qty: 1, Price: 400, Cost: 400
+[SS Uplift] Item: 1B-DOORS, Qty: 1, Price: 600, Cost: 600
+Stainless Uplift: TotalBase=4200, Factor=0.65, Item=1B-SS-2B, Uplift=2730
+
+--- Pass 2 Final State ---
+
+Pass 2 Verification:
+Expected Base String: $4200.00 | Actual Base Sum: $4200.00
+Expected SS Uplift: $2730.00 | Actual SS Uplift: $2730.00
+✅ PASS 2 SUCCESS: Identical idempotent output on re-sync!
+
+Cleaning up test data...
+Done.

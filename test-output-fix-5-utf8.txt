@@ -1,0 +1,45 @@
+﻿Setting up test quote and board...
+Created test board: 7b505086-65d3-440d-b532-b01024bed4c8
+
+Running syncBoardItems()...
+Syncing items for board 7b505086-65d3-440d-b532-b01024bed4c8 with config: {
+  "labourRate": 100,
+  "copperPricePerKg": 15
+}
+
+--- DIGITAL METER SYNC STARTED ---
+DIGITAL_METER_PARTS length: 18
+existingItems length: 5
+totalMeters found: 0
+
+--- SURGE DIVERTER SYNC STARTED ---
+Effective Tier Count: 0 (Source: Config (Forced))
+--- METERING DEBUG ---
+Config CT Metering: "undefined"
+Config Current Rating: "undefined"
+Parsed Amps: 0
+Is Over 100A: false
+CT Strict (Yes?): false
+CT MODE ACTIVE: false
+WC METERING ACTIVE: undefined
+----------------
+[Cleats] Out of Scope (User Managed). Custom=false, Form3B=false, Fault=999kA
+
+--- EXTRA DOORS SYNC STARTED ---
+
+--- Verification Results ---
+
+Target Quantities for Enclosures:
+1B-TIERS-400: 3
+1B-COMPARTMENTS: 12
+1B-BASE: 1
+1B-DOORS: 3
+1B-600MM: 1
+Found: 1B-DOORS | Qty: 3
+
+Expected Structural Count (Sum): 3
+Expected Stainless Qty (Sum * 0.65): 1.9500000000000002
+
+Actual Stainless Item Result:
+
+Cleanup complete.

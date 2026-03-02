@@ -1,0 +1,18 @@
+﻿--- 1. Base Items Overview ---
+Item: 1B-TIERS-400     | Qty: 3 | Unit Price: $1400.00 | Extended Cost: $4200.00
+Item: 1B-COMPARTMENTS  | Qty: 12 | Unit Price: $350.00 | Extended Cost: $4200.00
+Item: 1B-BASE          | Qty: 1 | Unit Price: $0.00 | Extended Cost: $0.00
+Item: 1B-DOORS         | Qty: 3 | Unit Price: $600.00 | Extended Cost: $1800.00
+Item: 1B-600MM         | Qty: 1 | Unit Price: $1000.00 | Extended Cost: $1000.00
+Item: 1B-800MM         | Qty: 0 | Unit Price: $2000.00 | Extended Cost: $0.00
+
+--- 2. Totals ---
+Summed Base Material Cost (S): $11200.00
+Multiplier (2B): 0.65
+Multiplier (NO4): 0.75
+Final Stainless Value (2B): $7280.00
+Final Stainless Value (NO4): $8400.00
+
+--- 3. Database Catalog Values for Uplift Items ---
+Catalog item: 1B-SS-2B, Unit Price: $3835.00
+Catalog item: 1B-SS-NO4, Unit Price: $4425.00

@@ -1,0 +1,68 @@
+﻿Setting up test quote and board...
+Created test board: 0f4513cc-15c0-4891-aade-a7685fbf5918
+
+Running syncBoardItems()...
+Syncing items for board 0f4513cc-15c0-4891-aade-a7685fbf5918 with config: {
+  "enclosureType": "Custom",
+  "material": "Powder 316 Stainless Steel",
+  "tierCount": 3,
+  "totalCompartments": 12,
+  "hasBase": "Yes",
+  "extraDoors": 3,
+  "is600MM": "Yes",
+  "is800MM": "No",
+  "width": 800,
+  "ipRating": "IP54",
+  "form": "3b",
+  "colour": "RAL7035",
+  "faultRating": "25kA",
+  "mainSwitchRating": "250A",
+  "cableEntry": "Top",
+  "cableExit": "Bottom",
+  "insulationLevel": "Air"
+}
+
+--- DIGITAL METER SYNC STARTED ---
+DIGITAL_METER_PARTS length: 18
+existingItems length: 5
+totalMeters found: 0
+
+--- SURGE DIVERTER SYNC STARTED ---
+Effective Tier Count: 3 (Source: Config (Forced))
+--- METERING DEBUG ---
+Config CT Metering: "undefined"
+Config Current Rating: "undefined"
+Parsed Amps: 0
+Is Over 100A: false
+CT Strict (Yes?): false
+CT MODE ACTIVE: false
+WC METERING ACTIVE: undefined
+----------------
+Stainless Uplift: StructuralCount=20, Factor=0.65, Item=1B-SS-2B, Qty=13
+
+--- EXTRA DOORS SYNC STARTED ---
+
+--- Verification Results ---
+
+Target Quantities for Enclosures:
+1B-TIERS-400: 3
+1B-COMPARTMENTS: 12
+1B-BASE: 1
+1B-DOORS: 3
+1B-600MM: 1
+Found: 1B-TIERS-400 | Qty: 3
+Found: 1B-COMPARTMENTS | Qty: 12
+Found: 1B-DOORS | Qty: 3
+
+Expected Structural Count (Sum): 18
+Expected Stainless Qty (Sum * 0.65): 11.700000000000001
+
+Actual Stainless Item Result:
+Item: 1B-SS-2B
+Quantity: 13
+Unit Price: $3835.00
+Total Cost: $49855.00
+
+Verification PASS: false
+
+Cleanup complete.
