@@ -19,14 +19,18 @@ export class ExportService {
             projectRef: quote.projectRef,
             description: quote.description,
             boards: quote.boards.map((board: any) => {
-                // Use pre-calculated board total if available (ensures consistency with route.ts)
-                const preCalculated = totals.boardTotals?.find((t: any) => t.boardId === board.id);
-
                 let boardTotal;
-                if (preCalculated) {
-                    boardTotal = preCalculated.sellPriceRounded;
+
+                if (totals?.boardTotals && totals.boardTotals.length > 0) {
+                    // SAFEGUARD 1: Do NOT recalculate if boardTotals exists
+                    const providedTotal = totals.boardTotals.find((t: any) => t.boardId === board.id);
+                    if (!providedTotal) {
+                        throw new Error(`Export safeguard failed: No pre-calculated total provided for board ${board.id}`);
+                    }
+                    boardTotal = providedTotal.sellPriceRounded;
                 } else {
-                    // Fallback to calculation
+                    // Fallback to calculation ONLY if boardTotals is completely absent
+                    // (e.g. legacy direct API calls that don't pass frontend totals)
                     boardTotal = this.calculateBoardTotal(board, settings);
                 }
 

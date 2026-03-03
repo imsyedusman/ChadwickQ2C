@@ -9,7 +9,7 @@ import FinancialsHeroCard from './FinancialsHeroCard';
 import SidebarCard from './SidebarCard';
 
 export default function GrandTotalView() {
-    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings, effectiveSettings } = useQuote();
+    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings, effectiveSettings, allBoardTotals } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
 
     if (!grandTotals) return null;
@@ -74,12 +74,17 @@ export default function GrandTotalView() {
 
             console.log("Calling ExportService with template:", templatePath);
 
-            // Pass null for boardTotals so ExportService calculates them using effectiveSettings
+            // Map allBoardTotals securely by boardId
+            const mappedBoardTotals = Object.entries(allBoardTotals).map(([boardId, totalsObj]) => ({
+                boardId: boardId,
+                sellPriceRounded: totalsObj.sellPriceRounded
+            }));
+
             await ExportService.generateQuoteDocument({
                 quote: { ...quoteData, templatePath },
                 settings: effectiveSettings, // Use effective settings (with overrides)
                 totals: {
-                    boardTotals: null,
+                    boardTotals: mappedBoardTotals,
                     grandTotals
                 }
             });
