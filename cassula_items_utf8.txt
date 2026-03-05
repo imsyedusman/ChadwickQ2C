@@ -1,0 +1,40 @@
+﻿
+Quote: Casula Childcare Centre
+
+Board: MSB-New Board
+| Category | Subcategory | Item | Qty | Labour Hours | Material Cost |
+|----------|-------------|------|-----|--------------|---------------|
+| Basics | Cubic Switchboard Enclosures (includes busbar supports) | 1A-TIERS | 3 | 18.00 | $4500.00 |
+| Basics | CT Metering | CT-TEST-BLOCK | 1 | 0.20 | $50.00 |
+| Basics | CT Metering | CT-WIRING | 1 | 3.50 | $45.00 |
+| Basics | Miscellaneous | MISC-TEST-TIERS | 3 | 3.00 | $0.00 |
+| Basics | Cubic Switchboard Enclosures (includes busbar supports) | 1A-COMPARTMENTS | 16 | 19.20 | $4800.00 |
+| Basics | CT Metering | CT-COMPARTMENTS | 1 | 2.50 | $120.00 |
+| Basics | CT Metering | CT-T-TYPE | 1 | 0.70 | $690.00 |
+| Basics | Miscellaneous | MISC-DELIVERY-HIAB | 1 | 1.00 | $800.00 |
+| Basics | Miscellaneous | MISC-CABLE-TRAY | 1 | 0.30 | $25.00 |
+| Basics | Cubic Switchboard Enclosures (includes busbar supports) | 1A-50KA | 1 | 4.80 | $1200.00 |
+| Basics | Miscellaneous | MISC-LABELS | 3 | 0.90 | $90.00 |
+| Basics | CT Metering | CT-PANEL | 1 | 1.00 | $80.00 |
+| Basics | Miscellaneous | MISC-HARDWARE | 3 | 0.30 | $150.00 |
+| Busbar | MCCB Tee Off Bars - labour and copper | MCCB-250A | 9 | 18.00 | $675.00 |
+| Busbar | MCCB Tee Off Bars - labour and copper | MCCB-400A | 4 | 8.00 | $400.00 |
+| Busbar | Main Bars - labour and copper > Cubic Busbars | BBC-400A-2 | 4 | 24.00 | $700.00 |
+| Busbar | CT Chamber Labour - copper included above | CT-400A | 1 | 6.00 | $0.00 |
+| Busbar |  | Busbar Insulation | 1 | 33.60 | $538.00 |
+| Switchboard | Circuit Breakers > MCCB > 36kA TM | C10F3TM063 | 2 | 1.00 | $357.68 |
+| Switchboard | Circuit Breakers > MCCB > 36kA TM | C10F3TM100 | 5 | 2.50 | $1210.95 |
+| Switchboard | MCCB Accessories | LV429517 | 14 | 1.40 | $232.26 |
+| Switchboard | MCCB Accessories | LV429338T | 7 | 3.50 | $678.65 |
+| Switchboard | MCCB Accessories | LV432593 | 2 | 0.20 | $71.54 |
+| Switchboard | MCCB Accessories | LV432598T | 1 | 0.50 | $130.02 |
+| Switchboard | Circuit Breakers > MCCB > 36kA ELECT | C40F32D400 | 1 | 0.50 | $709.08 |
+| Switchboard | Miscellaneous > Surge Protection Equipment > Surge Diverter | TDX100C-277/480 | 1 | 0.30 | $564.14 |
+| Switchboard | Fuses | IPD-FUSE-63A | 3 | 0.30 | $53.55 |
+| Switchboard | Wiring | IPD-WIRING-SURGE | 1 | 2.50 | $25.00 |
+| Switchboard | Power Meters | METSEPM3250 | 2 | 0.20 | $1276.74 |
+| Switchboard | Wiring | IPD-WIRING-DIGITAL | 2 | 8.00 | $63.00 |
+| Switchboard | Miscellaneous > Fuses | CHD-FUSE-20A-DIN | 6 | 0.60 | $22.20 |
+| Switchboard | Current Transformers | NHP-TEST-LINK | 2 | 0.20 | $96.00 |
+| Switchboard | Switches > Isolator > 3P | 31110 | 1 | 1.00 | $338.44 |
+| Switchboard | Current Transformers | TAIBB405A | 6 | 1.20 | $131.04 |

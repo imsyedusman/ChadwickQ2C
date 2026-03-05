@@ -35,50 +35,82 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
     let totalBoardCost = 0;
 
     items.forEach(item => {
-        const qty = item.quantity;
+        const qty = Number(item.quantity) || 0;
         const labour = qty * (item.labourHours || 0);
         const cost = qty * (item.unitPrice || 0);
 
         totalBoardLabour += labour;
         totalBoardCost += cost;
 
-        const cat = item.category || '';
-        // subcategory is typically stored as "Root > Child > Grandchild"
-        const subcatSegments = (item.subcategory || '').split('>').map(s => s.trim());
-        const rootSub = subcatSegments[0] || '';
+        const cat = (item.category || '').toLowerCase();
+        const subcat = (item.subcategory || '').toLowerCase();
+        const name = (item.name || '').toLowerCase();
 
-        // Prioritize structured hierarchical mapping strictly based on user requirements
-        if (cat === 'Switchboard' && rootSub === 'Circuit Breakers') {
+        // Helper to check if any part of the subcategory hierarchy contains a term
+        const subcatContains = (term: string) => subcat.includes(term.toLowerCase());
+
+        // ---------------------------------------------------------------------
+        // HIERARCHY-AWARE MAPPING
+        // ---------------------------------------------------------------------
+
+        // 1. Busbar Insulation (Must check name/subcat under Busbar category)
+        if (cat === 'busbar' && (subcatContains('insulation') || name.includes('insulation'))) {
+            buckets.busbarInsulation.items.push(item);
+            buckets.busbarInsulation.labour += labour;
+            buckets.busbarInsulation.cost += cost;
+        }
+        // 2. Main Busbars
+        else if (cat === 'busbar') {
+            buckets.busbars.items.push(item);
+            buckets.busbars.labour += labour;
+            buckets.busbars.cost += cost;
+        }
+        // 3. Circuit Breakers (Includes MCCB, MCB, Accessories, Trip Units)
+        else if (cat === 'switchboard' && (
+            subcatContains('circuit breaker') ||
+            subcatContains('mccb') ||
+            subcatContains('mcb') ||
+            subcatContains('acb') ||
+            subcatContains('trip unit')
+        )) {
             buckets.circuitBreakers.items.push(item);
             buckets.circuitBreakers.labour += labour;
             buckets.circuitBreakers.cost += cost;
-        } else if (cat === 'Busbar') {
-            if (rootSub === 'Busbar Insulation') {
-                buckets.busbarInsulation.items.push(item);
-                buckets.busbarInsulation.labour += labour;
-                buckets.busbarInsulation.cost += cost;
-            } else {
-                buckets.busbars.items.push(item);
-                buckets.busbars.labour += labour;
-                buckets.busbars.cost += cost;
-            }
-        } else if (cat === 'Switchboard' && ['Power Meters', 'Fuses', 'Current Transformers', 'Miscellaneous'].includes(rootSub)) {
-            buckets.miscellaneous.items.push(item);
-            buckets.miscellaneous.labour += labour;
-            buckets.miscellaneous.cost += cost;
-        } else if (cat === 'Switchboard' && rootSub === 'Switches') {
+        }
+        // 4. Isolators & Switches
+        else if (cat === 'switchboard' && (subcatContains('switch') || subcatContains('isolator'))) {
             buckets.isolators.items.push(item);
             buckets.isolators.labour += labour;
             buckets.isolators.cost += cost;
-        } else if (item.isSystemManaged && (item.systemTag === 'CT_METERING' || item.subcategory === 'CT Metering')) {
+        }
+        // 5. Miscellaneous (Meters, Fuses, CTs, Wiring, Surge, etc.)
+        else if (cat === 'switchboard' && (
+            subcatContains('meter') ||
+            subcatContains('fuse') ||
+            subcatContains('current transformer') ||
+            subcatContains('wiring') ||
+            subcatContains('surge') ||
+            subcatContains('miscellaneous') ||
+            item.systemTag === 'CT_METERING'
+        )) {
+            buckets.miscellaneous.items.push(item);
+            buckets.miscellaneous.labour += labour;
+            buckets.miscellaneous.cost += cost;
+        }
+        // 6. CT Metering (System Managed fallback)
+        else if (item.isSystemManaged && (item.systemTag === 'CT_METERING' || subcatContains('ct metering'))) {
             buckets.ctMetering.items.push(item);
             buckets.ctMetering.labour += labour;
             buckets.ctMetering.cost += cost;
-        } else if (cat === 'Basics') {
+        }
+        // 7. Basics
+        else if (cat === 'basics') {
             buckets.basics.items.push(item);
             buckets.basics.labour += labour;
             buckets.basics.cost += cost;
-        } else {
+        }
+        // 8. Default: Other
+        else {
             buckets.other.items.push(item);
             buckets.other.labour += labour;
             buckets.other.cost += cost;
@@ -107,7 +139,6 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
         other: { label: 'Other', color: 'bg-slate-400', desc: 'Uncategorized items' }
     };
 
-    // Construct groups explicitly in the order requested, ensuring mandatory ones come first
     const allGroups = [
         ...mandatoryOrderKeys,
         'basics',
@@ -117,9 +148,8 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
         key,
         ...groupMeta[key],
         bucket: buckets[key]
-    })).filter(g => g.bucket.items.length > 0 || mandatoryOrderKeys.includes(g.key)); // Ensure mandatory keys exist even if empty to preserve structure visually unless user strictly wants them hidden if empty. Let's assume hidden if empty to save space, but order remains absolute.
+    })).filter(g => g.bucket.items.length > 0 || mandatoryOrderKeys.includes(g.key));
 
-    // Better constraint: We filter empty out, but strictly maintain order.
     const displayGroups = allGroups.filter(g => g.bucket.items.length > 0);
 
     const safePercentNum = (val: number, total: number) => total > 0 ? (val / total) * 100 : 0;
@@ -132,7 +162,6 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
             )}
             onClick={() => setIsExpanded(!isExpanded)}
         >
-            {/* COLLAPSED VIEW (High Signal Strip) */}
             <div className={cn(
                 "px-6 flex items-center gap-6 text-[11px] font-medium overflow-hidden h-8 transition-opacity duration-200",
                 isExpanded ? "opacity-0 absolute inset-0 pointer-events-none" : "opacity-100"
@@ -157,7 +186,6 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
                 ))}
             </div>
 
-            {/* EXPANDED VIEW (Dashboard Layout) */}
             <div className={cn(
                 "px-6 transition-opacity duration-300 delay-100",
                 isExpanded ? "opacity-100" : "opacity-0 h-0 absolute overflow-hidden pointer-events-none"
@@ -189,7 +217,6 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
                                 </div>
 
                                 <div className="space-y-2 mt-3">
-                                    {/* Material Row */}
                                     <div className="flex items-center justify-between text-[11px]">
                                         <span className="text-gray-500">Material</span>
                                         <div className="flex items-center gap-2">
@@ -200,12 +227,10 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
                                             )}>{costPct.toFixed(1)}%</span>
                                         </div>
                                     </div>
-                                    {/* Visual Bar Material */}
                                     <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
                                         <div className={cn("h-full", group.color)} style={{ width: `${costPct}%` }}></div>
                                     </div>
 
-                                    {/* Labour Row */}
                                     <div className="flex items-center justify-between text-[11px] pt-1.5">
                                         <span className="text-gray-500">Labour</span>
                                         <div className="flex items-center gap-2">
@@ -222,7 +247,6 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
                     })}
                 </div>
 
-                {/* Visual Summary Footer */}
                 <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
                     <div className="text-[11px] text-gray-400 flex items-center gap-1.5 transition-colors hover:text-gray-600">
                         <ChevronUp size={14} className="opacity-60" />
