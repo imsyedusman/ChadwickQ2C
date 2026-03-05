@@ -200,18 +200,19 @@ function addCtItems(
     existingItems: any[]
 ) {
     // 1. Base Items (Wiring, Test Block, Compartments)
-    CT_BASE_ITEMS.forEach(pn => targetMap(pn, qty));
+    CT_BASE_ITEMS.forEach(pn => {
+        // Do not add CT-PANEL if the board location is Indoor
+        if (pn === 'CT-PANEL' && config.location === 'Indoor') return;
+        targetMap(pn, qty);
+    });
 
     // 2. CT Type (Coils) - Only if Active Metering
     if (includeCtType && config.ctType) {
         targetMap(`CT-${config.ctType}-TYPE`, qty);
     }
 
-    // 3. Panel Logic (Outdoor 600x600 Rule)
-    // CT-PANEL is the 600x600 item. It's in CT_BASE_ITEMS so already added.
-    // If we needed strict enforcement or distinct items, we'd do it here.
-    // Current requirement: "Outdoor -> enforce 600x600".
-    // CT-PANEL *IS* 600x600. So effectively done.
+    // 3. Panel Logic
+    // Indoor -> do NOT add CT-PANEL. Outdoor -> keep CT-PANEL.
 
     // 4. Busbars & Labour (Only if rating available)
     if (config.currentRating) {
