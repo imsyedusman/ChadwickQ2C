@@ -39,11 +39,7 @@ const AUTO_MANAGED_ITEMS = [
     'Busbar Insulation',
     '1B-DOORS',
     '1B-600MM',
-    '1B-800MM',
-    '1B1-CLEAT-SMALL-1',
-    '1B1-CLEAT-SMALL-2',
-    '1B1-CLEAT-LARGE-2',
-    '1B1-CLEAT-LARGE-3'
+    '1B-800MM'
 ];
 
 // List of Formula-Priced Items
@@ -54,11 +50,7 @@ const FORMULA_PRICED_ITEMS = [
     '1B-600MM', '1B-800MM',
     '1A-50KA', '1A-COLOUR',
     'Busbar Insulation',
-    'MISC-SITE-RECONNECTION',
-    '1B1-CLEAT-SMALL-1',
-    '1B1-CLEAT-SMALL-2',
-    '1B1-CLEAT-LARGE-2',
-    '1B1-CLEAT-LARGE-3'
+    'MISC-SITE-RECONNECTION'
 ];
 
 export function isAutoManaged(partNumber: string): boolean {

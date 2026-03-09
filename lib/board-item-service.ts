@@ -1165,7 +1165,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             if (cleatOverrides[partNumber] !== undefined) {
                 addTarget(partNumber, cleatOverrides[partNumber]);
             } else {
-                addTarget(partNumber, qty);
+                // Safeguard: Respect manual edit if item already exists on board
+                const existing = existingItems.find((i: Item) => i.name === partNumber);
+                if (existing) {
+                    addTarget(partNumber, existing.quantity.toNumber());
+                } else {
+                    addTarget(partNumber, qty);
+                }
             }
         } else {
             // User Managed: Trust the derived quantity (Existing).
@@ -1608,8 +1614,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         isSheetmetal: catalogItem?.isSheetmetal || false,
 
                         // Dynamic Locking
-                        isDefault: isCleat ? managingCleats : true,
-                        isSystemManaged: isCleat ? managingCleats : existingItem.isSystemManaged, // Don't touch others
+                        isDefault: isCleat ? false : true,
+                        isSystemManaged: isCleat ? false : existingItem.isSystemManaged, // Don't touch others
                         systemTag: itemTags.get(partNumber) || existingItem.systemTag || null, // Persist CT/WC tag
                         notes: newNotes
                     }
@@ -1683,7 +1689,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     labourHours: finalLabourHours,
                     quantity: targetQty,
                     cost: finalUnitPrice * targetQty,
-                    isDefault: true,
+                    isDefault: isCleat ? false : true,
                     isSheetmetal: catalogItem?.isSheetmetal || false,
                     systemTag: itemTags.get(partNumber) || null // Persist CT/WC tag
                 }

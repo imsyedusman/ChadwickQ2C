@@ -53,34 +53,7 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
     const [qty, setQty] = useState(initialQty);
 
-    // CLEAT EXEMPTION LOGIC
-    // Cleats are statically defined as "Auto Managed" in system-definitions.ts
-    // BUT we want them to be Manual if out-of-scope (Fault > 50kA or Form != 3B).
-    const isCleatPart = item.partNumber?.startsWith('1B1-CLEAT');
-    const isCleatSection = item.subcategory === 'Busbar Supports - Required for Custom Boards Only';
-    const isCleat = isCleatPart || isCleatSection;
-
-    let isAuto = isAutoManaged(item.partNumber) || isSystemManaged;
-
-    if (isCleat && boardConfig) {
-        // Parse Scope
-        const isCustom = boardConfig.enclosureType === 'Custom';
-        const isForm3B = (boardConfig.form || '').toLowerCase() === '3b'; // Handles undefined
-        // Safe Parse Fault Rating
-        const faultRatingStr = boardConfig.faultRating || '999';
-        const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
-        const isFaultSafe = faultkA <= 50; // In-scope only if 50kA or less
-
-        const inScope = isCustom && isForm3B && isFaultSafe;
-
-        if (!inScope) {
-            // OUT OF SCOPE: Force Manual Control
-            isAuto = false;
-        }
-    }
-
-    // Combine client-side check with server-side flag
-    const autoManaged = isAuto;
+    const autoManaged = isAutoManaged(item.partNumber) || isSystemManaged;
 
     // Pricing Calculation
     let displayUnitPrice = item.unitPrice;

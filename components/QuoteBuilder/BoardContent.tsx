@@ -197,25 +197,6 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         // Use database flag for system management, fallback to name-check only if necessary (or remove legacy check)
         let isAuto = item.isSystemManaged || isAutoManaged(item.name) || item.isDefault;
 
-        // CLEAT EXEMPTION LOGIC (Read-Only / Delete Lock)
-        // Cleats are statically defined as "Auto Managed" but should be manual if out-of-scope.
-        const isCleatPart = item.name?.startsWith('1B1-CLEAT');
-        const isCleatSection = item.subcategory === 'Busbar Supports - Required for Custom Boards Only';
-        const isCleat = isCleatPart || isCleatSection;
-
-        if (isCleat && selectedBoard?.config) {
-            const config = selectedBoard.config as any;
-            const isCustom = config.enclosureType === 'Custom';
-            const isForm3B = (config.form || '').toLowerCase() === '3b';
-            const faultRatingStr = config.faultRating || '999';
-            const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
-            const isFaultSafe = faultkA <= 50;
-
-            const inScope = isCustom && isForm3B && isFaultSafe;
-            if (!inScope) {
-                isAuto = false;
-            }
-        }
 
         const autoManaged = isAuto;
         const formulaPriced = isFormulaPriced(item.name);
@@ -230,8 +211,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const isNSX100Handle = item.name === 'LV429338T';
         const isOtherHandle = ['LV432598T', '33873'].includes(item.name);
 
-        const isQtyLocked = !!autoManaged && !isCleat;
-        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle && !isCleat);
+        const isQtyLocked = !!autoManaged;
+        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle);
 
         // Determine Tooltip Text
         let lockTooltip = "";
