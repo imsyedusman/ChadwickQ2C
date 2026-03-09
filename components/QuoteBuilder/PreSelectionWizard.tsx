@@ -270,6 +270,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
     // Config State
     const [config, setConfig] = useState<Partial<BoardConfig>>(DEFAULT_BOARD_CONFIG);
     const [isBakeliteOverridden, setIsBakeliteOverridden] = useState(false);
+    const [isMeterPanelOverridden, setIsMeterPanelOverridden] = useState(false);
 
     const [validationError, setValidationError] = useState<string | null>(null);
 
@@ -303,6 +304,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
                 // Merge on top of defaults to ensure no missing fields
                 setConfig({ ...DEFAULT_BOARD_CONFIG, ...newConfig });
+                setIsMeterPanelOverridden(true); // Existing board, respect whatever is there
             } else {
                 // Reset defaults completely
                 setConfig(DEFAULT_BOARD_CONFIG);
@@ -433,6 +435,17 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
     }, [config.currentRating, config.includesAcbs]);
 
+    // Automation: CT Metering Panel Defaulting
+    useEffect(() => {
+        if (isMeterPanelOverridden) return;
+        if (config.ctMetering === 'Yes') {
+            const newDefault = config.location === 'Outdoor' ? 'Yes' : 'No';
+            if (config.meterPanel !== newDefault) {
+                setConfig(prev => ({ ...prev, meterPanel: newDefault }));
+            }
+        }
+    }, [config.location, config.ctMetering, isMeterPanelOverridden]);
+
 
 
     // --- NAVIGATION ---
@@ -535,7 +548,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">Location <span className="text-red-500">*</span></label>
                     <SegmentedControl
                         value={config.location || ''}
-                        onChange={v => setConfig({ ...config, location: v, ipRating: '' })}
+                        onChange={v => {
+                            setConfig({ ...config, location: v, ipRating: '' });
+                            setIsMeterPanelOverridden(false);
+                        }}
                         options={LOCATIONS}
                     />
                 </div>
@@ -839,7 +855,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             <div className="w-28">
                                 <SegmentedControl
                                     value={config.ctMetering || 'No'}
-                                    onChange={v => setConfig({ ...config, ctMetering: v })}
+                                    onChange={v => {
+                                        setConfig({ ...config, ctMetering: v });
+                                        setIsMeterPanelOverridden(false);
+                                    }}
                                 />
                             </div>
                         </div>
@@ -1032,7 +1051,10 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         <label className="block text-xs font-semibold text-gray-600 mb-2">Meter Panel Included</label>
                         <SegmentedControl
                             value={config.meterPanel || 'No'}
-                            onChange={v => setConfig({ ...config, meterPanel: v })}
+                            onChange={v => {
+                                setConfig({ ...config, meterPanel: v });
+                                setIsMeterPanelOverridden(true);
+                            }}
                         />
                     </div>
                     <div>

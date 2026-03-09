@@ -199,20 +199,20 @@ function addCtItems(
     config: BoardConfig,
     existingItems: any[]
 ) {
-    // 1. Base Items (Wiring, Test Block, Compartments)
-    CT_BASE_ITEMS.forEach(pn => {
-        // Do not add CT-PANEL if the board location is Indoor
-        if (pn === 'CT-PANEL' && config.location === 'Indoor') return;
-        targetMap(pn, qty);
-    });
+    // Layer 1 – Core CT Metering (always added when CT Metering = Yes)
+    targetMap('CT-COMPARTMENTS', qty);
 
-    // 2. CT Type (Coils) - Only if Active Metering
+    // CT Type (Coils) - Only if Active Metering
     if (includeCtType && config.ctType) {
         targetMap(`CT-${config.ctType}-TYPE`, qty);
     }
 
-    // 3. Panel Logic
-    // Indoor -> do NOT add CT-PANEL. Outdoor -> keep CT-PANEL.
+    // Layer 2 – Meter Panel Section (only added when Meter Panel Included = Yes)
+    if (config.meterPanel === 'Yes') {
+        targetMap('CT-PANEL', qty);
+        targetMap('CT-TEST-BLOCK', qty);
+        targetMap('CT-WIRING', qty);
+    }
 
     // 4. Busbars & Labour (Only if rating available)
     if (config.currentRating) {
