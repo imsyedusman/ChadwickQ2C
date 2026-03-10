@@ -112,7 +112,8 @@ export async function GET(
 
             const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
+            const rInc = effectiveSettings.roundingIncrement;
+            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
 
             console.warn(`[WARNING] Backend calculateBoardTotal is recalculating board prices from raw items. This does NOT include QuoteContext uplifts (Sheetmetal/Cubic). This route should ideally receive totals from the client to ensure consistency.`);
             console.log(`Board Calculation: Material=${materialCost}, LabourHrs=${labourHours}, SellPrice=${sellPrice}, Rounded=${sellPriceRounded}`);
@@ -167,7 +168,8 @@ export async function GET(
             */
             const marginFactor = 1 - effectiveSettings.targetMarginPct;
             const sellPrice = marginFactor > 0 ? boardTotalCost / marginFactor : boardTotalCost;
-            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
+            const rInc = effectiveSettings.roundingIncrement;
+            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
 
             totalLabourHours += labourHours;
             totalMaterialCost += materialCost;

@@ -17,3 +17,21 @@ export function formatCurrency(value: number, decimals: number = 2): string {
     maximumFractionDigits: decimals
   })}`;
 }
+
+/**
+ * Format a quote number with an alphabetical suffix based on its revision
+ * @param quoteNumber - Base quote number e.g. "Q26-0240"
+ * @param revision - Integer revision, 0 means no suffix, 1 means "-A"
+ */
+export function formatQuoteNumber(quoteNumber: string, revision: number = 0): string {
+  if (!revision || revision === 0) return quoteNumber;
+
+  let suffix = "";
+  let r = revision;
+  while (r > 0) {
+    const remainder = (r - 1) % 26;
+    suffix = String.fromCharCode(65 + remainder) + suffix;
+    r = Math.floor((r - 1) / 26);
+  }
+  return `${quoteNumber}-${suffix}`;
+}

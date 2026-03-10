@@ -14,7 +14,7 @@ import { Loader2, ChevronLeft, ChevronRight, Check, ChevronDown, ChevronUp } fro
 import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
+    const { boards, loading, saving, quoteNumber, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -85,7 +85,7 @@ function QuoteBuilderContent() {
                         </div>
 
                         {/* Quote No */}
-                        <div className="font-bold text-gray-900">{quoteNumber || 'Q-...'}</div>
+                        <div className="font-bold text-gray-900">{formattedQuoteNumber || 'Q-...'}</div>
                         <div className="h-4 w-px bg-gray-200" />
 
                         {/* Client */}

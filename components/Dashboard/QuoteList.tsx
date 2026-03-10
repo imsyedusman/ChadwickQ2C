@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Trash2, Copy, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, formatQuoteNumber } from '@/lib/utils';
 
 interface Quote {
     id: string;
     quoteNumber: string;
+    revision: number;
     clientName: string | null;
     projectRef: string | null;
     description: string | null;
@@ -79,7 +80,8 @@ export default function QuoteList() {
         const totalCost = costBase + overheadAmount + engineeringCost;
         const marginFactor = 1 - settings.targetMarginPct;
         const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-        const sellPriceRounded = Math.round(sellPrice / settings.roundingIncrement) * settings.roundingIncrement;
+        const rInc = settings.roundingIncrement;
+        const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
 
         return sellPriceRounded;
     };
@@ -213,7 +215,7 @@ export default function QuoteList() {
                                     <div className="flex items-center gap-3">
                                         <h3 className="font-semibold text-gray-900">{quote.projectRef || 'Untitled Project'}</h3>
                                         <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                            {quote.quoteNumber}
+                                            {formatQuoteNumber(quote.quoteNumber, quote.revision)}
                                         </span>
                                         <span className={cn(
                                             "text-xs font-medium px-2 py-0.5 rounded-full",

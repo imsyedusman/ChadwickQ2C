@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged } from '@/lib/system-definitions';
+import { formatQuoteNumber } from '@/lib/utils';
 export interface QuoteSettings {
     labourRate: number;
     consumablesPct: number;
@@ -82,6 +83,8 @@ export interface BoardTotals {
 interface QuoteContextType {
     quoteId: string;
     quoteNumber: string;
+    revision: number;
+    formattedQuoteNumber: string;
     clientName: string;
     clientCompany: string;
     projectRef: string;
@@ -154,6 +157,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
+        revision: 0,
         clientName: '',
         clientCompany: '',
         projectRef: '',
@@ -184,6 +188,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             if (data) {
                 setMetadata({
                     quoteNumber: data.quoteNumber || '',
+                    revision: data.revision || 0,
                     clientName: data.clientName || '',
                     clientCompany: data.clientCompany || '',
                     projectRef: data.projectRef || '',
@@ -385,7 +390,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             const profit = sellPrice - totalCost;
 
             // 9. Rounded Sell Price
-            const sellPriceRounded = Math.round(sellPrice / effectiveSettings.roundingIncrement) * effectiveSettings.roundingIncrement;
+            const rInc = effectiveSettings.roundingIncrement;
+            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
 
             return {
                 materialCost,
@@ -653,6 +659,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             value={{
                 quoteId,
                 quoteNumber: metadata.quoteNumber,
+                revision: metadata.revision,
+                formattedQuoteNumber: formatQuoteNumber(metadata.quoteNumber, metadata.revision),
                 clientName: metadata.clientName,
                 clientCompany: metadata.clientCompany,
                 projectRef: metadata.projectRef,
