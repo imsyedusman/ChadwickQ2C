@@ -711,6 +711,17 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             {/* Board Composition Indicators */}
             <BoardComposition items={items} />
 
+            {/* Internal Notes Display */}
+            {selectedBoard.internalNotes && (
+                <div className="px-6 py-3 bg-blue-50/50 border-b border-blue-100 flex items-start gap-3">
+                    <FileText size={16} className="text-blue-500 mt-0.5 shrink-0" />
+                    <div>
+                        <div className="text-[10px] uppercase tracking-wider font-bold text-blue-600 mb-1">Internal Notes</div>
+                        <div className="text-xs text-blue-900 whitespace-pre-wrap">{selectedBoard.internalNotes}</div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <BoardSummary />
                 {items.length === 0 ? (

@@ -115,6 +115,7 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     drawingRef: 'No',
     drawingRefNumber: '',
     notes: '',
+    internalNotes: '',
     tierCount: 0,
     baseRequired: 'No',
     enclosureDepth: '400',
@@ -1075,15 +1076,29 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                     </div>
                 </div>
 
-                <div className="mt-4">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
-                    <textarea
-                        className="w-full p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                        rows={2}
-                        placeholder="Any additional notes..."
-                        value={config.notes}
-                        onChange={e => setConfig({ ...config, notes: e.target.value })}
-                    />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-4 border-t border-gray-100">
+                    <div>
+                        <label className="block text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-2">Customer Notes</label>
+                        <p className="text-[10px] text-gray-400 mb-2 italic">Appears in exported quote document - visible to customers.</p>
+                        <textarea
+                            className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-shadow"
+                            rows={3}
+                            placeholder="Customer-facing notes..."
+                            value={config.notes}
+                            onChange={e => setConfig({ ...config, notes: e.target.value })}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[11px] uppercase tracking-wider font-bold text-blue-600 mb-2">Internal Notes</label>
+                        <p className="text-[10px] text-blue-400 mb-2 italic">Visible only inside the application - not included in exported documents.</p>
+                        <textarea
+                            className="w-full p-2.5 bg-blue-50/30 border border-blue-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                            rows={3}
+                            placeholder="Internal team comments/reminders..."
+                            value={config.internalNotes}
+                            onChange={e => setConfig({ ...config, internalNotes: e.target.value })}
+                        />
+                    </div>
                 </div>
             </div >
         </div >

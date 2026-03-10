@@ -57,7 +57,9 @@ model Board {
   order       Int      @default(0)
   
   isOptional  Boolean  @default(false)
-  config      String?  // JSON string storing Pre-Selection values (IP, Form, etc.)
+  description    String?   @db.Text
+  internalNotes  String?   @db.Text
+  config         String?   @db.Text // JSON string for board specific configs Pre-Selection values (IP, Form, etc.)
   mccbVariant String?  // e.g. "B3", "F3" (Resolved from Fault Rating)
   
   items       Item[]

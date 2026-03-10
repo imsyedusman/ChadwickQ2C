@@ -8,7 +8,7 @@ export async function POST(
     try {
         const { id: quoteId } = await params;
         const body = await request.json();
-        const { name, type, config } = body;
+        const { name, type, config, internalNotes } = body;
 
         console.log('=== BOARD CREATION ===');
         console.log('Board name:', name);
@@ -22,6 +22,7 @@ export async function POST(
                 quoteId,
                 name,
                 type,
+                internalNotes,
                 order: count,
                 config: config ? JSON.stringify(config) : null,
                 mccbVariant: config?.faultRating ?

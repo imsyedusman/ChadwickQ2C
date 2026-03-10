@@ -8,7 +8,7 @@ export async function PUT(
     try {
         const { boardId } = await params;
         const body = await request.json();
-        const { name, type, config } = body;
+        const { name, type, config, internalNotes } = body;
 
         // Resolve new MCCB Variant if fault rating changed
         let newMccbVariant = undefined;
@@ -24,6 +24,7 @@ export async function PUT(
             data: {
                 name,
                 type,
+                internalNotes,
                 config: config ? JSON.stringify(config) : undefined,
                 mccbVariant: newMccbVariant // Update column
             } as any, // Cast for mccbVariant

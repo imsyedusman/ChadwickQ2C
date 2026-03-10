@@ -41,6 +41,8 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                     body: JSON.stringify({
                         name: config.name,
                         type: config.type,
+                        description: config.description, // Added description if present
+                        internalNotes: config.internalNotes,
                         config: config
                     }),
                 });
@@ -50,6 +52,7 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                 await addBoard({
                     name: config.name,
                     type: config.type,
+                    internalNotes: config.internalNotes,
                     config: config // Store full config
                 });
             }
@@ -304,9 +307,15 @@ export default function BoardList({ boards, selectedBoardId, onSelectBoard, quot
                 isOpen={isWizardOpen}
                 onClose={handleCloseWizard}
                 onConfirm={handleCreateBoard}
-                initialConfig={typeof editingBoard?.config === 'string'
-                    ? JSON.parse(editingBoard.config)
-                    : (editingBoard?.config || undefined)}
+                initialConfig={{
+                    ...(typeof editingBoard?.config === 'string'
+                        ? JSON.parse(editingBoard.config)
+                        : (editingBoard?.config || {})),
+                    name: editingBoard?.name,
+                    type: editingBoard?.type,
+                    description: (editingBoard as any)?.description,
+                    internalNotes: (editingBoard as any)?.internalNotes
+                }}
             />
 
             <BoardComparisonModal

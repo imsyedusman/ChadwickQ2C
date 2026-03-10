@@ -60,6 +60,7 @@ export interface Board {
     quoteId: string;
     name: string;
     description: string | null;
+    internalNotes: string | null;
     config?: any;
     items: Item[];
 }
@@ -119,7 +120,7 @@ interface QuoteContextType {
     };
     selectedBoardId: string | null;
     setSelectedBoardId: (id: string | null) => void;
-    addBoard: (boardData: { name: string; type: string; config?: any }) => Promise<void>;
+    addBoard: (boardData: { name: string; type: string; config?: any; internalNotes?: string }) => Promise<void>;
     addItemToBoard: (boardId: string, item: any) => Promise<void>;
     updateItem: (itemId: string, updates: Partial<Item>) => Promise<void>;
     removeItem: (itemId: string) => Promise<void>;
@@ -331,7 +332,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
     const { boardTotals, allBoardTotals, grandTotals } = calculateTotals();
 
-    const addBoard = async (boardData: { name: string; type: string; config?: any }) => {
+    const addBoard = async (boardData: { name: string; type: string; config?: any; internalNotes?: string }) => {
         try {
             const res = await fetch(`/api/quotes/${quoteId}/boards`, {
                 method: 'POST',

@@ -30,6 +30,7 @@ export interface BoardConfig {
     wholeCurrentMeters?: { type: string; quantity: number }[];
     bakeliteQty?: number;
     extraForDoorsOver?: boolean;
+    internalNotes?: string;
     [key: string]: any;
 }
 
