@@ -14,7 +14,8 @@ datasource db {
 
 model Quote {
   id            String   @id @default(uuid())
-  quoteNumber   String   @unique // Auto-generated friendly ID e.g. Q-1001
+  quoteNumber   String   // Auto-generated friendly ID e.g. Q-1001
+  revision      Int      @default(0) // 0 for original, increments for duplicates
   clientName    String?
   clientCompany String?
   projectRef    String?
@@ -43,6 +44,8 @@ model Quote {
   overrideRoundingIncrement Int?
   
   boards        Board[]
+
+  @@unique([quoteNumber, revision])
 }
 
 model Board {

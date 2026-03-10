@@ -27,19 +27,24 @@ async function runTest() {
     }
 
     // 2. Create Dummy Board
-    const quote = await prisma.quote.upsert({
+    const quote = await prisma.quote.findFirst({
         where: { quoteNumber: 'TEST-Q-CUBIC' },
-        update: {},
-        create: {
-            quoteNumber: 'TEST-Q-CUBIC',
-            clientName: 'Test Client',
-            status: 'DRAFT'
-        }
     });
+
+    let targetQuote = quote;
+    if (!targetQuote) {
+        targetQuote = await prisma.quote.create({
+            data: {
+                quoteNumber: 'TEST-Q-CUBIC',
+                clientName: 'Test Client',
+                status: 'DRAFT'
+            }
+        });
+    }
 
     const board = await prisma.board.create({
         data: {
-            quoteId: quote.id,
+            quoteId: targetQuote.id,
             name: 'Test Cubic Board',
             type: 'Main Switchboard (MSB)'
         }
@@ -132,7 +137,11 @@ async function runTest() {
     } finally {
         // Cleanup
         await prisma.board.delete({ where: { id: board.id } });
-        await prisma.quote.delete({ where: { quoteNumber: 'TEST-Q-CUBIC' } }); // Cascades? Check schema if needed, but doing explicit cleanup is polite
+        // Cleanup Quotes explicitly (since findFirst doesn't do what atomic upsert could do safely)
+        const quotesToDelete = await prisma.quote.findMany({ where: { quoteNumber: 'TEST-Q-CUBIC' } });
+        for (const q of quotesToDelete) {
+            await prisma.quote.delete({ where: { id: q.id } });
+        }
         await prisma.$disconnect();
     }
 }

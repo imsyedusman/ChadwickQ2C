@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 async function run() {
     const quote = await prisma.quote.findFirst({
         where: { quoteNumber: 'Q-1015' },
+        orderBy: { revision: 'desc' },
         include: {
             boards: {
                 include: { items: true }

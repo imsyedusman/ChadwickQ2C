@@ -51,8 +51,9 @@ export async function POST(request: Request) {
                 const { boards, ...quoteData } = quote;
 
                 // Check if quote exists by quoteNumber
-                const existing = await tx.quote.findUnique({
-                    where: { quoteNumber: quoteData.quoteNumber }
+                const existing = await tx.quote.findFirst({
+                    where: { quoteNumber: quoteData.quoteNumber },
+                    orderBy: { revision: 'desc' }
                 });
 
                 if (existing) {

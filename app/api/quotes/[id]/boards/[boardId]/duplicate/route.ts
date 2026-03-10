@@ -99,14 +99,16 @@ export async function POST(
         });
 
         // 4. Post-Transaction Automation Reconciliation
-        // Run OUTSIDE the transaction.
-        try {
+        // SKIPPED FOR DUPLICATION: The User requested that duplicated boards 
+        // are a true exact clone, preserving manual offsets and pricing on items.
+        // Reconciliation would overwrite these values.
+        /* try {
             await AutomationService.runBoardAutomationReconciliation(newBoard.id);
         } catch (autoError) {
             console.error('[Duplication] Automation Reconciliation Failed (Non-fatal):', autoError);
             // We do NOT fail the request because the board *was* created.
             // Future improvement: Return a warning to the UI.
-        }
+        } */
 
         return NextResponse.json({ success: true, board: newBoard });
 

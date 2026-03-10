@@ -27,19 +27,24 @@ async function runTest() {
     }
 
     // 2. Create Dummy Board
-    const quote = await prisma.quote.upsert({
+    const quote = await prisma.quote.findFirst({
         where: { quoteNumber: 'TEST-Q-CUBIC' },
-        update: {},
-        create: {
-            quoteNumber: 'TEST-Q-CUBIC',
-            clientName: 'Test Client',
-            status: 'DRAFT'
-        }
     });
+
+    let targetQuote = quote;
+    if (!targetQuote) {
+        targetQuote = await prisma.quote.create({
+            data: {
+                quoteNumber: 'TEST-Q-CUBIC',
+                clientName: 'Test Client',
+                status: 'DRAFT'
+            }
+        });
+    }
 
     const board = await prisma.board.create({
         data: {
-            quoteId: quote.id,
+            quoteId: targetQuote.id,
             name: 'Test Cubic Board',
             type: 'Main Switchboard (MSB)'
         }

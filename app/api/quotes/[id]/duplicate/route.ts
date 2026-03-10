@@ -26,52 +26,80 @@ export async function POST(
             return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
         }
 
-        const newQuoteNumber = await generateRevisionNumber(originalQuote.quoteNumber);
+        // We run the revision lookup and insertion in a Transaction
+        // to prevent race conditions during simultaneous duplication.
+        const newQuote = await prisma.$transaction(async (tx) => {
+            // Get max revision
+            const maxRevisionResult = await tx.quote.aggregate({
+                where: { quoteNumber: originalQuote.quoteNumber },
+                _max: { revision: true }
+            });
 
-        // Create the new quote with all boards and items
-        const newQuote = await prisma.quote.create({
-            data: {
-                quoteNumber: newQuoteNumber,
-                clientName: originalQuote.clientName,
-                clientCompany: originalQuote.clientCompany,
-                projectRef: `${originalQuote.projectRef} (Copy)`,
-                description: originalQuote.description,
-                status: 'DRAFT',
-                settingsSnapshot: originalQuote.settingsSnapshot,
-                globalDiscount: originalQuote.globalDiscount,
-                globalContingency: originalQuote.globalContingency,
-                boards: {
-                    create: originalQuote.boards.map((board: Board & { items: Item[] }) => ({
-                        name: board.name,
-                        type: board.type,
-                        order: board.order,
-                        isOptional: board.isOptional,
-                        config: board.config,
-                        items: {
-                            create: board.items.map((item: Item) => ({
-                                category: item.category,
-                                subcategory: item.subcategory,
-                                name: item.name,
-                                description: item.description,
-                                quantity: item.quantity,
-                                unitPrice: item.unitPrice,
-                                labourHours: item.labourHours,
-                                cost: item.cost,
-                                notes: item.notes,
-                                isDefault: item.isDefault,
-                                order: item.order,
-                            }))
-                        }
-                    }))
-                }
-            },
-            include: {
-                boards: {
-                    include: {
-                        items: true,
+            const maxRevision = maxRevisionResult._max.revision ?? 0;
+            const newRevision = maxRevision + 1;
+
+            // Create the new quote with all boards and items
+            return await tx.quote.create({
+                data: {
+                    quoteNumber: originalQuote.quoteNumber,
+                    revision: newRevision,
+                    clientName: originalQuote.clientName,
+                    clientCompany: originalQuote.clientCompany,
+                    projectRef: `${originalQuote.projectRef} (Copy)`,
+                    description: originalQuote.description,
+                    status: 'DRAFT',
+                    settingsSnapshot: originalQuote.settingsSnapshot,
+                    globalDiscount: originalQuote.globalDiscount,
+                    globalContingency: originalQuote.globalContingency,
+                    // Copy exact Financial Overrides
+                    overrideLabourRate: originalQuote.overrideLabourRate,
+                    overrideOverheadPct: originalQuote.overrideOverheadPct,
+                    overrideEngineeringPct: originalQuote.overrideEngineeringPct,
+                    overrideTargetMarginPct: originalQuote.overrideTargetMarginPct,
+                    overrideConsumablesPct: originalQuote.overrideConsumablesPct,
+                    overrideGstPct: originalQuote.overrideGstPct,
+                    overrideRoundingIncrement: originalQuote.overrideRoundingIncrement,
+                    overrideCopperPricePerKg: originalQuote.overrideCopperPricePerKg,
+                    boards: {
+                        create: originalQuote.boards.map((board: Board & { items: Item[] }) => ({
+                            name: board.name,
+                            type: board.type,
+                            order: board.order,
+                            isOptional: board.isOptional,
+                            mccbVariant: board.mccbVariant,
+                            config: board.config,
+                            items: {
+                                create: board.items.map((item: Item) => ({
+                                    category: item.category,
+                                    subcategory: item.subcategory,
+                                    name: item.name,
+                                    description: item.description,
+                                    quantity: item.quantity,
+                                    unitPrice: item.unitPrice,
+                                    labourHours: item.labourHours,
+                                    cost: item.cost,
+                                    notes: item.notes,
+                                    isDefault: item.isDefault,
+                                    order: item.order,
+                                    // Missing critical item fields
+                                    isSheetmetal: item.isSheetmetal,
+                                    isSystemManaged: item.isSystemManaged,
+                                    systemTag: item.systemTag,
+                                    partNumber: item.partNumber,
+                                    productFrame: item.productFrame,
+                                    mccbVariant: item.mccbVariant,
+                                    systemRuleType: item.systemRuleType
+                                }))
+                            }
+                        }))
+                    }
+                },
+                include: {
+                    boards: {
+                        include: { items: true }
                     }
                 }
-            }
+            });
         });
 
         return NextResponse.json(newQuote);
