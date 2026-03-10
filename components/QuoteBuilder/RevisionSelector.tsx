@@ -27,6 +27,7 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
                 const res = await fetch(`/api/quotes?quoteNumber=${quoteNumber}`);
                 if (res.ok) {
                     const data = await res.json();
+                    console.log("Quote revisions:", data);
                     // Sort by revision descending (newest first)
                     const sorted = (data as Revision[]).sort((a, b) => (b.revision || 0) - (a.revision || 0));
                     setRevisions(sorted);
@@ -52,10 +53,10 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
         );
     }
 
-    if (revisions.length <= 1) return null;
+    if (!revisions || revisions.length === 0) return null;
 
     return (
-        <div className="bg-gray-50 border-b border-gray-200 py-1 px-6 flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="bg-white border-b border-gray-200 py-1 px-6 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-sm">
             <span className="text-[10px] uppercase tracking-wider font-bold text-gray-400 mr-2 whitespace-nowrap">
                 Quote Versions
             </span>

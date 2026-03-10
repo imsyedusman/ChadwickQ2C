@@ -66,6 +66,7 @@ function QuoteBuilderContent() {
 
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
+            <RevisionSelector currentId={quoteId} quoteNumber={quoteNumber} />
             {/* Quote Header */}
             <div className={cn(
                 "bg-white border-b border-gray-200 transition-all duration-200 ease-in-out z-10",
