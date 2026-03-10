@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, Trash2, Copy, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
+import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
 
 interface Quote {
     id: string;
@@ -15,23 +16,25 @@ interface Quote {
     description: string | null;
     status: string;
     updatedAt: string;
-    boards: any[];
+    boards: PricingBoard[];
+    overrideLabourRate?: number | null;
+    overrideOverheadPct?: number | null;
+    overrideEngineeringPct?: number | null;
+    overrideTargetMarginPct?: number | null;
+    overrideConsumablesPct?: number | null;
+    overrideGstPct?: number | null;
+    overrideRoundingIncrement?: number | null;
+    overrideCopperPricePerKg?: number | null;
 }
 
-interface Settings {
-    labourRate: number;
-    consumablesPct: number;
-    overheadPct: number;
-    engineeringPct: number;
-    targetMarginPct: number;
-    roundingIncrement: number;
-}
+// Global settings snapshot may not be needed if we assume global settings for dashboard
+// But if quote has overrides, we use them.
 
 export default function QuoteList() {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
-    const [settings, setSettings] = useState<Settings | null>(null);
+    const [settings, setSettings] = useState<PricingSettings | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -61,39 +64,23 @@ export default function QuoteList() {
         }
     };
 
-    const calculateBoardTotal = (items: any[]): number => {
+    const calculateQuoteTotal = (quote: Quote): number => {
         if (!settings) return 0;
 
-        let materialCost = 0;
-        let labourHours = 0;
+        // Merge global settings with quote overrides
+        const effectiveSettings: PricingSettings = {
+            labourRate: quote.overrideLabourRate ?? settings.labourRate,
+            consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
+            overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
+            engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
+            targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
+            gstPct: quote.overrideGstPct ?? settings.gstPct,
+            roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
+            copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
+        };
 
-        items.forEach(item => {
-            materialCost += (item.unitPrice || 0) * (item.quantity || 0);
-            labourHours += (item.labourHours || 0) * (item.quantity || 0);
-        });
-
-        const labourCost = labourHours * settings.labourRate;
-        const consumablesCost = materialCost * settings.consumablesPct;
-        const costBase = materialCost + labourCost + consumablesCost;
-        const overheadAmount = costBase * settings.overheadPct;
-        const engineeringCost = costBase * settings.engineeringPct;
-        const totalCost = costBase + overheadAmount + engineeringCost;
-        const marginFactor = 1 - settings.targetMarginPct;
-        const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-        const rInc = settings.roundingIncrement;
-        const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
-
-        return sellPriceRounded;
-    };
-
-    const calculateQuoteTotal = (quote: Quote): number => {
-        let total = 0;
-        quote.boards.forEach(board => {
-            if (board.items) {
-                total += calculateBoardTotal(board.items);
-            }
-        });
-        return total;
+        const { grandTotals } = calculateQuoteTotals(quote.boards, effectiveSettings);
+        return grandTotals.sellPriceRounded;
     };
 
     const getStatusDisplay = (status: string) => {

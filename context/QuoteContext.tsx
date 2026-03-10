@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
+import { calculateQuoteTotals } from '@/lib/pricing';
 import { isAutoManaged } from '@/lib/system-definitions';
 import { formatQuoteNumber } from '@/lib/utils';
 export interface QuoteSettings {
@@ -318,166 +319,14 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             }
         };
 
-        const calculateForItems = (items: Item[], applySheetmetalUplift: boolean): BoardTotals => {
-            // 1. Base Costs
-            // Safeguard: item.quantity might be string if coming from Decimal serialization in some APIs/JSON
-            const getQty = (i: Item) => Number(i.quantity) || 0;
+        const { boardTotals: allBoardTotals, grandTotals } = calculateQuoteTotals(boards as any, effectiveSettings as any);
 
-            // Helper to get total price of an item (Dynamic Copper or Static)
-            const getItemTotalPrice = (item: Item) => {
-                const qty = getQty(item);
-                if (item.isCopperPriced && item.totalCopperWeightKgPerMeter) {
-                    const copperResult = computeBusbarPrice({
-                        copperWeightKgPerMeter: item.totalCopperWeightKgPerMeter,
-                        isCopperPriced: true,
-                        length: qty,
-                        copperPricePerKg: effectiveSettings.copperPricePerKg
-                    });
-                    return copperResult.totalPrice;
-                }
-                return item.unitPrice * qty;
-            };
-
-            const baseMaterialCost = items.reduce((sum, item) => sum + getItemTotalPrice(item), 0);
-            const labourHours = items.reduce((sum, item) => sum + (item.labourHours * getQty(item)), 0);
-
-            // Sheetmetal Logic
-            const sheetmetalSubtotal = items.reduce((sum, item) => {
-                if (item.isSheetmetal) {
-                    return sum + getItemTotalPrice(item);
-                }
-                return sum;
-            }, 0);
-
-            // Cubic Logic
-            const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
-            const cubicSubtotal = items.reduce((sum, item) => {
-                if (item.subcategory === CUBIC_SUBCATEGORY) {
-                    return sum + getItemTotalPrice(item);
-                }
-                return sum;
-            }, 0);
-
-            const sheetmetalUplift = (applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0) + (cubicSubtotal * 0.04);
-
-            // Total Material = Base + Uplift
-            const materialCost = baseMaterialCost + sheetmetalUplift;
-
-            // 2. Labour Cost
-            const labourRate = effectiveSettings.labourRate || 0; // fallback
-            const labourCost = labourHours * labourRate;
-
-            // 3. Consumables
-            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
-
-            // 4. Cost Base (Prime Cost)
-            const costBase = materialCost + labourCost + consumablesCost;
-
-            // 5. Overheads
-            const overheadAmount = costBase * effectiveSettings.overheadPct;
-
-            // 6. Engineering
-            const engineeringCost = costBase * effectiveSettings.engineeringPct;
-
-            // Total Cost
-            const totalCost = costBase + overheadAmount + engineeringCost;
-
-            // 7. Sell Price = Total Cost / (1 - Target Margin)
-            const marginFactor = 1 - effectiveSettings.targetMarginPct;
-            const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-
-            // 8. Profit/Margin
-            const profit = sellPrice - totalCost;
-
-            // 9. Rounded Sell Price
-            const rInc = effectiveSettings.roundingIncrement;
-            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
-
-            return {
-                materialCost,
-                labourHours,
-                labourCost,
-                consumablesCost,
-                costBase,
-                overheadAmount,
-                engineeringCost,
-                totalCost,
-                profit,
-                sellPrice,
-                sellPriceRounded,
-                sheetmetalSubtotal,
-                sheetmetalUplift,
-                cubicSubtotal
-            };
-        };
-
-        // 1. Selected Board Totals
-        const selectedBoard = boards.find(b => b.id === selectedBoardId);
-
-        let selectedBoardConfig: any = {};
-        if (selectedBoard && selectedBoard.config) {
-            try {
-                selectedBoardConfig = typeof selectedBoard.config === 'string' ? JSON.parse(selectedBoard.config) : selectedBoard.config;
-            } catch (e) {
-                console.error("Failed to parse selected board config", e);
-            }
-        }
-
-        const isCustom = selectedBoardConfig?.enclosureType === 'Custom';
-
-        // 1. Map all boards to their totals
-        const allBoardTotals: Record<string, BoardTotals> = {};
-        const boardResults = boards.map(board => {
-            let config: any = {};
-            if (board.config) {
-                try {
-                    config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
-                } catch (e) { /* ignore */ }
-            }
-            const isBoardCustom = config?.enclosureType === 'Custom';
-            const totals = calculateForItems(board.items || [], isBoardCustom);
-            allBoardTotals[board.id] = totals;
-            return totals;
-        });
-
-        // 2. Selected Board Totals (retrieve from map)
-        const boardTotals = selectedBoardId && allBoardTotals[selectedBoardId]
-            ? allBoardTotals[selectedBoardId]
+        // Selected Board Totals (retrieve from map)
+        const boardTotals = selectedBoardId && (allBoardTotals as any)[selectedBoardId]
+            ? (allBoardTotals as any)[selectedBoardId]
             : emptyTotals;
 
-        // Sum up all fields
-        const grandTotalBase = boardResults.reduce((acc, curr) => ({
-            materialCost: acc.materialCost + curr.materialCost,
-            labourHours: acc.labourHours + curr.labourHours,
-            labourCost: acc.labourCost + curr.labourCost,
-            consumablesCost: acc.consumablesCost + curr.consumablesCost,
-            costBase: acc.costBase + curr.costBase,
-            overheadAmount: acc.overheadAmount + curr.overheadAmount,
-            engineeringCost: acc.engineeringCost + curr.engineeringCost,
-            totalCost: acc.totalCost + curr.totalCost,
-            profit: acc.profit + curr.profit,
-            sellPrice: acc.sellPrice + curr.sellPrice,
-            sellPriceRounded: acc.sellPriceRounded + curr.sellPriceRounded,
-            sheetmetalSubtotal: acc.sheetmetalSubtotal + curr.sheetmetalSubtotal,
-            sheetmetalUplift: acc.sheetmetalUplift + curr.sheetmetalUplift,
-            cubicSubtotal: acc.cubicSubtotal + curr.cubicSubtotal
-        }), {
-            materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
-            costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
-            sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
-        });
-
-        // Use rounded price for GST calculation
-        const gst = grandTotalBase.sellPriceRounded * effectiveSettings.gstPct;
-        const finalSellPrice = grandTotalBase.sellPriceRounded + gst;
-
-        const grandTotals = {
-            ...grandTotalBase,
-            gst,
-            finalSellPrice
-        };
-
-        return { boardTotals, allBoardTotals, grandTotals };
+        return { boardTotals, allBoardTotals: allBoardTotals as Record<string, BoardTotals>, grandTotals: grandTotals as any };
     };
 
     const { boardTotals, allBoardTotals, grandTotals } = calculateTotals();

@@ -6,7 +6,6 @@ import { generateNextQuoteNumber } from '@/lib/quote-numbering';
 export async function GET() {
     try {
         const quotes = await prisma.quote.findMany({
-            orderBy: { updatedAt: 'desc' },
             include: {
                 boards: {
                     include: {
@@ -15,8 +14,18 @@ export async function GET() {
                 },
             }
         });
-        return NextResponse.json(quotes);
+
+        // Sort by quoteNumber desc, revision desc in JS because Prisma client might be out of sync
+        const sortedQuotes = (quotes as any[]).sort((a, b) => {
+            if (a.quoteNumber !== b.quoteNumber) {
+                return b.quoteNumber.localeCompare(a.quoteNumber);
+            }
+            return (b.revision || 0) - (a.revision || 0);
+        });
+
+        return NextResponse.json(sortedQuotes);
     } catch (error) {
+        console.error('Error fetching quotes:', error);
         return NextResponse.json({ error: 'Failed to fetch quotes' }, { status: 500 });
     }
 }
