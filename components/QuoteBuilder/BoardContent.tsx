@@ -9,10 +9,11 @@ import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
 import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
+import ManualItemForm from './ManualItemForm';
 
-// ONLY these 3 master categories should appear as top-level collapsibles
+// ONLY these categories should appear as top-level collapsibles
 // Using singular form to match database schema
-const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar'];
+const MASTER_CATEGORIES = ['Basics', 'Switchboard', 'Busbar', 'Other'];
 import { Switch } from '@/components/ui/switch'; // Ensure Switch is available or use standard input checkbox
 import { RefreshCw, FileSpreadsheet } from 'lucide-react'; // Import RotateCcw for Restore icon
 import { SystemItemHoverCard } from './SystemItemHoverCard';
@@ -28,7 +29,8 @@ import {
 const CATEGORY_LABELS: Record<string, string> = {
     'Basics': 'Basics',
     'Switchboard': 'Switchgears',
-    'Busbar': 'Busbars'
+    'Busbar': 'Busbars',
+    'Other': 'Other / Additional Items'
 };
 
 // Strict Order for Basics items (Part Numbers only)
@@ -87,8 +89,10 @@ interface BoardContentProps {
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
-    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote } = useQuote();
+    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote, addItemToBoard } = useQuote();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+    const [showManualForm, setShowManualForm] = useState(false);
+    const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
 
@@ -102,7 +106,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
 
     const items = selectedBoard.items || [];
 
-    // Group items by master category (only Basics, Switchboards, Busbars)
+    // Group items by master category (Basics, Switchboards, Busbars, Other)
     const groupedByMasterCategory = items.reduce((acc, item) => {
         const masterCat = item.category || 'Uncategorized';
         if (!acc[masterCat]) acc[masterCat] = [];
@@ -190,6 +194,35 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </div>
                     {/* Spacer for delete button alignment */}
                     <div className="w-[14px]"></div>
+                </div>
+            );
+        }
+
+        if (editingItemId === item.id) {
+            return (
+                <div key={item.id} className="p-4 border-b border-gray-100 bg-blue-50/30">
+                    <ManualItemForm
+                        isEditing
+                        initialData={{
+                            id: item.id,
+                            partNumber: item.name,
+                            description: item.description || '',
+                            unitPrice: item.unitPrice,
+                            labourHours: item.labourHours,
+                            quantity: Number(item.quantity)
+                        }}
+                        onSave={async (data) => {
+                            await updateItem(item.id, {
+                                name: data.partNumber,
+                                description: data.description,
+                                unitPrice: data.unitPrice,
+                                labourHours: data.labourHours,
+                                quantity: data.quantity
+                            });
+                            setEditingItemId(null);
+                        }}
+                        onCancel={() => setEditingItemId(null)}
+                    />
                 </div>
             );
         }
@@ -282,6 +315,13 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                         {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
                                     </span>
                                 </SystemItemHoverCard>
+                            </div>
+                        )}
+                        {item.category === 'Other' && (
+                            <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
+                                    Manual Entry
+                                </span>
                             </div>
                         )}
                     </div>
@@ -417,13 +457,24 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </SystemItemHoverCard>
                 )}
                 {!isNSX100Handle && !isDeleteLocked && (
-                    <button
-                        onClick={() => removeItem(item.id)}
-                        className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-colors"
-                        title="Remove item"
-                    >
-                        <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {item.category === 'Other' && (
+                            <button
+                                onClick={() => setEditingItemId(item.id)}
+                                className="text-gray-300 hover:text-blue-500 p-1 rounded"
+                                title="Edit manual item"
+                            >
+                                <Edit2 size={14} />
+                            </button>
+                        )}
+                        <button
+                            onClick={() => removeItem(item.id)}
+                            className="text-gray-300 hover:text-red-500 p-1 rounded"
+                            title="Remove item"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
                 )}
             </div>
         )
@@ -724,16 +775,16 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <BoardSummary />
-                {items.length === 0 ? (
+                {items.length === 0 && !showManualForm ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
                         <p>No items added yet.</p>
                         <p className="text-xs">Select items from the catalog below to add them.</p>
                     </div>
                 ) : (
-                    // Render ONLY the 3 master categories
+                    // Render ONLY the defined master categories
                     MASTER_CATEGORIES.map(masterCat => {
-                        const categoryItems = groupedByMasterCategory[masterCat];
-                        if (!categoryItems || categoryItems.length === 0) return null;
+                        const categoryItems = groupedByMasterCategory[masterCat] || [];
+                        if (categoryItems.length === 0 && masterCat !== 'Other') return null;
 
                         const isMasterCollapsed = collapsedSections[masterCat];
 
@@ -759,12 +810,43 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                             // Also apply strict sorting ONLY to Basics
                                             renderCategoryWithSubsections(categoryItems, masterCat === 'Basics')
                                         ) : (
-                                            // For Busbars, render items directly (flat list)
+                                            // For Busbars and Other, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
                                                 {[...categoryItems].sort(compareItems).map(item => renderItemRow(item, false))}
                                             </div>
                                         )}
                                     </>
+                                )}
+
+                                {/* Add Button/Form at the bottom of the 'Other' category */}
+                                {masterCat === 'Other' && !isMasterCollapsed && (
+                                    <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                                        {showManualForm ? (
+                                            <ManualItemForm
+                                                onSave={async (data) => {
+                                                    await addItemToBoard(selectedBoard.id, {
+                                                        category: 'Other',
+                                                        name: data.partNumber || data.description,
+                                                        description: data.description,
+                                                        unitPrice: data.unitPrice,
+                                                        labourHours: data.labourHours,
+                                                        quantity: data.quantity,
+                                                        partNumber: data.partNumber || null
+                                                    });
+                                                    setShowManualForm(false);
+                                                }}
+                                                onCancel={() => setShowManualForm(false)}
+                                            />
+                                        ) : (
+                                            <button
+                                                onClick={() => setShowManualForm(true)}
+                                                className="w-full py-3 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-white transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                            >
+                                                <Plus size={16} />
+                                                Add Line Item Manually
+                                            </button>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         );

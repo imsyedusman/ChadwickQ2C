@@ -8,19 +8,29 @@ export async function PUT(
     try {
         const { itemId } = await params;
         const body = await request.json();
-        const { quantity, notes } = body;
+        const { quantity, notes, unitPrice, labourHours, name, description } = body;
 
         // Get the item before update to check if it's a tier item
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, quantity: true, category: true }
+            select: { name: true, boardId: true, quantity: true, category: true, unitPrice: true }
         });
+
+        // Calculate new cost if unitPrice or quantity is provided
+        const finalQuantity = quantity !== undefined ? parseFloat(quantity) : (item?.quantity ? Number(item.quantity) : 1);
+        const finalUnitPrice = unitPrice !== undefined ? parseFloat(unitPrice) : (item?.unitPrice || 0);
+        const newCost = finalQuantity * finalUnitPrice;
 
         const updatedItem = await prisma.item.update({
             where: { id: itemId },
             data: {
                 quantity: quantity !== undefined ? parseFloat(quantity) : undefined,
                 notes: notes !== undefined ? notes : undefined,
+                unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : undefined,
+                labourHours: labourHours !== undefined ? parseFloat(labourHours) : undefined,
+                name: name !== undefined ? name : undefined,
+                description: description !== undefined ? description : undefined,
+                cost: newCost,
             },
         });
 
