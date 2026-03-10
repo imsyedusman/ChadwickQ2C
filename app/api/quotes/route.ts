@@ -3,9 +3,18 @@ import prisma from '@/lib/prisma';
 import { generateNextQuoteNumber } from '@/lib/quote-numbering';
 
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const quoteNumber = searchParams.get('quoteNumber');
+
+        const where: any = {};
+        if (quoteNumber) {
+            where.quoteNumber = quoteNumber;
+        }
+
         const quotes = await prisma.quote.findMany({
+            where,
             include: {
                 boards: {
                     include: {

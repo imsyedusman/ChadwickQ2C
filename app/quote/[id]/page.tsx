@@ -12,6 +12,7 @@ import QuoteCostingOverrides from '@/components/QuoteBuilder/QuoteCostingOverrid
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
+import RevisionSelector from '@/components/QuoteBuilder/RevisionSelector';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();

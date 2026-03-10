@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
@@ -35,6 +35,7 @@ export default function QuoteList() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [settings, setSettings] = useState<PricingSettings | null>(null);
+    const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
     const router = useRouter();
 
     useEffect(() => {
@@ -154,6 +155,58 @@ export default function QuoteList() {
         (q.quoteNumber || '').toLowerCase().includes(search.toLowerCase())
     ) : [];
 
+    interface QuoteGroup {
+        quoteNumber: string;
+        parent: Quote;
+        children: Quote[];
+        latestUpdate: string;
+        highestRevision: number;
+    }
+
+    const groupedQuotes = useMemo(() => {
+        const groups: Record<string, Quote[]> = {};
+        filteredQuotes.forEach(q => {
+            if (!groups[q.quoteNumber]) {
+                groups[q.quoteNumber] = [];
+            }
+            groups[q.quoteNumber].push(q);
+        });
+
+        const result: QuoteGroup[] = Object.entries(groups).map(([quoteNumber, quotesInGroup]) => {
+            // Sort by revision ascending to find the lowest (parent)
+            const sortedByRev = [...quotesInGroup].sort((a, b) => (a.revision || 0) - (b.revision || 0));
+            const parent = sortedByRev[0];
+
+            // All others are children, sorted by revision descending (newest first)
+            const children = sortedByRev.slice(1).sort((a, b) => (b.revision || 0) - (a.revision || 0));
+
+            // Find highest revision and latest update
+            const highestRevision = Math.max(...quotesInGroup.map(q => q.revision || 0));
+            const latestUpdate = quotesInGroup.reduce((latest, q) =>
+                new Date(q.updatedAt) > new Date(latest) ? q.updatedAt : latest
+                , quotesInGroup[0].updatedAt);
+
+            return {
+                quoteNumber,
+                parent,
+                children,
+                latestUpdate,
+                highestRevision
+            };
+        });
+
+        // Sort groups by latest update descending
+        return result.sort((a, b) => new Date(b.latestUpdate).getTime() - new Date(a.latestUpdate).getTime());
+    }, [filteredQuotes]);
+
+    const toggleGroup = (e: React.MouseEvent, quoteNumber: string) => {
+        e.stopPropagation();
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [quoteNumber]: !prev[quoteNumber]
+        }));
+    };
+
     if (loading) {
         return <div className="p-8 text-center text-gray-500">Loading quotes...</div>;
     }
@@ -182,74 +235,141 @@ export default function QuoteList() {
                 />
             </div>
 
-            <div className="grid gap-4">
-                {filteredQuotes.map((quote) => {
-                    const totalPrice = calculateQuoteTotal(quote);
-                    const boardCount = quote.boards.length;
-                    const updatedDate = new Date(quote.updatedAt);
+            <div className="grid gap-6">
+                {groupedQuotes.map((group) => {
+                    const isCollapsed = collapsedGroups[group.quoteNumber] || false;
+                    const parent = group.parent;
+                    const totalPrice = calculateQuoteTotal(parent);
+                    const updatedDate = new Date(parent.updatedAt);
 
                     return (
-                        <div
-                            key={quote.id}
-                            onClick={() => router.push(`/quote/${quote.id}`)}
-                            className="group bg-white p-6 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between"
-                        >
-                            <div className="flex items-start gap-4">
-                                <div className="p-3 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                    <FileText size={24} />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="font-semibold text-gray-900">{quote.projectRef || 'Untitled Project'}</h3>
-                                        <span className="text-xs font-medium px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                            {formatQuoteNumber(quote.quoteNumber, quote.revision)}
-                                        </span>
-                                        <span className={cn(
-                                            "text-xs font-medium px-2 py-0.5 rounded-full",
-                                            getStatusDisplay(quote.status).className
-                                        )}>
-                                            {getStatusDisplay(quote.status).label}
-                                        </span>
+                        <div key={group.quoteNumber} className="space-y-2">
+                            {/* Parent Row */}
+                            <div
+                                onClick={() => router.push(`/quote/${parent.id}`)}
+                                className="group bg-white p-5 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between shadow-sm"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="flex items-center gap-2 mt-1">
+                                        {group.children.length > 0 && (
+                                            <button
+                                                onClick={(e) => toggleGroup(e, group.quoteNumber)}
+                                                className="p-1 hover:bg-gray-100 rounded text-gray-400"
+                                            >
+                                                {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
+                                            </button>
+                                        )}
+                                        <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+                                            <FileText size={20} />
+                                        </div>
                                     </div>
-                                    <p className="text-gray-500 text-sm mt-1">{quote.clientName || 'No Client Name'}</p>
+                                    <div>
+                                        <div className="flex items-center gap-3">
+                                            <h3 className="font-semibold text-gray-900 text-lg">{parent.projectRef || 'Untitled Project'}</h3>
+                                            <span className="text-sm font-bold px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-lg border border-gray-200">
+                                                {formatQuoteNumber(parent.quoteNumber, parent.revision)}
+                                            </span>
+                                            {parent.revision === group.highestRevision && group.children.length > 0 && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full uppercase tracking-wider">
+                                                    Latest
+                                                </span>
+                                            )}
+                                            <span className={cn(
+                                                "text-xs font-medium px-2 py-0.5 rounded-full",
+                                                getStatusDisplay(parent.status).className
+                                            )}>
+                                                {getStatusDisplay(parent.status).label}
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-500 text-sm mt-0.5">{parent.clientName || 'No Client Name'}</p>
 
-                                    {/* Quick-View Summary */}
-                                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-                                        <span>
-                                            Updated {format(updatedDate, 'MMM d, yyyy')} at {format(updatedDate, 'h:mm a')}
-                                        </span>
-                                        <span className="flex items-center gap-1">
-                                            <span className="font-medium text-gray-700">{boardCount}</span>
-                                            {boardCount === 1 ? 'board' : 'boards'}
-                                        </span>
-                                        <span className="font-semibold text-blue-600">
-                                            ${totalPrice.toLocaleString()} ex GST
-                                        </span>
+                                        <div className="flex items-center gap-4 mt-2.5 text-xs text-gray-500">
+                                            <span>
+                                                Updated {format(updatedDate, 'MMM d, yyyy')} at {format(updatedDate, 'h:mm a')}
+                                            </span>
+                                            <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                                ${totalPrice.toLocaleString()} ex GST
+                                            </span>
+                                        </div>
                                     </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={(e) => handleDuplicate(e, parent.id)}
+                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title="Duplicate"
+                                    >
+                                        <Copy size={18} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDelete(e, parent.id)}
+                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                    onClick={(e) => handleDuplicate(e, quote.id)}
-                                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Duplicate"
-                                >
-                                    <Copy size={18} />
-                                </button>
-                                <button
-                                    onClick={(e) => handleDelete(e, quote.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Delete"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
+                            {/* Child Rows */}
+                            {!isCollapsed && group.children.length > 0 && (
+                                <div className="ml-12 space-y-2 border-l-2 border-gray-100 pl-4">
+                                    {group.children.map((child) => {
+                                        const childTotal = calculateQuoteTotal(child);
+                                        const childUpdate = new Date(child.updatedAt);
+                                        return (
+                                            <div
+                                                key={child.id}
+                                                onClick={() => router.push(`/quote/${child.id}`)}
+                                                className="group bg-white p-3.5 rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-gray-300">
+                                                        <Hash size={14} />
+                                                    </div>
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {formatQuoteNumber(child.quoteNumber, child.revision)}
+                                                    </span>
+                                                    {child.revision === group.highestRevision && (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.25 bg-green-50 text-green-600 rounded-full border border-green-100 uppercase tracking-tight">
+                                                            Latest
+                                                        </span>
+                                                    )}
+                                                    <div className="h-3 w-px bg-gray-200 mx-1" />
+                                                    <span className="text-xs text-gray-500">
+                                                        Updated {format(childUpdate, 'MMM d, h:mm a')}
+                                                    </span>
+                                                    <span className="text-xs font-medium text-gray-900 ml-2">
+                                                        ${childTotal.toLocaleString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => handleDuplicate(e, child.id)}
+                                                        className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md transition-colors"
+                                                        title="Duplicate"
+                                                    >
+                                                        <Copy size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, child.id)}
+                                                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
+                                                        title="Delete"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
 
-                {filteredQuotes.length === 0 && (
+                {groupedQuotes.length === 0 && (
                     <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                         No quotes found. Create one to get started.
                     </div>
