@@ -181,3 +181,10 @@ model Template {
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
+
+model QuoteSequence {
+  id         String   @id @default(uuid())
+  year       Int      @unique
+  lastNumber Int
+  updatedAt  DateTime @updatedAt
+}
