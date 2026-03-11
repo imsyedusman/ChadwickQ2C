@@ -1,0 +1,34 @@
+{
+  "without": {
+    "materialCost": 4000,
+    "labourHours": 0,
+    "labourCost": 0,
+    "consumablesCost": 120,
+    "costBase": 4120,
+    "overheadAmount": 824,
+    "engineeringCost": 824,
+    "totalCost": 5768,
+    "profit": 1266.1463414634145,
+    "sellPrice": 7034.1463414634145,
+    "sellPriceRounded": 7000,
+    "sheetmetalSubtotal": 0,
+    "sheetmetalUplift": 0,
+    "cubicSubtotal": 0
+  },
+  "with": {
+    "materialCost": 4000,
+    "labourHours": 0,
+    "labourCost": 0,
+    "consumablesCost": 120,
+    "costBase": 4120,
+    "overheadAmount": 824,
+    "engineeringCost": 824,
+    "totalCost": 5768,
+    "profit": 2266.1463414634145,
+    "sellPrice": 8034.1463414634145,
+    "sellPriceRounded": 8000,
+    "sheetmetalSubtotal": 0,
+    "sheetmetalUplift": 0,
+    "cubicSubtotal": 0
+  }
+}

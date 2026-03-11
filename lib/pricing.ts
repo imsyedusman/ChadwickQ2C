@@ -119,9 +119,6 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
         return item.unitPrice * qty;
     };
 
-    const baseMaterialCost = items.reduce((sum, item) => sum + getItemTotalPrice(item), 0);
-    const labourHours = items.reduce((sum, item) => sum + (item.labourHours * getQty(item)), 0);
-
     const sheetmetalSubtotal = items.reduce((sum, item) => {
         if (item.isSheetmetal) {
             return sum + getItemTotalPrice(item);
@@ -139,7 +136,20 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
 
     const applySheetmetalUplift = isCustomBoard;
     const sheetmetalUplift = (applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0) + (cubicSubtotal * 0.04);
+
+    // Only include non-price-adjustments in material cost
+    const baseMaterialCost = items.reduce((sum, item) => {
+        if (item.subcategory === 'Price Adjustment') return sum;
+        return sum + getItemTotalPrice(item);
+    }, 0);
+
     const materialCost = baseMaterialCost + sheetmetalUplift;
+
+    // Only include non-price-adjustments in labour
+    const labourHours = items.reduce((sum, item) => {
+        if (item.subcategory === 'Price Adjustment') return sum;
+        return sum + (item.labourHours * getQty(item));
+    }, 0);
 
     const labourRate = settings.labourRate || 0;
     const labourCost = labourHours * labourRate;
@@ -150,11 +160,24 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
     const totalCost = costBase + overheadAmount + engineeringCost;
 
     const marginFactor = 1 - settings.targetMarginPct;
-    const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
+    const preAdjustmentSellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
+
+    // Calculate Price Adjustments Total strictly
+    const priceAdjustmentsTotal = items.reduce((sum, item) => {
+        if (item.subcategory === 'Price Adjustment') {
+            const up = Number(item.unitPrice) || 0;
+            const q = Number(item.quantity) || 0;
+            return sum + (up * q);
+        }
+        return sum;
+    }, 0);
+
+    const sellPrice = preAdjustmentSellPrice + priceAdjustmentsTotal;
     const profit = sellPrice - totalCost;
 
     const rInc = settings.roundingIncrement;
-    const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
+    const preAdjustmentRounded = (rInc && rInc > 0) ? Math.round(preAdjustmentSellPrice / rInc) * rInc : preAdjustmentSellPrice;
+    const sellPriceRounded = preAdjustmentRounded + priceAdjustmentsTotal;
 
     return {
         materialCost,

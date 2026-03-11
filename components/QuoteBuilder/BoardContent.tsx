@@ -209,7 +209,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             description: item.description || '',
                             unitPrice: item.unitPrice,
                             labourHours: item.labourHours,
-                            quantity: Number(item.quantity)
+                            quantity: Number(item.quantity),
+                            type: item.subcategory === 'Price Adjustment' ? 'Price Adjustment' : 'Item'
                         }}
                         onSave={async (data) => {
                             await updateItem(item.id, {
@@ -217,7 +218,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 description: data.description,
                                 unitPrice: data.unitPrice,
                                 labourHours: data.labourHours,
-                                quantity: data.quantity
+                                quantity: data.quantity,
+                                subcategory: data.type === 'Price Adjustment' ? 'Price Adjustment' : null
                             });
                             setEditingItemId(null);
                         }}
@@ -319,8 +321,13 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         )}
                         {item.category === 'Other' && (
                             <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-1.5 py-0.5 text-[10px] font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
-                                    Manual Entry
+                                <span className={cn(
+                                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
+                                    item.subcategory === 'Price Adjustment'
+                                        ? "bg-slate-50 text-slate-700 ring-slate-600/20"
+                                        : "bg-purple-50 text-purple-700 ring-purple-600/20"
+                                )}>
+                                    {item.subcategory === 'Price Adjustment' ? 'Price Adjustment' : 'Manual Item'}
                                 </span>
                             </div>
                         )}
@@ -821,7 +828,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                                         unitPrice: data.unitPrice,
                                                         labourHours: data.labourHours,
                                                         quantity: data.quantity,
-                                                        partNumber: data.partNumber || null
+                                                        partNumber: data.partNumber || null,
+                                                        subcategory: data.type === 'Price Adjustment' ? 'Price Adjustment' : undefined
                                                     });
                                                     setShowManualForm(false);
                                                 }}
