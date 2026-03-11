@@ -10,7 +10,13 @@ export async function GET(request: Request) {
 
         const where: any = {};
         if (quoteNumber) {
-            where.quoteNumber = quoteNumber;
+            // If the provided quoteNumber has a suffix, extract the base
+            const baseMatch = quoteNumber.match(/^(Q\d{2}-\d{4})/);
+            const baseNumber = baseMatch ? baseMatch[1] : quoteNumber;
+
+            where.quoteNumber = {
+                startsWith: baseNumber
+            };
         }
 
         const quotes = await prisma.quote.findMany({

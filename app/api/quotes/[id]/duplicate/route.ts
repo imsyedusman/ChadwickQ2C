@@ -29,19 +29,29 @@ export async function POST(
         // We run the revision lookup and insertion in a Transaction
         // to prevent race conditions during simultaneous duplication.
         const newQuote = await prisma.$transaction(async (tx) => {
-            // Get max revision
+            // Use the utility to generate the next full quote number (relative to base)
+            const newFullQuoteNumber = await generateRevisionNumber(originalQuote.quoteNumber);
+
+            // Get the base number to correctly increment the internal revision field
+            const baseMatch = newFullQuoteNumber.match(/^(Q\d{2}-\d{4})/);
+            const baseNumber = baseMatch ? baseMatch[1] : newFullQuoteNumber;
+
+            // For the numeric revision field, we can either keep it as 0 (since suffix is in string)
+            // or increment it for internal sorting. Let's increment it so we maintain original order.
             const maxRevisionResult = await tx.quote.aggregate({
-                where: { quoteNumber: originalQuote.quoteNumber },
+                where: {
+                    quoteNumber: {
+                        startsWith: baseNumber
+                    }
+                },
                 _max: { revision: true }
             });
-
-            const maxRevision = maxRevisionResult._max.revision ?? 0;
-            const newRevision = maxRevision + 1;
+            const newRevision = (maxRevisionResult._max.revision ?? 0) + 1;
 
             // Create the new quote with all boards and items
             return await tx.quote.create({
                 data: {
-                    quoteNumber: originalQuote.quoteNumber,
+                    quoteNumber: newFullQuoteNumber,
                     revision: newRevision,
                     clientName: originalQuote.clientName,
                     clientCompany: originalQuote.clientCompany,

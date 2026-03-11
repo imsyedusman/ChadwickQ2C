@@ -119,7 +119,8 @@ export async function PUT(
             overrideTargetMarginPct,
             overrideConsumablesPct,
             overrideGstPct,
-            overrideRoundingIncrement
+            overrideRoundingIncrement,
+            quoteNumber
         } = body;
 
         const updatedQuote = await prisma.quote.update({
@@ -138,7 +139,8 @@ export async function PUT(
                 overrideTargetMarginPct,
                 overrideConsumablesPct,
                 overrideGstPct,
-                overrideRoundingIncrement
+                overrideRoundingIncrement,
+                quoteNumber
             },
         });
 

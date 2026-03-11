@@ -76,7 +76,8 @@ export async function generateNextQuoteNumber(): Promise<string> {
  * @returns {Promise<string>} The new quote number with the next alphabetical suffix.
  */
 export async function generateRevisionNumber(originalQuoteNumber: string): Promise<string> {
-    // Extract base number (e.g., "Q26-0240" from "Q26-0240-A")
+    // Extract base number (e.g., "Q26-0243" from "Q26-0243-A")
+    // We look for the standard QYY-NNNN pattern at the start
     const match = originalQuoteNumber.match(/^(Q\d{2}-\d{4})/);
     const baseNumber = match ? match[1] : originalQuoteNumber;
 
@@ -99,14 +100,14 @@ export async function generateRevisionNumber(originalQuoteNumber: string): Promi
     const existingSuffixes: string[] = [];
 
     for (const q of existingQuotes) {
-        // Match suffixes like -A, -B, -Z, -AA
-        const suffixMatch = q.quoteNumber.match(/^(Q\d{2}-\d{4})-([A-Z]+)$/);
-        if (suffixMatch && suffixMatch[2]) {
-            existingSuffixes.push(suffixMatch[2]);
-        } else if (q.quoteNumber === baseNumber) {
-            // The base quote itself doesn't have a suffix, but it exists
-            // We ensure existingSuffixes at least represents *some* state if needed,
-            // but the very presence of the base means at least "-A" is needed.
+        // Match suffixes like -A, -B, -Z, -AA at the end of the base number
+        // We escape the baseNumber just in case it contains special characters
+        const escapedBase = baseNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const suffixRegex = new RegExp(`^${escapedBase}-([A-Z]+)$`);
+        const suffixMatch = q.quoteNumber.match(suffixRegex);
+
+        if (suffixMatch && suffixMatch[1]) {
+            existingSuffixes.push(suffixMatch[1]);
         }
     }
 

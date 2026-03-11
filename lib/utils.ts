@@ -26,6 +26,9 @@ export function formatCurrency(value: number, decimals: number = 2): string {
 export function formatQuoteNumber(quoteNumber: string, revision: number = 0): string {
   if (!revision || revision === 0) return quoteNumber;
 
+  // If the quoteNumber already has a suffix (e.g. -A, -B), don't add another one
+  if (quoteNumber.match(/-[A-Z]+$/)) return quoteNumber;
+
   let suffix = "";
   let r = revision;
   while (r > 0) {

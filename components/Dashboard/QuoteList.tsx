@@ -164,15 +164,22 @@ export default function QuoteList() {
     }
 
     const groupedQuotes = useMemo(() => {
+        const getBaseQuoteNumber = (num: string) => {
+            // Standard format is QYY-NNNN or QYY-NNNN-SUFFIX
+            const match = num.match(/^(Q\d{2}-\d{4})/);
+            return match ? match[1] : num;
+        };
+
         const groups: Record<string, Quote[]> = {};
         filteredQuotes.forEach(q => {
-            if (!groups[q.quoteNumber]) {
-                groups[q.quoteNumber] = [];
+            const base = getBaseQuoteNumber(q.quoteNumber);
+            if (!groups[base]) {
+                groups[base] = [];
             }
-            groups[q.quoteNumber].push(q);
+            groups[base].push(q);
         });
 
-        const result: QuoteGroup[] = Object.entries(groups).map(([quoteNumber, quotesInGroup]) => {
+        const result: QuoteGroup[] = Object.entries(groups).map(([baseNumber, quotesInGroup]) => {
             // Sort by revision ascending to find the lowest (parent)
             const sortedByRev = [...quotesInGroup].sort((a, b) => (a.revision || 0) - (b.revision || 0));
             const parent = sortedByRev[0];
@@ -187,7 +194,7 @@ export default function QuoteList() {
                 , quotesInGroup[0].updatedAt);
 
             return {
-                quoteNumber,
+                quoteNumber: baseNumber,
                 parent,
                 children,
                 latestUpdate,
