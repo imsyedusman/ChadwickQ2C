@@ -13,7 +13,7 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        const users = await (prisma.user as any).findMany({
+        const users = await (prisma as any).user.findMany({
             include: {
                 role: true,
             },
@@ -47,14 +47,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
-        const existing = await (prisma.user as any).findUnique({ where: { email } });
+        const existing = await (prisma as any).user.findUnique({ where: { email } });
         if (existing) {
             return NextResponse.json({ error: 'User already exists' }, { status: 400 });
         }
 
         const hashedPassword = await bcrypt.hash(password, 12);
 
-        const newUser = await (prisma.user as any).create({
+        const newUser = await (prisma as any).user.create({
             data: {
                 email,
                 name,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
             include: { role: true }
         });
 
-        await logAction(session.user?.id, 'USER_CREATE', 'USER', newUser.id, { email });
+        await logAction((session.user as any)?.id, 'USER_CREATE', 'USER', newUser.id, { email });
 
         const { password: _, ...sanitized } = newUser;
         return NextResponse.json(sanitized);
