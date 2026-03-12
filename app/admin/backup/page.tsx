@@ -10,11 +10,11 @@ export default function BackupPage() {
             <div className="max-w-5xl mx-auto">
                 <div className="mb-6">
                     <Link
-                        href="/settings"
+                        href="/admin"
                         className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors mb-4"
                     >
                         <ArrowLeft size={16} />
-                        Back to Settings
+                        Back to Admin Control Center
                     </Link>
                     <h1 className="text-3xl font-bold text-gray-900">Backup & Restore</h1>
                     <p className="text-gray-600 mt-2">

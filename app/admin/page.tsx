@@ -77,6 +77,13 @@ const ADMIN_SECTIONS = [
                 href: '/admin/audit',
                 icon: <ClipboardList className="w-6 h-6 text-amber-600" />,
                 color: 'bg-amber-50',
+            },
+            {
+                title: 'Backup & Restore',
+                description: 'Full system backup and restoration of Quotes and Catalog data.',
+                href: '/admin/backup',
+                icon: <Database className="w-6 h-6 text-blue-600" />,
+                color: 'bg-blue-50',
             }
         ]
     },
