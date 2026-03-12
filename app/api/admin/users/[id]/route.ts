@@ -29,13 +29,13 @@ export async function PATCH(
             updateData.password = await bcrypt.hash(password, 12);
         }
 
-        const updatedUser = await (prisma.user as any).update({
+        const updatedUser = await (prisma as any).user.update({
             where: { id },
             data: updateData,
             include: { role: true }
         });
 
-        await logAction(session.user?.id, 'USER_UPDATE', 'USER', id, { updatedFields: Object.keys(updateData) });
+        await logAction((session.user as any)?.id, 'USER_UPDATE', 'USER', id, { updatedFields: Object.keys(updateData) });
 
         const { password: _, ...sanitized } = updatedUser;
         return NextResponse.json(sanitized);
@@ -58,12 +58,12 @@ export async function DELETE(
 
         // We usually don't delete users, we DISABLE them.
         // But if explicitly requested:
-        await (prisma.user as any).update({
+        await (prisma as any).user.update({
             where: { id },
             data: { status: 'DISABLED' }
         });
 
-        await logAction(session.user?.id, 'USER_DISABLE', 'USER', id);
+        await logAction((session.user as any)?.id, 'USER_DISABLE', 'USER', id);
 
         return NextResponse.json({ success: true });
     } catch (error) {
