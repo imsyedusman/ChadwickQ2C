@@ -22,6 +22,9 @@ model Quote {
   description   String?
   status        String   @default("DRAFT") // DRAFT, SENT, APPROVED, REJECTED
   
+  // Revision Grouping
+  revisionGroupId String? // Unifies a family of revisions/duplicates
+  
   // Ownership tracking
   createdBy     String?
   creator       User?    @relation("QuoteCreator", fields: [createdBy], references: [id])

@@ -130,7 +130,7 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
                     <input
                         type="text"
                         required
-                        value={description}
+                        value={description ?? ""}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="e.g. Supplier discount, External enclosure..."
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 py-1.5 px-3 transition-colors"
@@ -142,7 +142,7 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
                     <label className="sr-only">Part Number</label>
                     <input
                         type="text"
-                        value={partNumber}
+                        value={partNumber ?? ""}
                         onChange={(e) => setPartNumber(e.target.value)}
                         placeholder="Optional"
                         className="w-full text-sm bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 placeholder:text-gray-400 py-1.5 px-3 transition-colors"
@@ -158,7 +158,7 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
                     <input
                         type="number"
                         step="0.01"
-                        value={unitPrice}
+                        value={unitPrice ?? ""}
                         onChange={(e) => setUnitPrice(e.target.value)}
                         placeholder="0.00"
                         className="w-full pl-7 pr-3 text-sm bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 py-1.5 transition-colors"
@@ -173,7 +173,7 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
                             type="number"
                             step="0.1"
                             min="0"
-                            value={labourHours}
+                            value={labourHours ?? ""}
                             onChange={(e) => setLabourHours(e.target.value)}
                             placeholder="0.0"
                             className="w-full pr-8 pl-3 text-sm bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 py-1.5 transition-colors"
@@ -190,7 +190,7 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
                     <input
                         type="number"
                         step="0.1"
-                        value={quantity}
+                        value={quantity ?? ""}
                         onChange={(e) => setQuantity(e.target.value)}
                         placeholder="1"
                         className="w-full pr-8 pl-3 text-sm bg-gray-50 border border-gray-200 rounded-md focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 py-1.5 transition-colors"

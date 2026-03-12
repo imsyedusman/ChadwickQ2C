@@ -540,7 +540,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         type="text"
                         className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm font-medium text-gray-900"
                         placeholder="e.g. MSB-01"
-                        value={config.name}
+                        value={config.name ?? ""}
                         onChange={e => setConfig({ ...config, name: e.target.value })}
                     />
                 </div>
@@ -630,7 +630,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             min="0"
                             max="20"
                             className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                            value={config.tierCount}
+                            value={config.tierCount ?? 0}
                             onChange={e => setConfig({ ...config, tierCount: parseInt(e.target.value) || 0 })}
                             placeholder="0"
                         />
@@ -645,7 +645,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 type="number"
                                 min="1"
                                 className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                value={config.totalCompartments || ''}
+                                value={config.totalCompartments ?? ""}
                                 onChange={e => setConfig({ ...config, totalCompartments: parseInt(e.target.value) || 0 })}
                                 placeholder="e.g. 5"
                             />
@@ -702,7 +702,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 type="number"
                                 min="0"
                                 className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                value={config.boardWidth || ''}
+                                value={config.boardWidth ?? ""}
                                 onChange={e => setConfig({ ...config, boardWidth: parseFloat(e.target.value) || undefined })}
                                 placeholder="e.g. 3800"
                             />
@@ -713,7 +713,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 type="number"
                                 min="1"
                                 className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                value={config.shippingSections || 1}
+                                value={config.shippingSections ?? 1}
                                 onChange={e => setConfig({ ...config, shippingSections: parseInt(e.target.value) || 1 })}
                             />
                         </div>
@@ -749,7 +749,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                     type="number"
                                     min="1"
                                     className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900"
-                                    value={config.cableZoneCount || ''}
+                                    value={config.cableZoneCount ?? ""}
                                     onChange={e => setConfig({ ...config, cableZoneCount: parseInt(e.target.value) || 0 })}
                                     placeholder="Number of zones..."
                                 />
@@ -881,7 +881,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                         type="number"
                                         min="1"
                                         className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.ctQuantity}
+                                        value={config.ctQuantity ?? 1}
                                         onChange={e => setConfig({ ...config, ctQuantity: parseInt(e.target.value) || 1 })}
                                     />
                                 </div>
@@ -908,7 +908,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                         type="number"
                                         min="1"
                                         className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.ctSpareQuantity || 1}
+                                        value={config.ctSpareQuantity ?? 1}
                                         onChange={e => setConfig({ ...config, ctSpareQuantity: parseInt(e.target.value) || 1 })}
                                     />
                                     <p className="text-[9px] text-gray-400 mt-1">
@@ -982,7 +982,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                                 type="number"
                                                 min="1"
                                                 className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                                value={meter.quantity}
+                                                value={meter.quantity ?? 1}
                                                 onChange={e => {
                                                     const newMeters = [...(config.wholeCurrentMeters || [])];
                                                     newMeters[index] = { ...meter, quantity: parseInt(e.target.value) || 1 };
@@ -1069,7 +1069,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                 type="text"
                                 className="w-full mt-2 p-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
                                 placeholder="Ref Number..."
-                                value={config.drawingRefNumber}
+                                value={config.drawingRefNumber ?? ""}
                                 onChange={e => setConfig({ ...config, drawingRefNumber: e.target.value })}
                             />
                         )}
@@ -1084,7 +1084,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-shadow"
                             rows={3}
                             placeholder="Customer-facing notes..."
-                            value={config.notes}
+                            value={config.notes ?? ""}
                             onChange={e => setConfig({ ...config, notes: e.target.value })}
                         />
                     </div>
@@ -1095,7 +1095,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                             className="w-full p-2.5 bg-blue-50/30 border border-blue-200 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
                             rows={3}
                             placeholder="Internal team comments/reminders..."
-                            value={config.internalNotes}
+                            value={config.internalNotes ?? ""}
                             onChange={e => setConfig({ ...config, internalNotes: e.target.value })}
                         />
                     </div>

@@ -86,6 +86,7 @@ interface QuoteContextType {
     quoteId: string;
     quoteNumber: string;
     revision: number;
+    revisionGroupId: string;
     formattedQuoteNumber: string;
     clientName: string;
     clientCompany: string;
@@ -160,6 +161,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
         revision: 0,
+        revisionGroupId: '',
         clientName: '',
         clientCompany: '',
         projectRef: '',
@@ -191,6 +193,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 setMetadata({
                     quoteNumber: data.quoteNumber || '',
                     revision: data.revision || 0,
+                    revisionGroupId: data.revisionGroupId || '',
                     clientName: data.clientName || '',
                     clientCompany: data.clientCompany || '',
                     projectRef: data.projectRef || '',
@@ -510,6 +513,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 quoteId,
                 quoteNumber: metadata.quoteNumber,
                 revision: metadata.revision,
+                revisionGroupId: metadata.revisionGroupId,
                 formattedQuoteNumber: formatQuoteNumber(metadata.quoteNumber, metadata.revision),
                 clientName: metadata.clientName,
                 clientCompany: metadata.clientCompany,

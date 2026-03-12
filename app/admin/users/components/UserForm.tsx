@@ -79,6 +79,11 @@ export default function UserForm({ user, isOpen, onClose, onSuccess }: UserFormP
                 delete (payload as any).password;
             }
 
+            // Client-side domain validation for NEW users
+            if (!user && !payload.email.toLowerCase().endsWith('@chadwickswitchboards.com.au')) {
+                throw new Error('User accounts must use a @chadwickswitchboards.com.au email address.');
+            }
+
             const res = await fetch(endpoint, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -146,9 +151,12 @@ export default function UserForm({ user, isOpen, onClose, onSuccess }: UserFormP
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                     className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-2.5 pl-11 pr-4 text-sm focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium"
-                                    placeholder="john.doe@chadwick.com.au"
+                                    placeholder="john.doe@chadwickswitchboards.com.au"
                                 />
                             </div>
+                            <p className="text-[10px] text-gray-400 mt-1 ml-1 font-medium italic">
+                                Domain restricted to @chadwickswitchboards.com.au
+                            </p>
                         </div>
 
                         {/* Role Field */}

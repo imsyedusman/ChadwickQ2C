@@ -37,6 +37,10 @@ export default function Navbar() {
             .substring(0, 2);
     };
 
+    if (pathname === '/login' || pathname?.startsWith('/shared-quote/')) {
+        return null;
+    }
+
     return (
         <nav className={cn(
             "bg-white border-b border-gray-200 sticky top-0 z-50 transition-all duration-300",
@@ -52,6 +56,7 @@ export default function Navbar() {
                                 width={120}
                                 height={40}
                                 className={cn("w-auto transition-all", isQuotePage ? "h-6" : "h-8")}
+                                priority
                                 suppressHydrationWarning
                             />
                             {!isQuotePage && <span className="font-bold text-xl text-gray-900 tracking-tight">Q2C</span>}

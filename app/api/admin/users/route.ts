@@ -47,6 +47,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
+        // Domain validation
+        if (!email.toLowerCase().endsWith('@chadwickswitchboards.com.au')) {
+            return NextResponse.json({ 
+                error: 'Only @chadwickswitchboards.com.au emails are permitted for new accounts.' 
+            }, { status: 400 });
+        }
+
         const existing = await (prisma as any).user.findUnique({ where: { email } });
         if (existing) {
             return NextResponse.json({ error: 'User already exists' }, { status: 400 });

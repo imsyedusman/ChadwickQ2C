@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { CatalogItem } from '@prisma/client';
 import * as XLSX from 'xlsx';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function GET(request: Request) {
     try {
@@ -225,6 +227,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (session?.user?.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { items } = body;
 
@@ -302,6 +309,11 @@ import { classifyCatalogItem } from '@/lib/catalog-service';
 
 export async function PATCH(request: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (session?.user?.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(request.url);
         const action = searchParams.get('action');
 
@@ -361,6 +373,11 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (session?.user?.role !== 'ADMIN') {
+            return NextResponse.json({ error: 'Unauthorized. Admin access required.' }, { status: 403 });
+        }
+
         const { searchParams } = new URL(request.url);
         const brand = searchParams.get('brand');
 

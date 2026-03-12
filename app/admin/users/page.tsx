@@ -107,16 +107,16 @@ export default function UserManagementPage() {
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-500">
             {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center justify-between gap-4 mb-8">
                 <div>
                     <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">User Management</h1>
                     <p className="text-gray-500 mt-1">Manage team members, roles and access permissions.</p>
                 </div>
                 <Button 
                     onClick={handleAdd}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-6 h-auto shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 h-10 shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
-                    <Plus className="w-5 h-5 mr-2" />
+                    <Plus className="w-4 h-4 mr-2" />
                     Add New User
                 </Button>
             </div>

@@ -10,8 +10,17 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         const search = searchParams.get('search');
         const status = searchParams.get('status');
+        const quoteNumber = searchParams.get('quoteNumber');
+        const revisionGroupId = searchParams.get('revisionGroupId');
+        const showTrash = searchParams.get('showTrash') === 'true';
 
         const where: any = {};
+        if (revisionGroupId) {
+            where.revisionGroupId = revisionGroupId;
+        }
+        if (quoteNumber) {
+            where.quoteNumber = quoteNumber;
+        }
         if (search) {
             where.OR = [
                 { quoteNumber: { contains: search, mode: 'insensitive' } },
@@ -19,8 +28,11 @@ export async function GET(request: Request) {
                 { projectRef: { contains: search, mode: 'insensitive' } },
             ];
         }
+
         if (status) {
             where.status = status;
+        } else if (showTrash) {
+            where.status = 'TRASH';
         } else {
             where.status = { not: 'TRASH' };
         }
@@ -70,9 +82,15 @@ export async function POST(request: Request) {
             },
         } as any);
 
+        // Update the quote with its own ID as the revisionGroupId
+        const updatedQuote = await (prisma.quote as any).update({
+            where: { id: newQuote.id },
+            data: { revisionGroupId: newQuote.id }
+        });
+
         await logAction(userId, 'CREATE_QUOTE', 'QUOTE', newQuote.id, { quoteNumber });
 
-        return NextResponse.json(newQuote);
+        return NextResponse.json(updatedQuote);
     } catch (error) {
         console.error('Failed to create quote:', error);
         return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });

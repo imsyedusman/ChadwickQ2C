@@ -13,21 +13,25 @@ interface Revision {
 
 interface RevisionSelectorProps {
     currentId: string;
-    quoteNumber: string;
+    revisionGroupId: string;
 }
 
-export default function RevisionSelector({ currentId, quoteNumber }: RevisionSelectorProps) {
+export default function RevisionSelector({ currentId, revisionGroupId }: RevisionSelectorProps) {
     const [revisions, setRevisions] = useState<Revision[]>([]);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
         async function fetchRevisions() {
+            if (!revisionGroupId) {
+                setLoading(false);
+                return;
+            }
+
             try {
-                const res = await fetch(`/api/quotes?quoteNumber=${quoteNumber}`);
+                const res = await fetch(`/api/quotes?revisionGroupId=${revisionGroupId}`);
                 if (res.ok) {
                     const data = await res.json();
-                    console.log("Quote revisions:", data);
                     // Sort by revision descending (newest first)
                     const sorted = (data as Revision[]).sort((a, b) => (b.revision || 0) - (a.revision || 0));
                     setRevisions(sorted);
@@ -39,11 +43,12 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
             }
         }
 
-        if (quoteNumber) {
-            fetchRevisions();
-        }
-    }, [quoteNumber]);
+        fetchRevisions();
+    }, [revisionGroupId]);
 
+    // Handle initial state and single-version fallback
+    const displayRevisions = revisions.length > 0 ? revisions : [];
+    
     if (loading) {
         return (
             <div className="h-10 flex items-center px-6 border-b border-gray-100 bg-gray-50/50">
@@ -53,7 +58,13 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
         );
     }
 
-    if (!revisions || revisions.length === 0) return null;
+    // If we're not loading and have no revisions, we don't show the strip
+    // UNLESS we want to show at least the current one.
+    // The user requested: "If no other revisions exist, the selector should still show the current quote" 
+    // but the list comes from the API. We can manually add the current quote if the list is empty or doesn't contain it.
+    
+    // However, if we're on a page with a quoteId, we should at least have that one in revisions if filtering by revisionGroupId works.
+    if (!loading && displayRevisions.length === 0) return null;
 
     return (
         <div className="bg-white border-b border-gray-200 py-1 px-6 flex items-center gap-2 overflow-x-auto no-scrollbar shadow-sm">
@@ -61,7 +72,7 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
                 Quote Versions
             </span>
             <div className="flex items-center gap-1">
-                {revisions.map((rev, index) => {
+                {displayRevisions.map((rev, index) => {
                     const isActive = rev.id === currentId;
                     const formattedDisplay = formatQuoteNumber(rev.quoteNumber, rev.revision);
 
@@ -70,7 +81,7 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
                             <button
                                 onClick={() => isActive ? null : router.push(`/quote/${rev.id}`)}
                                 className={cn(
-                                    "px-3 py-1 rounded-md text-xs font-medium transition-all",
+                                    "px-3 py-1 rounded-md text-xs font-medium transition-all cursor-pointer",
                                     isActive
                                         ? "bg-blue-600 text-white shadow-sm scale-105"
                                         : "text-gray-600 hover:bg-gray-200 hover:text-gray-900"
@@ -78,7 +89,7 @@ export default function RevisionSelector({ currentId, quoteNumber }: RevisionSel
                             >
                                 {formattedDisplay}
                             </button>
-                            {index < revisions.length - 1 && (
+                            {index < displayRevisions.length - 1 && (
                                 <span className="text-gray-300 mx-1 text-xs">|</span>
                             )}
                         </div>

@@ -18,7 +18,7 @@ import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
 import { Share2 } from 'lucide-react';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
+    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -70,7 +70,7 @@ function QuoteBuilderContent() {
 
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
-            <RevisionSelector currentId={quoteId} quoteNumber={quoteNumber} />
+            <RevisionSelector currentId={quoteId} revisionGroupId={revisionGroupId} />
             {/* Quote Header */}
             <div className={cn(
                 "bg-white border-b border-gray-200 transition-all duration-200 ease-in-out z-10",
@@ -154,7 +154,7 @@ function QuoteBuilderContent() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={quoteNumber}
+                                    value={quoteNumber ?? ""}
                                     onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
                                     className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
                                     placeholder="Q-..."
@@ -169,7 +169,7 @@ function QuoteBuilderContent() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={clientName}
+                                    value={clientName ?? ""}
                                     onChange={(e) => updateMetadata({ clientName: e.target.value })}
                                     className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
                                     placeholder="Client Name"
@@ -184,7 +184,7 @@ function QuoteBuilderContent() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={clientCompany}
+                                    value={clientCompany ?? ""}
                                     onChange={(e) => updateMetadata({ clientCompany: e.target.value })}
                                     className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
                                     placeholder="Client Company"
@@ -199,7 +199,7 @@ function QuoteBuilderContent() {
                                 </label>
                                 <input
                                     type="text"
-                                    value={projectRef}
+                                    value={projectRef ?? ""}
                                     onChange={(e) => updateMetadata({ projectRef: e.target.value })}
                                     className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
                                     placeholder="Project Reference"

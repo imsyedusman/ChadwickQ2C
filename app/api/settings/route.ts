@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
 
 export async function GET() {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
         let settings = await prisma.settings.findUnique({
             where: { id: 'global' },
         });
+// ... (rest of GET)
 
         if (!settings) {
             settings = await prisma.settings.create({
@@ -33,6 +41,11 @@ export async function GET() {
 
 export async function PUT(request: Request) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session || (session.user as any).role === 'VIEWER') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
         const body = await request.json();
 
         const settings = await prisma.settings.upsert({

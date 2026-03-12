@@ -134,6 +134,7 @@ export default function QuoteList() {
             const res = await fetch(`/api/quotes/${id}?permanent=${isPermanent}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete quote');
             setQuotes(quotes.filter((q) => q.id !== id));
+            router.refresh();
         } catch (error) {
             console.error('Failed to delete quote', error);
             alert('Failed to delete quote');
@@ -153,6 +154,7 @@ export default function QuoteList() {
             
             // Success: remove from current list (Trash view)
             setQuotes(quotes.filter(q => q.id !== id));
+            router.refresh();
         } catch (error) {
             console.error('Failed to restore quote', error);
             alert('Failed to restore quote');

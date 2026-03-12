@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Search, Trash2, Filter, Database, RefreshCw, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { classifyCatalogItem } from '@/lib/catalog-service';
 
@@ -28,6 +29,9 @@ interface ComparisonSummary {
 }
 
 export default function CatalogManager() {
+    const { data: session } = useSession();
+    const isAdmin = session?.user?.role === 'ADMIN';
+
     // Upload State
     const [previewItems, setPreviewItems] = useState<CatalogItem[]>([]);
     const [uploading, setUploading] = useState(false);
@@ -444,15 +448,17 @@ export default function CatalogManager() {
                                     </div>
                                 </div>
 
-                                <button
-                                    onClick={() => handleDeleteBrand(stat.brand, stat.originalBrand)}
-                                    disabled={deletingBrand === stat.brand}
-                                    className="w-full py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors flex items-center justify-center gap-2"
-                                    title="Delete all items from this brand"
-                                >
-                                    {deletingBrand === stat.brand ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
-                                    Delete Pricelist
-                                </button>
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => handleDeleteBrand(stat.brand, stat.originalBrand)}
+                                        disabled={deletingBrand === stat.brand}
+                                        className="w-full py-2 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors flex items-center justify-center gap-2"
+                                        title="Delete all items from this brand"
+                                    >
+                                        {deletingBrand === stat.brand ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                                        Delete Pricelist
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => handleDownloadExcel(stat.brand)}
                                     className="w-full py-2 text-xs font-medium text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors flex items-center justify-center gap-2 mt-2"
@@ -468,11 +474,12 @@ export default function CatalogManager() {
             </div>
 
             {/* Upload Section */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Upload className="text-blue-600" size={20} />
-                    Import Catalog
-                </h2>
+            {isAdmin && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Upload className="text-blue-600" size={20} />
+                        Import Catalog
+                    </h2>
 
                 <div className="space-y-6">
                     {/* Brand Selection */}
@@ -832,6 +839,7 @@ export default function CatalogManager() {
                     )}
                 </div>
             </div>
+        )}
 
             {/* Saved Catalog Section */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
