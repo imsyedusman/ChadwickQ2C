@@ -19,19 +19,30 @@ export const metadata: Metadata = {
   description: "Modern quoting system for Chadwick Switchboards",
 };
 
-export default function RootLayout({
+import { NextAuthProvider } from "@/components/Shared/NextAuthProvider";
+import { headers } from "next/headers";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const headersList = await headers();
+  const pathname = headersList.get("x-invoke-path") || "";
+  const isLoginPage = pathname === "/login";
+  const isSharedPage = pathname.startsWith("/shared-quote");
+  const hideNavbar = isLoginPage || isSharedPage;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${inter.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50`}
       >
-        <Navbar />
-        {children}
-        <Toaster position="top-right" richColors />
+        <NextAuthProvider>
+          {!hideNavbar && <Navbar />}
+          {children}
+          <Toaster position="top-right" richColors />
+        </NextAuthProvider>
       </body>
     </html>
   );

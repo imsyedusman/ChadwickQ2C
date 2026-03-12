@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Board, Item } from '@prisma/client';
 import { generateRevisionNumber } from '@/lib/quote-numbering';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { logAction } from '@/lib/audit';
 
 export async function POST(
     request: Request,
@@ -48,6 +51,9 @@ export async function POST(
             });
             const newRevision = (maxRevisionResult._max.revision ?? 0) + 1;
 
+            const session = await getServerSession(authOptions);
+            const userId = session?.user?.id;
+
             // Create the new quote with all boards and items
             return await tx.quote.create({
                 data: {
@@ -70,6 +76,11 @@ export async function POST(
                     overrideGstPct: originalQuote.overrideGstPct,
                     overrideRoundingIncrement: originalQuote.overrideRoundingIncrement,
                     overrideCopperPricePerKg: originalQuote.overrideCopperPricePerKg,
+                    
+                    // Ownership
+                    createdBy: userId as string,
+                    lastModifiedBy: userId as string,
+
                     boards: {
                         create: originalQuote.boards.map((board: Board & { items: Item[] }) => ({
                             name: board.name,
@@ -91,7 +102,6 @@ export async function POST(
                                     notes: item.notes,
                                     isDefault: item.isDefault,
                                     order: item.order,
-                                    // Missing critical item fields
                                     isSheetmetal: item.isSheetmetal,
                                     isSystemManaged: item.isSystemManaged,
                                     systemTag: item.systemTag,
@@ -109,7 +119,12 @@ export async function POST(
                         include: { items: true }
                     }
                 }
-            });
+            } as any);
+        });
+
+        await logAction((newQuote as any).createdBy, 'DUPLICATE_QUOTE', 'QUOTE', newQuote.id, { 
+            originalId: id, 
+            newQuoteNumber: newQuote.quoteNumber 
         });
 
         return NextResponse.json(newQuote);

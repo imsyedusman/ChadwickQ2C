@@ -60,40 +60,44 @@ export default function BackupManager() {
         setRestoring(true);
         setRestoreStatus(null);
 
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            try {
-                const json = JSON.parse(evt.target?.result as string);
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
 
-                const res = await fetch('/api/admin/backup/catalog', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'catalog_backup',
-                        items: json.items,
-                        clearBeforeImport
-                    })
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    setRestoreStatus({
-                        type: 'success',
-                        message: `Successfully restored ${data.details.createdCount} items.${data.details.deletedCount ? ` (Deleted ${data.details.deletedCount} existing items)` : ''}`
-                    });
-                } else {
-                    throw new Error(data.error || 'Restore failed');
-                }
-            } catch (error: any) {
-                console.error('Restore failed', error);
-                setRestoreStatus({ type: 'error', message: error.message || 'Failed to restore backup' });
-            } finally {
-                setRestoring(false);
-                e.target.value = ''; // Reset input
+            if (!json.items || !Array.isArray(json.items)) {
+                throw new Error('Invalid catalog backup format: "items" array missing');
             }
-        };
-        reader.readAsText(file);
+
+            const res = await fetch('/api/admin/backup/catalog', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'catalog_backup',
+                    items: json.items,
+                    clearBeforeImport
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setRestoreStatus({
+                    type: 'success',
+                    message: `Successfully restored ${data.details.createdCount} items.${data.details.deletedCount ? ` (Deleted ${data.details.deletedCount} existing items)` : ''}`
+                });
+            } else {
+                throw new Error(data.error || 'Restore failed');
+            }
+        } catch (error: any) {
+            console.error('Restore failed:', error);
+            setRestoreStatus({ 
+                type: 'error', 
+                message: error.message || 'Failed to restore backup' 
+            });
+        } finally {
+            setRestoring(false);
+            e.target.value = ''; // Reset input
+        }
     };
 
     const handleRestoreQuotes = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,39 +112,43 @@ export default function BackupManager() {
         setRestoring(true);
         setRestoreStatus(null);
 
-        const reader = new FileReader();
-        reader.onload = async (evt) => {
-            try {
-                const json = JSON.parse(evt.target?.result as string);
+        try {
+            const text = await file.text();
+            const json = JSON.parse(text);
 
-                const res = await fetch('/api/admin/backup/quotes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'quotes_backup',
-                        quotes: json.quotes
-                    })
-                });
-
-                const data = await res.json();
-
-                if (res.ok) {
-                    setRestoreStatus({
-                        type: 'success',
-                        message: `Successfully restored quotes. Created: ${data.details.createdCount}, Updated: ${data.details.updatedCount}`
-                    });
-                } else {
-                    throw new Error(data.error || 'Restore failed');
-                }
-            } catch (error: any) {
-                console.error('Restore failed', error);
-                setRestoreStatus({ type: 'error', message: error.message || 'Failed to restore quotes' });
-            } finally {
-                setRestoring(false);
-                e.target.value = ''; // Reset input
+            if (!json.quotes || !Array.isArray(json.quotes)) {
+                throw new Error('Invalid quotes backup format: "quotes" array missing');
             }
-        };
-        reader.readAsText(file);
+
+            const res = await fetch('/api/admin/backup/quotes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'quotes_backup',
+                    quotes: json.quotes
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                setRestoreStatus({
+                    type: 'success',
+                    message: `Successfully restored quotes. Created: ${data.details.createdCount}, Updated: ${data.details.updatedCount}`
+                });
+            } else {
+                throw new Error(data.error || 'Restore failed');
+            }
+        } catch (error: any) {
+            console.error('Restore failed:', error);
+            setRestoreStatus({ 
+                type: 'error', 
+                message: error.message || 'Failed to restore quotes' 
+            });
+        } finally {
+            setRestoring(false);
+            e.target.value = ''; // Reset input
+        }
     };
 
     return (

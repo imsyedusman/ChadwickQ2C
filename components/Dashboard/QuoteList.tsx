@@ -15,6 +15,7 @@ interface Quote {
     projectRef: string | null;
     description: string | null;
     status: string;
+    createdAt: string;
     updatedAt: string;
     boards: PricingBoard[];
     overrideLabourRate?: number | null;
@@ -25,6 +26,8 @@ interface Quote {
     overrideGstPct?: number | null;
     overrideRoundingIncrement?: number | null;
     overrideCopperPricePerKg?: number | null;
+    creator?: { name: string; email: string } | null;
+    modifier?: { name: string; email: string } | null;
 }
 
 // Global settings snapshot may not be needed if we assume global settings for dashboard
@@ -85,7 +88,7 @@ export default function QuoteList() {
             copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
         };
 
-        const { grandTotals } = calculateQuoteTotals(quote.boards, effectiveSettings);
+        const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
         return grandTotals.sellPriceRounded;
     };
 
@@ -351,11 +354,24 @@ export default function QuoteList() {
                                         </div>
                                         <p className="text-gray-500 text-sm mt-0.5">{parent.clientName || 'No Client Name'}</p>
 
-                                        <div className="flex items-center gap-4 mt-2.5 text-xs text-gray-500">
-                                            <span>
-                                                Updated {format(updatedDate, 'MMM d, yyyy')} at {format(updatedDate, 'h:mm a')}
-                                            </span>
-                                            <span className="font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                        <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-2.5 text-[11px] text-gray-500">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold uppercase tracking-tighter text-gray-400">Created</span>
+                                                <span className="font-medium text-gray-700">{format(new Date(parent.createdAt), 'MMM d, yyyy')}</span>
+                                                {parent.creator && (
+                                                    <span className="text-gray-400">by {parent.creator.name || parent.creator.email}</span>
+                                                )}
+                                            </div>
+                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="font-bold uppercase tracking-tighter text-gray-400">Modified</span>
+                                                <span className="font-medium text-gray-700">{format(updatedDate, 'MMM d, yyyy @ h:mm a')}</span>
+                                                {parent.modifier && (
+                                                    <span className="text-gray-400">by {parent.modifier.name || parent.modifier.email}</span>
+                                                )}
+                                            </div>
+                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
+                                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 shadow-sm">
                                                 ${totalPrice.toLocaleString()} ex GST
                                             </span>
                                         </div>
@@ -426,10 +442,12 @@ export default function QuoteList() {
                                                         </span>
                                                     )}
                                                     <div className="h-3 w-px bg-gray-200 mx-1" />
-                                                    <span className="text-xs text-gray-500">
-                                                        Updated {format(childUpdate, 'MMM d, h:mm a')}
+                                                    <span className="text-[11px] text-gray-500">
+                                                        <span className="font-bold uppercase tracking-tighter text-gray-400 mr-1">Updated</span>
+                                                        {format(childUpdate, 'MMM d, h:mm a')} 
+                                                        {child.modifier && <span className="ml-1 text-gray-400 group-hover:text-gray-500 transition-colors">by {child.modifier.name || child.modifier.email}</span>}
                                                     </span>
-                                                    <span className="text-xs font-medium text-gray-900 ml-2">
+                                                    <span className="text-xs font-bold text-gray-900 ml-auto mr-4">
                                                         ${childTotal.toLocaleString()}
                                                     </span>
                                                 </div>

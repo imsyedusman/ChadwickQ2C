@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  experimental: {
+    middlewareClientMaxBodySize: 512 * 1024 * 1024, // 512MB
+  },
 };
 
 export default nextConfig;

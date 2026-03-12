@@ -11,8 +11,11 @@ import GrandTotalView from '@/components/QuoteBuilder/GrandTotalView';
 import QuoteCostingOverrides from '@/components/QuoteBuilder/QuoteCostingOverrides';
 import { QuoteProvider, useQuote } from '@/context/QuoteContext';
 import { Loader2, ChevronLeft, ChevronRight, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
 import RevisionSelector from '@/components/QuoteBuilder/RevisionSelector';
+import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
+import { Share2 } from 'lucide-react';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
@@ -21,6 +24,7 @@ function QuoteBuilderContent() {
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
     const [drawerCategory, setDrawerCategory] = useState<'Basics' | 'Switchboard' | 'Busbar' | undefined>(undefined);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
+    const [isShareOpen, setIsShareOpen] = useState(false);
 
     // Load persisted preferences on mount
     useEffect(() => {
@@ -116,6 +120,16 @@ function QuoteBuilderContent() {
                             ) : (
                                 <Check className="w-3 h-3 text-green-500" />
                             )}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsShareOpen(true);
+                                }}
+                                className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm ml-2"
+                            >
+                                <Share2 size={14} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Share</span>
+                            </button>
                         </div>
                     </div>
                 ) : (
@@ -225,6 +239,13 @@ function QuoteBuilderContent() {
                                     </span>
                                 )}
                             </div>
+                            <Button 
+                                onClick={() => setIsShareOpen(true)}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 border-none font-bold text-sm h-10"
+                            >
+                                <Share2 size={16} />
+                                Share Quote
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -318,6 +339,13 @@ function QuoteBuilderContent() {
                     </div>
                 )
             }
+
+            {/* Share Dialog */}
+            <ShareDialog 
+                quoteId={quoteId} 
+                isOpen={isShareOpen} 
+                onClose={() => setIsShareOpen(false)} 
+            />
         </div >
     );
 }

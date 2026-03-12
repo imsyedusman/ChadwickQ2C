@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { triggerSequenceSync } from '@/lib/quote-numbering';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { canEditQuote } from '@/lib/permissions';
+import { logAction } from '@/lib/audit';
 
 export async function GET(
     request: Request,
@@ -14,28 +18,27 @@ export async function GET(
                 boards: {
                     include: {
                         items: true,
-                        // No direct relation to CatalogItem, so we can't include it here.
                     },
                     orderBy: { order: 'asc' },
                 },
+                ...({
+                    creator: { select: { name: true, email: true } },
+                    modifier: { select: { name: true, email: true } }
+                } as any)
             },
-        });
+        } as any);
 
         if (!quote) {
             return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
         }
 
-        // --- ENRICHMENT STEP: Fetch and Merge Catalog Data (Copper Weights) ---
-
-        // 1. Collect all Part Numbers
         const partNumbers = new Set<string>();
-        quote.boards.forEach(board => {
-            board.items.forEach(item => {
+        quote.boards.forEach((board: any) => {
+            board.items.forEach((item: any) => {
                 if (item.partNumber) partNumbers.add(item.partNumber);
             });
         });
 
-        // 2. Fetch Catalog Details
         const catalogItems = await prisma.catalogItem.findMany({
             where: {
                 partNumber: { in: Array.from(partNumbers) }
@@ -47,7 +50,6 @@ export async function GET(
             }
         });
 
-        // 3. Create Map
         const catalogMap = new Map<string, { totalCopperWeightKgPerMeter: number | null, isCopperPriced: boolean }>();
         catalogItems.forEach(ci => {
             if (ci.partNumber) {
@@ -58,20 +60,18 @@ export async function GET(
             }
         });
 
-        // 4. Merge into Response
-        const enrichedBoards = quote.boards.map(board => ({
+        const enrichedBoards = quote.boards.map((board: any) => ({
             ...board,
-            items: board.items.map(item => {
+            items: board.items.map((item: any) => {
                 const catalogData = item.partNumber ? catalogMap.get(item.partNumber) : null;
                 return {
                     ...item,
-                    totalCopperWeightKgPerMeter: catalogData?.totalCopperWeightKgPerMeter ?? null, // Default to null if missing
+                    totalCopperWeightKgPerMeter: catalogData?.totalCopperWeightKgPerMeter ?? null,
                     isCopperPriced: catalogData?.isCopperPriced ?? false
                 };
             })
         }));
 
-        // Return modified quote object
         return NextResponse.json({
             ...quote,
             boards: enrichedBoards
@@ -92,32 +92,35 @@ export async function DELETE(
         const { searchParams } = new URL(request.url);
         const permanent = searchParams.get('permanent') === 'true';
 
+        const quote = await prisma.quote.findUnique({
+            where: { id },
+            select: { quoteNumber: true, createdBy: true }
+        } as any);
+
+        if (!quote) {
+            return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+        }
+
+        if (!(await canEditQuote(quote.createdBy))) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+
         if (permanent) {
-            // Fetch quote first to get its number for synchronization
-            const quote = await prisma.quote.findUnique({
-                where: { id },
-                select: { quoteNumber: true }
-            });
-
-            if (!quote) {
-                return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
-            }
-
             await prisma.quote.delete({
                 where: { id },
             });
-
-            // Synchronize sequence after permanent deletion
             await triggerSequenceSync(quote.quoteNumber, true);
-
+            await logAction(userId, 'DELETE_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber, permanent: true });
             return NextResponse.json({ success: true, permanent: true });
         } else {
-            // Soft delete: move to TRASH
             await prisma.quote.update({
                 where: { id },
                 data: { status: 'TRASH' }
             });
-
+            await logAction(userId, 'TRASH_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber });
             return NextResponse.json({ success: true, trashed: true });
         }
     } catch (error) {
@@ -133,54 +136,37 @@ export async function PUT(
     try {
         const { id } = await params;
         const body = await request.json() as any;
-        const {
-            clientName,
-            clientCompany,
-            projectRef,
-            description,
-            status,
-            settingsSnapshot,
-            // Overrides
-            overrideLabourRate,
-            overrideOverheadPct,
-            overrideEngineeringPct,
-            overrideTargetMarginPct,
-            overrideConsumablesPct,
-            overrideGstPct,
-            overrideRoundingIncrement,
-            quoteNumber
-        } = body;
-
-        // Fetch existing quote to check if quoteNumber is changing
+        
         const existingQuote = await prisma.quote.findUnique({
             where: { id },
-            select: { quoteNumber: true }
-        });
+            select: { quoteNumber: true, createdBy: true }
+        } as any);
+
+        if (!existingQuote) {
+            return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+        }
+
+        if (!(await canEditQuote(existingQuote.createdBy))) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
 
         const updatedQuote = await prisma.quote.update({
             where: { id },
             data: {
-                clientName,
-                clientCompany,
-                projectRef,
-                description,
-                status,
-                settingsSnapshot,
-                // Overrides
-                overrideLabourRate,
-                overrideOverheadPct,
-                overrideEngineeringPct,
-                overrideTargetMarginPct,
-                overrideConsumablesPct,
-                overrideGstPct,
-                overrideRoundingIncrement,
-                quoteNumber
+                ...Object.fromEntries(
+                    Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier' ].includes(key))
+                ),
+                lastModifiedBy: userId as string,
             },
-        });
+        } as any);
 
-        // If quote number was manually changed, trigger sequence sync
-        if (quoteNumber && existingQuote && quoteNumber !== existingQuote.quoteNumber) {
-            await triggerSequenceSync(quoteNumber);
+        await logAction(userId, 'UPDATE_QUOTE', 'QUOTE', id, { quoteNumber: updatedQuote.quoteNumber });
+
+        if (body.quoteNumber && existingQuote && body.quoteNumber !== existingQuote.quoteNumber) {
+            await triggerSequenceSync(body.quoteNumber);
         }
 
         return NextResponse.json(updatedQuote);

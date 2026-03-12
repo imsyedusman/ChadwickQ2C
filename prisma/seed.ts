@@ -13,6 +13,10 @@ async function main() {
         console.log('\n--- Seeding Vendor Catalog ---');
         execSync('npx ts-node --compiler-options "{\\"module\\":\\"commonjs\\"}" scripts/import-vendor-catalog.ts', { stdio: 'inherit' });
 
+        // Authentication
+        console.log('\n--- Seeding Authentication ---');
+        execSync('npx ts-node --compiler-options "{\\"module\\":\\"commonjs\\"}" scripts/seed-auth.ts', { stdio: 'inherit' });
+
         console.log('\n✅ Seeding Complete.');
     } catch (error) {
         console.error('❌ Seeding Failed:', error);

@@ -1,54 +1,45 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateNextQuoteNumber } from '@/lib/quote-numbering';
-
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { logAction } from '@/lib/audit';
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const quoteNumber = searchParams.get('quoteNumber');
-        const showTrash = searchParams.get('showTrash') === 'true';
+        const search = searchParams.get('search');
+        const status = searchParams.get('status');
 
         const where: any = {};
-        if (quoteNumber) {
-            // If the provided quoteNumber has a suffix, extract the base
-            const baseMatch = quoteNumber.match(/^(Q\d{2}-\d{4})/);
-            const baseNumber = baseMatch ? baseMatch[1] : quoteNumber;
-
-            where.quoteNumber = {
-                startsWith: baseNumber
-            };
+        if (search) {
+            where.OR = [
+                { quoteNumber: { contains: search, mode: 'insensitive' } },
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { projectRef: { contains: search, mode: 'insensitive' } },
+            ];
         }
-
-        // Filter out Trash quotes by default
-        if (!showTrash) {
-            where.status = { not: 'TRASH' };
+        if (status) {
+            where.status = status;
         } else {
-            where.status = 'TRASH';
+            where.status = { not: 'TRASH' };
         }
 
-        const quotes = await prisma.quote.findMany({
+        const quotes = await (prisma.quote as any).findMany({
             where,
             include: {
                 boards: {
-                    include: {
-                        items: true,
-                    }
+                    include: { items: true }
                 },
-            }
+                creator: { select: { name: true, email: true } },
+                modifier: { select: { name: true, email: true } }
+            },
+            orderBy: { updatedAt: 'desc' },
         });
 
-        // Sort by quoteNumber desc, revision desc in JS because Prisma client might be out of sync
-        const sortedQuotes = (quotes as any[]).sort((a, b) => {
-            if (a.quoteNumber !== b.quoteNumber) {
-                return b.quoteNumber.localeCompare(a.quoteNumber);
-            }
-            return (b.revision || 0) - (a.revision || 0);
-        });
-
-        return NextResponse.json(sortedQuotes);
+        return NextResponse.json(quotes);
     } catch (error) {
-        console.error('Error fetching quotes:', error);
+        console.error('Failed to fetch quotes:', error);
         return NextResponse.json({ error: 'Failed to fetch quotes' }, { status: 500 });
     }
 }
@@ -57,7 +48,14 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { clientName, projectRef, description } = body;
+        
+        const session = await getServerSession(authOptions);
+        const userId = (session?.user as any)?.id;
 
+        if (!userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+        
         const quoteNumber = await generateNextQuoteNumber();
 
         const newQuote = await prisma.quote.create({
@@ -67,11 +65,16 @@ export async function POST(request: Request) {
                 projectRef,
                 description,
                 status: 'DRAFT',
+                createdBy: userId,
+                lastModifiedBy: userId,
             },
-        });
+        } as any);
+
+        await logAction(userId, 'CREATE_QUOTE', 'QUOTE', newQuote.id, { quoteNumber });
 
         return NextResponse.json(newQuote);
     } catch (error) {
+        console.error('Failed to create quote:', error);
         return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });
     }
 }
