@@ -12,7 +12,7 @@ export async function GET(
 ) {
     try {
         const { id } = await params;
-        const quote = await prisma.quote.findUnique({
+        const quote: any = await prisma.quote.findUnique({
             where: { id },
             include: {
                 boards: {
@@ -92,7 +92,7 @@ export async function DELETE(
         const { searchParams } = new URL(request.url);
         const permanent = searchParams.get('permanent') === 'true';
 
-        const quote = await prisma.quote.findUnique({
+        const quote: any = await prisma.quote.findUnique({
             where: { id },
             select: { quoteNumber: true, createdBy: true }
         } as any);
@@ -137,7 +137,7 @@ export async function PUT(
         const { id } = await params;
         const body = await request.json() as any;
         
-        const existingQuote = await prisma.quote.findUnique({
+        const existingQuote: any = await prisma.quote.findUnique({
             where: { id },
             select: { quoteNumber: true, createdBy: true }
         } as any);
