@@ -10,5 +10,5 @@
  * If a sequence already exists in the database, changing this file will NOT affect numbering.
  */
 export const QuoteSequenceConfig: Record<number, number> = {
-    2026: 239, // so that +1 starts at 240
+    2026: 250, // Q26-0251 is the first quote
 };

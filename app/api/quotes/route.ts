@@ -7,6 +7,7 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const quoteNumber = searchParams.get('quoteNumber');
+        const showTrash = searchParams.get('showTrash') === 'true';
 
         const where: any = {};
         if (quoteNumber) {
@@ -17,6 +18,13 @@ export async function GET(request: Request) {
             where.quoteNumber = {
                 startsWith: baseNumber
             };
+        }
+
+        // Filter out Trash quotes by default
+        if (!showTrash) {
+            where.status = { not: 'TRASH' };
+        } else {
+            where.status = 'TRASH';
         }
 
         const quotes = await prisma.quote.findMany({

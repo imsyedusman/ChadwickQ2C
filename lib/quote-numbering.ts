@@ -16,6 +16,11 @@
  * - When `generateNextQuoteNumber()` is called, it gets the current year.
  * - If a sequence record does not exist for the year, it creates one (applying the configurable starting offset if defined, or starting at 0).
  * - It then atomically increments the `lastNumber` for that year and formats the output.
+ * 
+ * Developer Control:
+ * - To manually set the starting number (e.g., to Q26-0488), update the `QuoteSequence` table:
+ *   `UPDATE "QuoteSequence" SET "lastNumber" = 487 WHERE "year" = 2026;`
+ * - The next generated quote will be the value of `lastNumber + 1`.
  */
 
 import prisma from './prisma';
@@ -148,4 +153,95 @@ export async function generateRevisionNumber(originalQuoteNumber: string): Promi
     const nextSuffix = getNumberSuffix(maxSuffixNum + 1);
 
     return `${baseNumber}-${nextSuffix}`;
+}
+
+/**
+ * Synchronizes the QuoteSequence table with the highest quote number in the database for a given year.
+ * Prevents unintentional backwards movement unless the highest number was explicitly deleted.
+ * 
+ * @param year The year to synchronize (e.g. 2026)
+ * @param deletedNumber Optional numeric part of the quote that was permanently deleted
+ */
+export async function syncQuoteSequence(year: number, deletedNumber?: number) {
+    const quoteNumbers = await prisma.quote.findMany({
+        where: {
+            quoteNumber: {
+                startsWith: `Q${year.toString().slice(-2)}-`
+            }
+        },
+        select: { quoteNumber: true }
+    });
+
+    let maxInDb = 0;
+    const yearPrefix = `Q${year.toString().slice(-2)}-`;
+
+    for (const q of quoteNumbers) {
+        // Extract numeric part, ignoring revision suffixes (e.g. Q26-0243-A -> 243)
+        const match = q.quoteNumber.match(/^Q\d{2}-(\d{4})/);
+        if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxInDb) maxInDb = num;
+        }
+    }
+
+    await prisma.$transaction(async (tx) => {
+        let sequence = await tx.quoteSequence.findUnique({
+            where: { year }
+        });
+
+        if (!sequence) {
+            // If it doesn't exist, create it with the max if found, or use config/0
+            const startingOffset = QuoteSequenceConfig[year] || 0;
+            const initialNumber = Math.max(maxInDb, startingOffset);
+
+            await tx.quoteSequence.create({
+                data: {
+                    year,
+                    lastNumber: initialNumber
+                }
+            });
+            return;
+        }
+
+        const currentSequence = sequence.lastNumber;
+
+        // Stability Logic:
+        // 1. If DB has a higher number than sequence (e.g. manual rename up) -> Sync forward
+        if (maxInDb > currentSequence) {
+            await tx.quoteSequence.update({
+                where: { year },
+                data: { lastNumber: maxInDb }
+            });
+        }
+        // 2. If DB is lower than sequence AND we just deleted the tail -> Sync backward
+        else if (maxInDb < currentSequence && deletedNumber === currentSequence) {
+            await tx.quoteSequence.update({
+                where: { year },
+                data: { lastNumber: maxInDb }
+            });
+        }
+        // Otherwise, leave unchanged (don't move back for non-tail deletions)
+    });
+}
+
+/**
+ * Trigger sequence synchronization for a given quote number.
+ * 
+ * @param quoteNumber The quote number to parse (e.g. Q26-0243)
+ * @param isDeletion Boolean indicating if synchronization is triggered by permanent deletion
+ */
+export async function triggerSequenceSync(quoteNumber: string, isDeletion: boolean = false) {
+    // Expected format QYY-NNNN...
+    const match = quoteNumber.match(/^Q(\d{2})-(\d{4})/);
+    if (!match) return;
+
+    const shortYear = match[1];
+    const numericPart = parseInt(match[2], 10);
+    
+    // Determine the full year (assuming 21st century)
+    const currentYear = new Date().getFullYear();
+    const yearPrefix = Math.floor(currentYear / 100) * 100;
+    const fullYear = yearPrefix + parseInt(shortYear, 10);
+
+    await syncQuoteSequence(fullYear, isDeletion ? numericPart : undefined);
 }

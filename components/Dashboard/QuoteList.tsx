@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
@@ -36,16 +36,21 @@ export default function QuoteList() {
     const [search, setSearch] = useState('');
     const [settings, setSettings] = useState<PricingSettings | null>(null);
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+    const [view, setView] = useState<'ACTIVE' | 'TRASH'>('ACTIVE');
     const router = useRouter();
 
     useEffect(() => {
         fetchQuotes();
+    }, [view]);
+
+    useEffect(() => {
         fetchSettings();
     }, []);
 
     const fetchQuotes = async () => {
+        setLoading(true);
         try {
-            const res = await fetch('/api/quotes');
+            const res = await fetch(`/api/quotes?showTrash=${view === 'TRASH'}`);
             const data = await res.json();
             setQuotes(data);
         } catch (error) {
@@ -114,13 +119,40 @@ export default function QuoteList() {
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
-        if (!confirm('Are you sure you want to delete this quote?')) return;
+        const isPermanent = view === 'TRASH';
+        
+        if (isPermanent) {
+            if (!confirm('Permanently delete this quote? This will also update the sequential numbering if this was the latest quote. This action cannot be undone.')) return;
+        } else {
+            if (!confirm('Move this quote to Trash?')) return;
+        }
 
         try {
-            await fetch(`/api/quotes/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/quotes/${id}?permanent=${isPermanent}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete quote');
             setQuotes(quotes.filter((q) => q.id !== id));
         } catch (error) {
             console.error('Failed to delete quote', error);
+            alert('Failed to delete quote');
+        }
+    };
+
+    const handleRestore = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        try {
+            const res = await fetch(`/api/quotes/${id}/restore`, { method: 'POST' });
+            if (res.status === 409) {
+                const data = await res.json();
+                alert(data.error || 'Quote number already exists. Please rename it before restoring.');
+                return;
+            }
+            if (!res.ok) throw new Error('Failed to restore quote');
+            
+            // Success: remove from current list (Trash view)
+            setQuotes(quotes.filter(q => q.id !== id));
+        } catch (error) {
+            console.error('Failed to restore quote', error);
+            alert('Failed to restore quote');
         }
     };
 
@@ -221,14 +253,43 @@ export default function QuoteList() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-gray-900">Quotes</h1>
-                <button
-                    onClick={handleCreate}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                >
-                    <Plus size={20} />
-                    New Quote
-                </button>
+                <div className="flex items-center gap-6">
+                    <h1 className="text-3xl font-bold text-gray-900">Quotes</h1>
+                    <div className="flex bg-gray-100 p-1 rounded-lg self-end">
+                        <button
+                            onClick={() => setView('ACTIVE')}
+                            className={cn(
+                                "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                                view === 'ACTIVE' 
+                                    ? "bg-white text-blue-600 shadow-sm" 
+                                    : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            Active
+                        </button>
+                        <button
+                            onClick={() => setView('TRASH')}
+                            className={cn(
+                                "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2",
+                                view === 'TRASH' 
+                                    ? "bg-white text-red-600 shadow-sm" 
+                                    : "text-gray-500 hover:text-gray-700"
+                            )}
+                        >
+                            <Trash2 size={16} />
+                            Trash
+                        </button>
+                    </div>
+                </div>
+                {view === 'ACTIVE' && (
+                    <button
+                        onClick={handleCreate}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+                    >
+                        <Plus size={20} />
+                        New Quote
+                    </button>
+                )}
             </div>
 
             <div className="relative">
@@ -302,20 +363,41 @@ export default function QuoteList() {
                                 </div>
 
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={(e) => handleDuplicate(e, parent.id)}
-                                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title="Duplicate"
-                                    >
-                                        <Copy size={18} />
-                                    </button>
-                                    <button
-                                        onClick={(e) => handleDelete(e, parent.id)}
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                        title="Delete"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
+                                    {view === 'ACTIVE' ? (
+                                        <>
+                                            <button
+                                                onClick={(e) => handleDuplicate(e, parent.id)}
+                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Duplicate"
+                                            >
+                                                <Copy size={18} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(e, parent.id)}
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Move to Trash"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={(e) => handleRestore(e, parent.id)}
+                                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                title="Restore"
+                                            >
+                                                <RotateCcw size={18} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => handleDelete(e, parent.id)}
+                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Permanently Delete"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -352,20 +434,41 @@ export default function QuoteList() {
                                                     </span>
                                                 </div>
                                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button
-                                                        onClick={(e) => handleDuplicate(e, child.id)}
-                                                        className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md transition-colors"
-                                                        title="Duplicate"
-                                                    >
-                                                        <Copy size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => handleDelete(e, child.id)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
+                                                    {view === 'ACTIVE' ? (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => handleDuplicate(e, child.id)}
+                                                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md transition-colors"
+                                                                title="Duplicate"
+                                                            >
+                                                                <Copy size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDelete(e, child.id)}
+                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
+                                                                title="Move to Trash"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button
+                                                                onClick={(e) => handleRestore(e, child.id)}
+                                                                className="p-1.5 text-gray-400 hover:text-green-600 rounded-md transition-colors"
+                                                                title="Restore"
+                                                            >
+                                                                <RotateCcw size={16} />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => handleDelete(e, child.id)}
+                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
+                                                                title="Permanently Delete"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { triggerSequenceSync } from '@/lib/quote-numbering';
 
 export async function GET(
     request: Request,
@@ -88,12 +89,39 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
-        await prisma.quote.delete({
-            where: { id },
-        });
+        const { searchParams } = new URL(request.url);
+        const permanent = searchParams.get('permanent') === 'true';
 
-        return NextResponse.json({ success: true });
+        if (permanent) {
+            // Fetch quote first to get its number for synchronization
+            const quote = await prisma.quote.findUnique({
+                where: { id },
+                select: { quoteNumber: true }
+            });
+
+            if (!quote) {
+                return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+            }
+
+            await prisma.quote.delete({
+                where: { id },
+            });
+
+            // Synchronize sequence after permanent deletion
+            await triggerSequenceSync(quote.quoteNumber, true);
+
+            return NextResponse.json({ success: true, permanent: true });
+        } else {
+            // Soft delete: move to TRASH
+            await prisma.quote.update({
+                where: { id },
+                data: { status: 'TRASH' }
+            });
+
+            return NextResponse.json({ success: true, trashed: true });
+        }
     } catch (error) {
+        console.error('Failed to delete quote:', error);
         return NextResponse.json({ error: 'Failed to delete quote' }, { status: 500 });
     }
 }
@@ -123,6 +151,12 @@ export async function PUT(
             quoteNumber
         } = body;
 
+        // Fetch existing quote to check if quoteNumber is changing
+        const existingQuote = await prisma.quote.findUnique({
+            where: { id },
+            select: { quoteNumber: true }
+        });
+
         const updatedQuote = await prisma.quote.update({
             where: { id },
             data: {
@@ -144,8 +178,14 @@ export async function PUT(
             },
         });
 
+        // If quote number was manually changed, trigger sequence sync
+        if (quoteNumber && existingQuote && quoteNumber !== existingQuote.quoteNumber) {
+            await triggerSequenceSync(quoteNumber);
+        }
+
         return NextResponse.json(updatedQuote);
     } catch (error) {
+        console.error('Failed to update quote:', error);
         return NextResponse.json({ error: 'Failed to update quote' }, { status: 500 });
     }
 }
