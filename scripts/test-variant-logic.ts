@@ -1,3 +1,4 @@
+export {};
 
 // Self-contained test for deriveVariant logic
 // Copies logic from lib/automation.ts
