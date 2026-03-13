@@ -956,7 +956,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             throw new Error(`100A Series Metering exceeds maximum 30 fuse capacity (Current: ${totalFuseQty})`);
         }
 
-        if (totalFuseQty > 0) {
+        if (totalFuseQty > 6) {
             let chassisPart = '';
             if (totalFuseQty <= 18) chassisPart = '100A-CHASSIS-18';
             else if (totalFuseQty <= 24) chassisPart = '100A-CHASSIS-24';

@@ -12,7 +12,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("from") || "/";
@@ -90,7 +90,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-2xl py-3 pl-12 pr-4 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 transition-all font-medium"
-                  placeholder="name@chadwick.com.au"
+                  placeholder="name@chadwickswitchboards.com.au"
                   required
                   autoComplete="email"
                 />
@@ -138,7 +138,7 @@ export default function LoginPage() {
             </p>
           </div>
         </div>
-        
+
         <div className="mt-10 flex flex-col items-center gap-4">
           <p className="text-gray-400 text-xs font-medium">
             &copy; {new Date().getFullYear()} Chadwick Switchboards. All rights reserved.
