@@ -8,7 +8,7 @@ async function main() {
         await prisma.quote.create({
             data: {
                 quoteNumber: 'Q26-9999',
-                customerName: 'Test Customer',
+                clientName: 'Test Customer',
                 status: 'DRAFT',
             }
         });
