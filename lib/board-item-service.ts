@@ -898,6 +898,16 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const isWcActive = meterList.length > 0;
 
     if (isWcActive) {
+        // DIAGNOSTIC LOGGING: Investigate production fuse calculation issues
+        console.log(`[Metering] WC Logic Started for Board ${boardId}`);
+        console.log(`[Metering] Config:`, { 
+            wholeCurrentMetering: config.wholeCurrentMetering,
+            wcType: config.wcType,
+            wcQuantity: config.wcQuantity,
+            meterCount: meterList.length,
+            meters: JSON.stringify(meterList)
+        });
+
         // Local Accumulator
         const wcTotals = new Map<string, number>();
         const addWc = (part: string, qty: number) => {
@@ -922,6 +932,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         // 4. Deterministic Derivation (Step 2)
         const totalMeters = total1phMeters + total3phMeters;
         const totalFuseQty = (total1phMeters * 1) + (total3phMeters * 3);
+
+        console.log(`[Metering] Calculated Totals: 1ph=${total1phMeters}, 3ph=${total3phMeters}, Fuses=${totalFuseQty}`);
 
         const panelQty = config.bakeliteQty ?? totalMeters;
 
@@ -951,19 +963,23 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
         // 3a. Derived Chassis Logic (Step 3)
         // totalFuseQty is already calculated above
-
-        if (totalFuseQty > 30) {
-            throw new Error(`100A Series Metering exceeds maximum 30 fuse capacity (Current: ${totalFuseQty})`);
-        }
+        // REMOVED: Soft-Cap/Error logic as per user request (2026-03-14)
 
         if (totalFuseQty > 6) {
-            let chassisPart = '';
-            if (totalFuseQty <= 18) chassisPart = '100A-CHASSIS-18';
-            else if (totalFuseQty <= 24) chassisPart = '100A-CHASSIS-24';
-            else if (totalFuseQty <= 30) chassisPart = '100A-CHASSIS-30';
+            let fusesRemaining = totalFuseQty;
+            console.log(`[Metering] Chassis Calculation for ${totalFuseQty} fuses.`);
 
-            if (chassisPart) {
-                addWc(chassisPart, 1);
+            while (fusesRemaining > 0) {
+                if (fusesRemaining > 24) {
+                    addWc('100A-CHASSIS-30', 1);
+                    fusesRemaining -= 30;
+                } else if (fusesRemaining > 18) {
+                    addWc('100A-CHASSIS-24', 1);
+                    fusesRemaining -= 24;
+                } else {
+                    addWc('100A-CHASSIS-18', 1);
+                    fusesRemaining -= 18;
+                }
             }
         }
 
