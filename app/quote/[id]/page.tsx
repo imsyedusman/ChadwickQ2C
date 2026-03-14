@@ -18,7 +18,7 @@ import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
 import { Share2 } from 'lucide-react';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, updateMetadata, updateStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
+    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, projectStatus, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -68,6 +68,15 @@ function QuoteBuilderContent() {
         }
     };
 
+    const getProjectStatusColor = (status: string) => {
+        switch (status) {
+            case 'Budget': return 'bg-purple-50 text-purple-700 border-purple-200';
+            case 'Tender': return 'bg-orange-50 text-orange-700 border-orange-200';
+            case 'Live': return 'bg-green-50 text-green-700 border-green-200';
+            default: return 'bg-gray-50 text-gray-700 border-gray-200';
+        }
+    };
+
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
             <RevisionSelector currentId={quoteId} revisionGroupId={revisionGroupId} />
@@ -109,6 +118,14 @@ function QuoteBuilderContent() {
 
                         {/* Status & Save State */}
                         <div className="flex items-center gap-4">
+                            {projectStatus && (
+                                <span className={cn(
+                                    "text-[9px] font-bold px-2 py-0.25 rounded border uppercase tracking-tighter",
+                                    getProjectStatusColor(projectStatus)
+                                )}>
+                                    {projectStatus}
+                                </span>
+                            )}
                             <span className={cn(
                                 "text-xs font-medium px-2 py-0.5 rounded-full border",
                                 getStatusColor(status)
@@ -224,6 +241,27 @@ function QuoteBuilderContent() {
                                     <option value="LOST">Lost</option>
                                 </select>
                             </div>
+
+                            {/* Project Status Badge (Editable) */}
+                            {projectStatus && (
+                                <div className="relative group">
+                                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
+                                        Proj Status
+                                    </label>
+                                    <select
+                                        value={projectStatus}
+                                        onChange={(e) => updateProjectStatus(e.target.value)}
+                                        className={cn(
+                                            "text-[10px] font-bold px-3 py-1.5 rounded-md border uppercase tracking-widest bg-white cursor-pointer transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none",
+                                            getProjectStatusColor(projectStatus)
+                                        )}
+                                    >
+                                        <option value="Budget">Budget</option>
+                                        <option value="Tender">Tender</option>
+                                        <option value="Live">Live</option>
+                                    </select>
+                                </div>
+                            )}
 
                             {/* Autosave Indicator */}
                             <div className="flex items-center gap-2 text-sm text-gray-500">

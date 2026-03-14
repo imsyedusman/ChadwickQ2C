@@ -2,19 +2,51 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw, Filter, Settings2, MoreHorizontal, User as UserIcon, Clock, Check, X, Shield, Briefcase, ChevronLeft, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { format, formatDistanceToNow } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
+import NewQuoteDialog from './NewQuoteDialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
+} from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from '@/components/ui/hover-card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface Quote {
     id: string;
     quoteNumber: string;
     revision: number;
     clientName: string | null;
+    clientCompany: string | null;
     projectRef: string | null;
     description: string | null;
     status: string;
+    projectId: string | null;
+    projectStatus: string;
     createdAt: string;
     updatedAt: string;
     boards: PricingBoard[];
@@ -26,8 +58,20 @@ interface Quote {
     overrideGstPct?: number | null;
     overrideRoundingIncrement?: number | null;
     overrideCopperPricePerKg?: number | null;
+    createdBy?: string | null;
+    lastModifiedBy?: string | null;
+    gridInternalNotes: string | null;
     creator?: { name: string; email: string } | null;
     modifier?: { name: string; email: string } | null;
+    project?: {
+        id: string;
+        projectName: string;
+        clientName: string | null;
+        companyName: string | null;
+        projectStatus: string;
+    } | null;
+    total?: number;
+    totalIncGst?: number;
 }
 
 // Global settings snapshot may not be needed if we assume global settings for dashboard
@@ -37,14 +81,59 @@ export default function QuoteList() {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
+    const [quoteStatusFilter, setQuoteStatusFilter] = useState<string>('ALL');
+    const [projectStatusFilter, setProjectStatusFilter] = useState<string>('ALL');
     const [settings, setSettings] = useState<PricingSettings | null>(null);
     const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
     const [view, setView] = useState<'ACTIVE' | 'TRASH'>('ACTIVE');
+    const [isNewQuoteDialogOpen, setIsNewQuoteDialogOpen] = useState(false);
+    const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({
+        quoteNumber: true,
+        projectName: true,
+        clientName: true,
+        company: true,
+        projectStatus: true,
+        quoteStatus: true,
+        total: true,
+        activity: true,
+        internalNotes: false,
+    });
+    const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
+    const [savingId, setSavingId] = useState<string | null>(null);
+    
+    // Column Persistence
+    useEffect(() => {
+        const savedVisibility = localStorage.getItem('quotesGridColumnVisibility');
+        if (savedVisibility) {
+            try {
+                setColumnVisibility(JSON.parse(savedVisibility));
+            } catch (e) {
+                console.error('Failed to parse column visibility', e);
+            }
+        }
+    }, []);
+
+    const toggleColumnVisibility = (field: string, visible: boolean) => {
+        const newVisibility = { ...columnVisibility, [field]: visible };
+        setColumnVisibility(newVisibility);
+        localStorage.setItem('quotesGridColumnVisibility', JSON.stringify(newVisibility));
+    };
+    
+    // Pagination
+    const [page, setPage] = useState(1);
+    const [limit] = useState(25);
+    const [total, setTotal] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+
     const router = useRouter();
 
     useEffect(() => {
+        setPage(1); // Reset to first page on filter change
+    }, [view, quoteStatusFilter, projectStatusFilter, search]);
+
+    useEffect(() => {
         fetchQuotes();
-    }, [view]);
+    }, [view, quoteStatusFilter, projectStatusFilter, search, page]);
 
     useEffect(() => {
         fetchSettings();
@@ -53,9 +142,22 @@ export default function QuoteList() {
     const fetchQuotes = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/quotes?showTrash=${view === 'TRASH'}`);
-            const data = await res.json();
-            setQuotes(data);
+            const params = new URLSearchParams({
+                showTrash: (view === 'TRASH').toString(),
+                page: page.toString(),
+                limit: limit.toString()
+            });
+            if (quoteStatusFilter !== 'ALL') params.append('status', quoteStatusFilter);
+            if (projectStatusFilter !== 'ALL') params.append('projectStatus', projectStatusFilter);
+            if (search) params.append('search', search);
+            
+            const url = `/api/quotes?${params}`;
+            const res = await fetch(url);
+            const result = await res.json();
+            // result is { data, page, limit, total, totalPages }
+            setQuotes(result.data || []);
+            setTotal(result.total || 0);
+            setTotalPages(result.totalPages || 0);
         } catch (error) {
             console.error('Failed to fetch quotes', error);
         } finally {
@@ -73,24 +175,7 @@ export default function QuoteList() {
         }
     };
 
-    const calculateQuoteTotal = (quote: Quote): number => {
-        if (!settings) return 0;
 
-        // Merge global settings with quote overrides
-        const effectiveSettings: PricingSettings = {
-            labourRate: quote.overrideLabourRate ?? settings.labourRate,
-            consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
-            overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
-            engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
-            targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
-            gstPct: quote.overrideGstPct ?? settings.gstPct,
-            roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
-            copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
-        };
-
-        const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
-        return grandTotals.sellPriceRounded;
-    };
 
     const getStatusDisplay = (status: string) => {
         const statusMap: Record<string, { label: string; className: string }> = {
@@ -102,22 +187,78 @@ export default function QuoteList() {
         return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
     };
 
-    const handleCreate = async () => {
+    const getProjectStatusDisplay = (status: string) => {
+        const statusMap: Record<string, { label: string; className: string }> = {
+            'Budget': { label: 'Budget', className: 'bg-purple-100 text-purple-700 border-purple-200' },
+            'Tender': { label: 'Tender', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+            'Live': { label: 'Live', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+        };
+        return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' };
+    };
+
+    const handleInlineUpdate = async (quoteId: string, field: string, value: string, projectId?: string) => {
+        const originalValue = quotes.find(q => q.id === quoteId)?.[field as keyof Quote] || '';
+        
+        setSavingId(quoteId);
         try {
-            const res = await fetch('/api/quotes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    clientName: 'New Client',
-                    projectRef: 'New Project',
-                    description: 'New Quote',
-                }),
-            });
-            const newQuote = await res.json();
-            router.push(`/quote/${newQuote.id}`);
+            let res: Response;
+            if ((field === 'projectName' || field === 'projectStatus') && projectId) {
+                const projectBody: any = {};
+                if (field === 'projectName') projectBody.projectName = value;
+                if (field === 'projectStatus') projectBody.projectStatus = value;
+
+                res = await fetch(`/api/projects/${projectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(projectBody)
+                });
+            } else {
+                const quoteBody = { id: quoteId, field, value };
+                res = await fetch('/api/quotes/bulk-update', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(quoteBody)
+                });
+            }
+
+            if (!res.ok) throw new Error('Update failed');
+
+            // Refresh the grid to ensure alignment with server state
+            await fetchQuotes();
+            setEditingCell(null);
         } catch (error) {
-            console.error('Failed to create quote', error);
+            console.error('Update failed', error);
+            // Revert optimistic update
+            setQuotes(prev => prev.map(q => {
+                if (q.id === quoteId) {
+                    if (field === 'projectName' && q.project) {
+                        return { ...q, project: { ...q.project, projectName: originalValue as any } };
+                    }
+                    if (field === 'projectStatus' && q.project) {
+                        return { ...q, project: { ...q.project, projectStatus: originalValue as any } };
+                    }
+                    return { ...q, [field]: originalValue };
+                }
+                return q;
+            }));
+            alert('Failed to update field');
+        } finally {
+            setSavingId(null);
         }
+    };
+
+    const getInitials = (name?: string | null, email?: string | null) => {
+        if (name && name.trim()) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        }
+        if (email) {
+            return email.split('@')[0].substring(0, 2).toUpperCase();
+        }
+        return '??';
+    };
+
+    const handleCreate = () => {
+        setIsNewQuoteDialogOpen(true);
     };
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -133,7 +274,9 @@ export default function QuoteList() {
         try {
             const res = await fetch(`/api/quotes/${id}?permanent=${isPermanent}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete quote');
-            setQuotes(quotes.filter((q) => q.id !== id));
+            
+            // Re-fetch to update pagination and grid
+            await fetchQuotes();
             router.refresh();
         } catch (error) {
             console.error('Failed to delete quote', error);
@@ -152,8 +295,8 @@ export default function QuoteList() {
             }
             if (!res.ok) throw new Error('Failed to restore quote');
             
-            // Success: remove from current list (Trash view)
-            setQuotes(quotes.filter(q => q.id !== id));
+            // Re-fetch to update pagination and grid
+            await fetchQuotes();
             router.refresh();
         } catch (error) {
             console.error('Failed to restore quote', error);
@@ -186,9 +329,10 @@ export default function QuoteList() {
         }
     };
 
-    const filteredQuotes = Array.isArray(quotes) ? quotes.filter((q) =>
+    const filteredQuotes = Array.isArray(quotes) ? quotes.filter((q: Quote) =>
         (q.clientName || '').toLowerCase().includes(search.toLowerCase()) ||
-        (q.projectRef || '').toLowerCase().includes(search.toLowerCase()) ||
+        (q.clientCompany || '').toLowerCase().includes(search.toLowerCase()) ||
+        (q.project?.projectName || q.projectRef || '').toLowerCase().includes(search.toLowerCase()) ||
         (q.quoteNumber || '').toLowerCase().includes(search.toLowerCase())
     ) : [];
 
@@ -208,7 +352,7 @@ export default function QuoteList() {
         };
 
         const groups: Record<string, Quote[]> = {};
-        filteredQuotes.forEach(q => {
+        filteredQuotes.forEach((q: Quote) => {
             const base = getBaseQuoteNumber(q.quoteNumber);
             if (!groups[base]) {
                 groups[base] = [];
@@ -225,10 +369,10 @@ export default function QuoteList() {
             const children = sortedByRev.slice(1).sort((a, b) => (b.revision || 0) - (a.revision || 0));
 
             // Find highest revision and latest update
-            const highestRevision = Math.max(...quotesInGroup.map(q => q.revision || 0));
-            const latestUpdate = quotesInGroup.reduce((latest, q) =>
-                new Date(q.updatedAt) > new Date(latest) ? q.updatedAt : latest
-                , quotesInGroup[0].updatedAt);
+            const highestRevision = Math.max(...quotesInGroup.map((q: Quote) => q.revision || 0));
+            const latestUpdate = quotesInGroup.reduce((latest: string, q: Quote) =>
+                (new Date(q.updatedAt) > new Date(latest)) ? q.updatedAt : latest
+                , quotesInGroup[0]?.updatedAt || new Date().toISOString());
 
             return {
                 quoteNumber: baseNumber,
@@ -297,214 +441,639 @@ export default function QuoteList() {
                 )}
             </div>
 
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                    type="text"
-                    placeholder="Search quotes..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-gray-900 placeholder:text-gray-500"
-                />
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Search quotes, clients, or projects..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white shadow-sm hover:border-gray-300"
+                    />
+                </div>
+                
+                <div className="flex items-center gap-2">
+                    <Select value={projectStatusFilter} onValueChange={setProjectStatusFilter}>
+                        <SelectTrigger className="w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300">
+                            <SelectValue placeholder="Project Status" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                            <SelectItem value="ALL">All Project Status</SelectItem>
+                            <SelectItem value="Budget">Budget</SelectItem>
+                            <SelectItem value="Tender">Tender</SelectItem>
+                            <SelectItem value="Live">Live</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <Select value={quoteStatusFilter} onValueChange={setQuoteStatusFilter}>
+                        <SelectTrigger className="w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300">
+                            <SelectValue placeholder="Quote Status" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                            <SelectItem value="ALL">All Quote Status</SelectItem>
+                            <SelectItem value="DRAFT">Draft</SelectItem>
+                            <SelectItem value="SENT">Sent</SelectItem>
+                            <SelectItem value="WON">Won</SelectItem>
+                            <SelectItem value="LOST">Lost</SelectItem>
+                        </SelectContent>
+                    </Select>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="icon" className="h-10 w-10 border-gray-200 rounded-xl bg-white shadow-sm hover:bg-gray-50">
+                                <Settings2 className="h-4 w-4 text-gray-500" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56 rounded-xl p-2">
+                            <DropdownMenuLabel className="px-2 py-1.5 text-xs font-bold text-gray-400 uppercase tracking-wider">Visible Columns</DropdownMenuLabel>
+                            <DropdownMenuSeparator className="my-1" />
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.projectName}
+                                onCheckedChange={(v) => toggleColumnVisibility('projectName', !!v)}
+                                className="rounded-md"
+                            >
+                                Project Name
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.clientName}
+                                onCheckedChange={(v) => toggleColumnVisibility('clientName', !!v)}
+                                className="rounded-md"
+                            >
+                                Client Name
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.company}
+                                onCheckedChange={(v) => toggleColumnVisibility('company', !!v)}
+                                className="rounded-md"
+                            >
+                                Company
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.projectStatus}
+                                onCheckedChange={(v) => toggleColumnVisibility('projectStatus', !!v)}
+                                className="rounded-md"
+                            >
+                                Project Status
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.quoteStatus}
+                                onCheckedChange={(v) => toggleColumnVisibility('quoteStatus', !!v)}
+                                className="rounded-md"
+                            >
+                                Quote Status
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.total}
+                                onCheckedChange={(v) => toggleColumnVisibility('total', !!v)}
+                                className="rounded-md"
+                            >
+                                Total (Sell)
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.activity}
+                                onCheckedChange={(v) => toggleColumnVisibility('activity', !!v)}
+                                className="rounded-md"
+                            >
+                                Activity
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem
+                                checked={columnVisibility.internalNotes}
+                                onCheckedChange={(v) => toggleColumnVisibility('internalNotes', !!v)}
+                                className="rounded-md"
+                            >
+                                Internal Grid Notes
+                            </DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </div>
 
-            <div className="grid gap-6">
-                {groupedQuotes.map((group) => {
-                    const isCollapsed = collapsedGroups[group.quoteNumber] || false;
-                    const parent = group.parent;
-                    const totalPrice = calculateQuoteTotal(parent);
-                    const updatedDate = new Date(parent.updatedAt);
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                {/* Table Header */}
+                <div className={cn(
+                    "grid gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-widest",
+                    {
+                        "grid-cols-[1.5fr_1.5fr_1fr_1fr_0.8fr_0.8fr_1fr_1fr_auto]": true // We'll use a dynamic grid soon, for now let's just fix the template columns
+                    }
+                )}
+                    style={{
+                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                    }}
+                >
+                    <div className="flex items-center gap-2">Quote Number</div>
+                    {columnVisibility.projectName && <div>Project Name</div>}
+                    {columnVisibility.clientName && <div>Client Name</div>}
+                    {columnVisibility.company && <div>Company</div>}
+                    {columnVisibility.projectStatus && <div className="text-center">Proj Status</div>}
+                    {columnVisibility.quoteStatus && <div className="text-center">Quote Status</div>}
+                    {columnVisibility.total && <div className="text-right">Total</div>}
+                    {columnVisibility.internalNotes && <div>Grid Notes</div>}
+                    {columnVisibility.activity && <div className="pl-4">Activity</div>}
+                    <div className="w-10"></div>
+                </div>
 
-                    return (
-                        <div key={group.quoteNumber} className="space-y-2">
-                            {/* Parent Row */}
-                            <div
-                                onClick={() => router.push(`/quote/${parent.id}`)}
-                                className="group bg-white p-5 rounded-xl border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer flex items-center justify-between shadow-sm"
-                            >
-                                <div className="flex items-start gap-4">
-                                    <div className="flex items-center gap-2 mt-1">
-                                        {group.children.length > 0 && (
-                                            <button
-                                                onClick={(e) => toggleGroup(e, group.quoteNumber)}
-                                                className="p-1 hover:bg-gray-100 rounded text-gray-400"
-                                            >
-                                                {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                                            </button>
-                                        )}
-                                        <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                                            <FileText size={20} />
+                <div className="divide-y divide-gray-100 overflow-y-auto max-h-[calc(100vh-280px)]">
+                    {groupedQuotes.map((group) => {
+                        const isCollapsed = collapsedGroups[group.quoteNumber] || false;
+                        const parent = group.parent;
+                        const totalPrice = parent.totalIncGst || 0;
+                        const updatedDate = new Date(parent.updatedAt);
+
+                        return (
+                            <div key={group.quoteNumber} className="flex flex-col">
+                                {/* Parent Row */}
+                                <div
+                                    className={cn(
+                                        "grid gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-all cursor-pointer group animate-in fade-in slide-in-from-top-1 duration-200",
+                                        !isCollapsed && group.children.length > 0 && "bg-blue-50/20"
+                                    )}
+                                    style={{
+                                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                                    }}
+                                    onClick={() => router.push(`/quote/${parent.id}`)}
+                                >
+                                    {/* Quote Number */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2">
+                                            {group.children.length > 0 && (
+                                                <button
+                                                    onClick={(e) => toggleGroup(e, group.quoteNumber)}
+                                                    className="p-1 hover:bg-gray-200 rounded text-gray-400 transition-all hover:scale-110 active:scale-95"
+                                                >
+                                                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                                                {formatQuoteNumber(parent.quoteNumber, parent.revision)}
+                                                {parent.revision === group.highestRevision && group.children.length > 0 && (
+                                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-green-500 text-white rounded-full uppercase tracking-tighter">
+                                                        Latest
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-[10px] text-gray-400 mt-1">
+                                                <Clock size={10} />
+                                                {parent.createdAt ? format(new Date(parent.createdAt), 'dd/MM/yy') : '--/--/--'}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-3">
-                                            <h3 className="font-semibold text-gray-900 text-lg">{parent.projectRef || 'Untitled Project'}</h3>
-                                            <span className="text-sm font-bold px-2.5 py-0.5 bg-gray-100 text-gray-700 rounded-lg border border-gray-200">
-                                                {formatQuoteNumber(parent.quoteNumber, parent.revision)}
-                                            </span>
-                                            {parent.revision === group.highestRevision && group.children.length > 0 && (
-                                                <span className="text-[10px] font-bold px-2 py-0.5 bg-green-100 text-green-700 rounded-full uppercase tracking-wider">
-                                                    Latest
+
+                                    {/* Project Name */}
+                                    {columnVisibility.projectName && (
+                                        <div 
+                                            className={cn(
+                                                "font-semibold text-gray-800 truncate text-sm flex items-center gap-2 group/cell h-full",
+                                                editingCell?.id === parent.id && editingCell?.field === 'projectName' && "bg-blue-50/50 -mx-2 px-2 rounded"
+                                            )}
+                                            title={parent.project?.projectName || parent.projectRef || ''}
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingCell({ id: parent.id, field: 'projectName', value: parent.project?.projectName || parent.projectRef || '' });
+                                            }}
+                                        >
+                                            {editingCell?.id === parent.id && editingCell?.field === 'projectName' ? (
+                                                <input
+                                                    autoFocus
+                                                    className="w-full px-2 py-1 text-sm border-b-2 border-blue-500 focus:outline-none bg-transparent"
+                                                    value={editingCell.value}
+                                                    onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleInlineUpdate(parent.id, 'projectName', editingCell.value, parent.projectId || undefined);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                    onBlur={() => handleInlineUpdate(parent.id, 'projectName', editingCell.value, parent.projectId || undefined)}
+                                                />
+                                            ) : (
+                                                <span className="flex items-center gap-2">
+                                                    <span className="truncate group-hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">
+                                                        {parent.project?.projectName || parent.projectRef || <span className="text-gray-300 italic">Untitled</span>}
+                                                    </span>
+                                                    <Pencil size={12} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
                                                 </span>
                                             )}
-                                            <span className={cn(
-                                                "text-xs font-medium px-2 py-0.5 rounded-full",
-                                                getStatusDisplay(parent.status).className
-                                            )}>
-                                                {getStatusDisplay(parent.status).label}
-                                            </span>
                                         </div>
-                                        <p className="text-gray-500 text-sm mt-0.5">{parent.clientName || 'No Client Name'}</p>
+                                    )}
 
-                                        <div className="flex flex-wrap items-center gap-y-1 gap-x-4 mt-2.5 text-[11px] text-gray-500">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="font-bold uppercase tracking-tighter text-gray-400">Created</span>
-                                                <span className="font-medium text-gray-700">{format(new Date(parent.createdAt), 'MMM d, yyyy')}</span>
-                                                {parent.creator && (
-                                                    <span className="text-gray-400">by {parent.creator.name || parent.creator.email}</span>
-                                                )}
-                                            </div>
-                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="font-bold uppercase tracking-tighter text-gray-400">Modified</span>
-                                                <span className="font-medium text-gray-700">{format(updatedDate, 'MMM d, yyyy @ h:mm a')}</span>
-                                                {parent.modifier && (
-                                                    <span className="text-gray-400">by {parent.modifier.name || parent.modifier.email}</span>
-                                                )}
-                                            </div>
-                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 shadow-sm">
-                                                ${totalPrice.toLocaleString()} ex GST
-                                            </span>
+                                    {/* Client Name */}
+                                    {columnVisibility.clientName && (
+                                        <div 
+                                            className={cn(
+                                                "text-sm text-gray-600 truncate flex items-center gap-2 group/cell h-full",
+                                                editingCell?.id === parent.id && editingCell?.field === 'clientName' && "bg-blue-50/50 -mx-2 px-2 rounded"
+                                            )}
+                                            onDoubleClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingCell({ id: parent.id, field: 'clientName', value: parent.project?.clientName || parent.clientName || '' });
+                                            }}
+                                        >
+                                            {editingCell?.id === parent.id && editingCell?.field === 'clientName' ? (
+                                                <input
+                                                    autoFocus
+                                                    className="w-full px-2 py-1 text-sm border-b-2 border-blue-500 focus:outline-none bg-transparent"
+                                                    value={editingCell.value}
+                                                    onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleInlineUpdate(parent.id, 'clientName', editingCell.value);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                    onBlur={() => handleInlineUpdate(parent.id, 'clientName', editingCell.value)}
+                                                />
+                                            ) : (
+                                                <span className="flex items-center gap-2">
+                                                    <span className="truncate group-hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">
+                                                        {parent.project?.clientName || parent.clientName || <span className="text-gray-300">---</span>}
+                                                    </span>
+                                                    <Pencil size={12} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
+                                                </span>
+                                            )}
                                         </div>
+                                    )}
+
+                                    {/* Company Name */}
+                                    {columnVisibility.company && (
+                                        <div 
+                                            className="text-sm text-gray-600 truncate"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingCell({ id: parent.id, field: 'clientCompany', value: parent.project?.companyName || parent.clientCompany || '' });
+                                            }}
+                                        >
+                                            {editingCell?.id === parent.id && editingCell?.field === 'clientCompany' ? (
+                                                <input
+                                                    autoFocus
+                                                    className="w-full px-2 py-1 text-sm border-b-2 border-blue-500 focus:outline-none bg-blue-50/50"
+                                                    value={editingCell.value}
+                                                    onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') handleInlineUpdate(parent.id, 'clientCompany', editingCell.value);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                    onBlur={() => handleInlineUpdate(parent.id, 'clientCompany', editingCell.value)}
+                                                />
+                                            ) : (
+                                                <span className="hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">
+                                                    {parent.project?.companyName || parent.clientCompany || <span className="text-gray-300">---</span>}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Project Status */}
+                                    {columnVisibility.projectStatus && (
+                                        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                            {parent.projectId ? (
+                                                <Select
+                                                    value={parent.project?.projectStatus}
+                                                    onValueChange={(val) => handleInlineUpdate(parent.id, 'projectStatus', val, parent.projectId!)}
+                                                >
+                                                    <SelectTrigger className={cn(
+                                                        "h-7 px-2 text-[10px] font-bold rounded border uppercase tracking-tighter w-[80px]",
+                                                        getProjectStatusDisplay(parent.project!.projectStatus).className
+                                                    )}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="rounded-xl">
+                                                        <SelectItem value="Budget">Budget</SelectItem>
+                                                        <SelectItem value="Tender">Tender</SelectItem>
+                                                        <SelectItem value="Live">Live</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <span className="text-[10px] font-bold px-2 py-1 rounded border border-gray-100 text-gray-400 uppercase tracking-tighter bg-gray-50/50">
+                                                    Legacy
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Quote Status */}
+                                    {columnVisibility.quoteStatus && (
+                                        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                            <Select
+                                                value={parent.status}
+                                                onValueChange={(val) => handleInlineUpdate(parent.id, 'status', val)}
+                                            >
+                                                <SelectTrigger className={cn(
+                                                    "h-7 px-2 text-[10px] font-bold rounded border uppercase tracking-tighter w-[80px]",
+                                                    getStatusDisplay(parent.status).className
+                                                )}>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="rounded-xl">
+                                                    <SelectItem value="DRAFT">Draft</SelectItem>
+                                                    <SelectItem value="SENT">Sent</SelectItem>
+                                                    <SelectItem value="WON">Won</SelectItem>
+                                                    <SelectItem value="LOST">Lost</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
+
+                                    {/* Total */}
+                                    {columnVisibility.total && (
+                                        <div className="text-right font-bold text-gray-900 text-sm">
+                                            ${totalPrice.toLocaleString()}
+                                        </div>
+                                    )}
+
+                                    {/* Internal Grid Notes */}
+                                    {columnVisibility.internalNotes && (
+                                        <div 
+                                            className="text-xs text-gray-500 truncate italic cursor-text hover:bg-gray-100/50 px-2 py-1 rounded transition-colors group/note"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingCell({ id: parent.id, field: 'gridInternalNotes', value: parent.gridInternalNotes || '' });
+                                            }}
+                                        >
+                                            {editingCell?.id === parent.id && editingCell?.field === 'gridInternalNotes' ? (
+                                                <textarea
+                                                    autoFocus
+                                                    className="w-full p-2 text-xs border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-lg"
+                                                    value={editingCell.value}
+                                                    onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && e.ctrlKey) handleInlineUpdate(parent.id, 'gridInternalNotes', editingCell.value);
+                                                        if (e.key === 'Escape') setEditingCell(null);
+                                                    }}
+                                                    onBlur={() => handleInlineUpdate(parent.id, 'gridInternalNotes', editingCell.value)}
+                                                />
+                                            ) : (
+                                                <>
+                                                    {parent.gridInternalNotes || <span className="text-gray-300 opacity-0 group-hover/note:opacity-100 transition-opacity">Add note...</span>}
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Activity Column */}
+                                    {columnVisibility.activity && (
+                                        <div className="pl-4">
+                                            <HoverCard openDelay={200}>
+                                                <HoverCardTrigger asChild>
+                                                    <div className="flex items-center gap-2 cursor-help group/activity">
+                                                        <div className="w-6 h-6 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center text-[10px] font-bold text-blue-700 shadow-sm transition-transform group-hover/activity:scale-110">
+                                                            {getInitials(parent.modifier?.name || parent.creator?.name, parent.modifier?.email || parent.creator?.email)}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-semibold text-gray-600">
+                                                                {getInitials(parent.modifier?.name || parent.creator?.name, parent.modifier?.email || parent.creator?.email)}
+                                                            </span>
+                                                            <span className="text-[9px] text-gray-400">
+                                                                {formatDistanceToNow(new Date(parent.updatedAt), { addSuffix: true }).replace('about ', '')}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </HoverCardTrigger>
+                                                <HoverCardContent className="w-80 rounded-2xl p-4 shadow-xl border-gray-100" side="left">
+                                                    <div className="flex flex-col gap-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="p-2 bg-blue-50 rounded-xl">
+                                                                <Clock size={20} className="text-blue-600" />
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-gray-900">Activity History</h4>
+                                                                <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Audit Detail</p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-3">
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="mt-0.5 p-1 bg-green-50 rounded-md">
+                                                                    <Plus size={10} className="text-green-600" />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <p className="text-xs text-gray-600">Created by <span className="font-bold text-gray-900">{parent.creator?.name || 'Unknown'}</span></p>
+                                                                    <p className="text-[10px] text-gray-400">{format(new Date(parent.createdAt), 'dd MMM yyyy HH:mm')}</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-start gap-3">
+                                                                <div className="mt-0.5 p-1 bg-yellow-50 rounded-md">
+                                                                    <MoreHorizontal size={10} className="text-yellow-600" />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <p className="text-xs text-gray-600">Last modified by <span className="font-bold text-gray-900">{parent.modifier?.name || parent.creator?.name || 'Unknown'}</span></p>
+                                                                    <p className="text-[10px] text-gray-400">{format(new Date(parent.updatedAt), 'dd MMM yyyy HH:mm')}</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </HoverCardContent>
+                                            </HoverCard>
+                                        </div>
+                                    )}
+
+                                    {/* Actions */}
+                                    <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100 rounded-lg text-gray-400 group-hover:text-gray-600">
+                                                    <MoreHorizontal size={16} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
+                                                {view === 'ACTIVE' ? (
+                                                    <>
+                                                        <DropdownMenuItem onClick={(e) => handleDuplicate(e, parent.id)} className="rounded-md gap-3 py-2">
+                                                            <Copy size={16} className="text-blue-500" />
+                                                            Duplicate Quote
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator className="my-1" />
+                                                        <DropdownMenuItem onClick={(e) => handleDelete(e, parent.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50">
+                                                            <Trash2 size={16} />
+                                                            Move to Trash
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <DropdownMenuItem onClick={(e) => handleRestore(e, parent.id)} className="rounded-md gap-3 py-2 text-green-600 focus:text-green-700 focus:bg-green-50">
+                                                            <RotateCcw size={16} />
+                                                            Restore Quote
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator className="my-1" />
+                                                        <DropdownMenuItem onClick={(e) => handleDelete(e, parent.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50 font-bold">
+                                                            <Trash2 size={16} />
+                                                            Delete Permanently
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {view === 'ACTIVE' ? (
-                                        <>
-                                            <button
-                                                onClick={(e) => handleDuplicate(e, parent.id)}
-                                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="Duplicate"
-                                            >
-                                                <Copy size={18} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDelete(e, parent.id)}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Move to Trash"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <button
-                                                onClick={(e) => handleRestore(e, parent.id)}
-                                                className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                title="Restore"
-                                            >
-                                                <RotateCcw size={18} />
-                                            </button>
-                                            <button
-                                                onClick={(e) => handleDelete(e, parent.id)}
-                                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="Permanently Delete"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Child Rows */}
-                            {!isCollapsed && group.children.length > 0 && (
-                                <div className="ml-12 space-y-2 border-l-2 border-gray-100 pl-4">
-                                    {group.children.map((child) => {
-                                        const childTotal = calculateQuoteTotal(child);
-                                        const childUpdate = new Date(child.updatedAt);
-                                        return (
-                                            <div
-                                                key={child.id}
-                                                onClick={() => router.push(`/quote/${child.id}`)}
-                                                className="group bg-white p-3.5 rounded-xl border border-gray-100 hover:border-blue-200 hover:shadow-sm transition-all cursor-pointer flex items-center justify-between"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="text-gray-300">
-                                                        <Hash size={14} />
+                                {/* Child Rows */}
+                                {!isCollapsed && group.children.length > 0 && (
+                                    <div className="flex flex-col bg-gray-50/20 border-t border-gray-50/50">
+                                        {group.children.map((child: Quote) => {
+                                            const childTotal = child.totalIncGst || 0;
+                                            return (
+                                                <div
+                                                    key={child.id}
+                                                    className={cn(
+                                                        "grid gap-4 px-6 py-2 items-center hover:bg-white transition-all cursor-pointer group/child border-b border-gray-50 last:border-0",
+                                                    )}
+                                                    style={{
+                                                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                                                    }}
+                                                    onClick={() => router.push(`/quote/${child.id}`)}
+                                                >
+                                                    <div className="flex items-center gap-3 pl-8">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50" />
+                                                        <div>
+                                                            <div className="text-xs font-bold text-gray-500">
+                                                                {formatQuoteNumber(child.quoteNumber, child.revision)}
+                                                            </div>
+                                                            <div className="text-[9px] text-gray-400 font-medium">
+                                                                {format(new Date(child.updatedAt), 'dd/MM/yy HH:mm')}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <span className="text-sm font-semibold text-gray-700">
-                                                        {formatQuoteNumber(child.quoteNumber, child.revision)}
-                                                    </span>
-                                                    {child.revision === group.highestRevision && (
-                                                        <span className="text-[9px] font-bold px-1.5 py-0.25 bg-green-50 text-green-600 rounded-full border border-green-100 uppercase tracking-tight">
-                                                            Latest
-                                                        </span>
+                                                    {columnVisibility.projectName && (
+                                                        <div className="text-xs text-gray-400 truncate italic">
+                                                            {child.description || 'No description'}
+                                                        </div>
                                                     )}
-                                                    <div className="h-3 w-px bg-gray-200 mx-1" />
-                                                    <span className="text-[11px] text-gray-500">
-                                                        <span className="font-bold uppercase tracking-tighter text-gray-400 mr-1">Updated</span>
-                                                        {format(childUpdate, 'MMM d, h:mm a')} 
-                                                        {child.modifier && <span className="ml-1 text-gray-400 group-hover:text-gray-500 transition-colors">by {child.modifier.name || child.modifier.email}</span>}
-                                                    </span>
-                                                    <span className="text-xs font-bold text-gray-900 ml-auto mr-4">
-                                                        ${childTotal.toLocaleString()}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {view === 'ACTIVE' ? (
-                                                        <>
-                                                            <button
-                                                                onClick={(e) => handleDuplicate(e, child.id)}
-                                                                className="p-1.5 text-gray-400 hover:text-blue-600 rounded-md transition-colors"
-                                                                title="Duplicate"
-                                                            >
-                                                                <Copy size={16} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => handleDelete(e, child.id)}
-                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
-                                                                title="Move to Trash"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <button
-                                                                onClick={(e) => handleRestore(e, child.id)}
-                                                                className="p-1.5 text-gray-400 hover:text-green-600 rounded-md transition-colors"
-                                                                title="Restore"
-                                                            >
-                                                                <RotateCcw size={16} />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => handleDelete(e, child.id)}
-                                                                className="p-1.5 text-gray-400 hover:text-red-600 rounded-md transition-colors"
-                                                                title="Permanently Delete"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </>
+                                                    {columnVisibility.clientName && (
+                                                        <div className="text-xs text-gray-400 truncate">
+                                                            {child.project?.clientName || child.clientName || '---'}
+                                                        </div>
                                                     )}
+                                                    {columnVisibility.company && (
+                                                        <div className="text-xs text-gray-400 truncate">
+                                                            {child.project?.companyName || child.clientCompany || '---'}
+                                                        </div>
+                                                    )}
+                                                    {columnVisibility.projectStatus && <div />}
+                                                    {columnVisibility.quoteStatus && (
+                                                        <div className="flex justify-center">
+                                                            <span className={cn(
+                                                                "text-[8px] font-bold px-1.5 py-0.25 rounded border uppercase tracking-tighter opacity-70",
+                                                                getStatusDisplay(child.status).className
+                                                            )}>
+                                                                {getStatusDisplay(child.status).label}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {columnVisibility.total && (
+                                                        <div className="text-right text-xs font-bold text-gray-400">
+                                                            ${childTotal.toLocaleString()}
+                                                        </div>
+                                                    )}
+                                                    {columnVisibility.internalNotes && (
+                                                        <div className="text-[10px] text-gray-400 truncate italic">
+                                                            {child.gridInternalNotes}
+                                                        </div>
+                                                    )}
+                                                    {columnVisibility.activity && (
+                                                        <div className="pl-4 flex items-center gap-2 opacity-50">
+                                                            <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-500">
+                                                                {getInitials(child.modifier?.name || child.creator?.name, child.modifier?.email || child.creator?.email)}
+                                                            </div>
+                                                            <span className="text-[8px] text-gray-400">
+                                                                {formatDistanceToNow(new Date(child.updatedAt), { addSuffix: true }).replace('about ', '')}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                                                         <button
+                                                            onClick={(e) => handleDelete(e, child.id)}
+                                                            className="p-1 px-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-[9px] font-bold uppercase tracking-wider transition-colors"
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
 
                 {groupedQuotes.length === 0 && (
-                    <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                        No quotes found. Create one to get started.
+                    <div className="text-center py-20 bg-gray-50/50">
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                            <div className="p-4 bg-white rounded-full border border-gray-100 shadow-sm">
+                                <Search className="text-gray-300" size={32} />
+                            </div>
+                            <p className="text-gray-500 font-medium">No results match your filters.</p>
+                            <Button variant="outline" size="sm" onClick={() => {
+                                setQuoteStatusFilter('ALL');
+                                setProjectStatusFilter('ALL');
+                                setSearch('');
+                            }}>
+                                Clear all filters
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Pagination Footer */}
+                {totalPages > 1 && (
+                    <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                        <div className="text-sm text-gray-500">
+                            Showing <span className="font-semibold text-gray-900">{((page - 1) * limit) + 1}</span> to <span className="font-semibold text-gray-900">{Math.min(page * limit, total)}</span> of <span className="font-semibold text-gray-900">{total}</span> quotes
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                disabled={page === 1}
+                                className="h-9 px-3 rounded-xl border-gray-200"
+                            >
+                                <ChevronLeft size={16} />
+                                Previous
+                            </Button>
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                    // Basic pagination logic: show current page and a few around it
+                                    let startPage = Math.max(1, page - 2);
+                                    let endPage = Math.min(totalPages, startPage + 4);
+                                    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+                                    
+                                    const p = startPage + i;
+                                    if (p > totalPages) return null;
+
+                                    return (
+                                        <Button
+                                            key={p}
+                                            variant={page === p ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setPage(p)}
+                                            className={cn(
+                                                "h-9 w-9 rounded-xl p-0",
+                                                page === p ? "bg-blue-600 hover:bg-blue-700" : "border-gray-200"
+                                            )}
+                                        >
+                                            {p}
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={page === totalPages}
+                                className="h-9 px-3 rounded-xl border-gray-200"
+                            >
+                                Next
+                                <ChevronRight size={16} />
+                            </Button>
+                        </div>
                     </div>
                 )}
             </div>
+
+            <NewQuoteDialog 
+                isOpen={isNewQuoteDialogOpen} 
+                onClose={() => setIsNewQuoteDialogOpen(false)} 
+            />
         </div>
     );
 }

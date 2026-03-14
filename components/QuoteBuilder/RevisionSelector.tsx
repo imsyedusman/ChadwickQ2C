@@ -31,7 +31,8 @@ export default function RevisionSelector({ currentId, revisionGroupId }: Revisio
             try {
                 const res = await fetch(`/api/quotes?revisionGroupId=${revisionGroupId}`);
                 if (res.ok) {
-                    const data = await res.json();
+                    const result = await res.json();
+                    const data = result.data || [];
                     // Sort by revision descending (newest first)
                     const sorted = (data as Revision[]).sort((a, b) => (b.revision || 0) - (a.revision || 0));
                     setRevisions(sorted);

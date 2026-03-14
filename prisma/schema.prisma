@@ -12,6 +12,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ProjectStatus {
+  Budget
+  Tender
+  Live
+}
+
 model Quote {
   id            String   @id @default(uuid())
   quoteNumber   String   // Auto-generated friendly ID e.g. Q-1001
@@ -56,7 +62,25 @@ model Quote {
   boards        Board[]
   shareLinks    ShareLink[]
 
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id])
+
+  gridInternalNotes String? @db.Text
+
   @@unique([quoteNumber, revision])
+}
+
+model Project {
+  id                 String   @id @default(uuid())
+  projectName        String
+  clientName         String?
+  companyName        String?
+  projectReference   String?
+  projectDescription String?
+  projectStatus      ProjectStatus @default(Budget)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  quotes             Quote[]
 }
 
 // Authentication & User Management

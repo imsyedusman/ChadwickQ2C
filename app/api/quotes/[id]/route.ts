@@ -21,6 +21,7 @@ export async function GET(
                     },
                     orderBy: { order: 'asc' },
                 },
+                project: true,
                 ...({
                     creator: { select: { name: true, email: true } },
                     modifier: { select: { name: true, email: true } }

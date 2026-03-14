@@ -1,0 +1,50 @@
+Duplicate Projects (projectName + clientName):
+[
+  {
+    "_count": {
+      "id": 2
+    },
+    "projectName": "Direct New Project",
+    "clientName": "New Client"
+  },
+  {
+    "_count": {
+      "id": 2
+    },
+    "projectName": "Verification Project",
+    "clientName": "Test Client"
+  }
+]
+
+Details for Direct New Project / New Client:
+[
+  {
+    "id": "45dbd3f4-000e-4630-9da2-5bb1609fda47",
+    "projectName": "Direct New Project",
+    "clientName": "New Client",
+    "createdAt": "2026-03-14T05:43:12.519Z"
+  },
+  {
+    "id": "cbb68737-3310-4093-bfe4-1e9cf9738104",
+    "projectName": "Direct New Project",
+    "clientName": "New Client",
+    "createdAt": "2026-03-14T05:43:40.779Z"
+  }
+]
+
+Details for Verification Project / Test Client:
+[
+  {
+    "id": "9fbdce61-0d18-4ba1-9512-ee594d581e32",
+    "projectName": "Verification Project",
+    "clientName": "Test Client",
+    "createdAt": "2026-03-14T05:43:12.502Z"
+  },
+  {
+    "id": "dbe5354e-fec0-464c-bf8d-fcfcb7957713",
+    "projectName": "Verification Project",
+    "clientName": "Test Client",
+    "createdAt": "2026-03-14T05:43:40.765Z"
+  }
+]
+

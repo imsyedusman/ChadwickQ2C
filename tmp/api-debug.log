@@ -1,0 +1,684 @@
+2026-03-14T07:09:41.181Z - GET /api/quotes - page:1, limit:25, status:null
+2026-03-14T07:11:44.648Z - GET /api/quotes - page:1, limit:25, status:null
+2026-03-14T07:11:44.649Z - GET /api/quotes - WHERE: {"status":{"not":"TRASH"}}
+2026-03-14T07:11:44.650Z - GET /api/quotes - Calling prisma.quote.findMany...
+2026-03-14T07:11:44.660Z - GET /api/quotes - DATABASE ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:618:163
+
+  615 logToFile(`GET /api/quotes - WHERE: ${JSON.stringify(where)}`);
+  616 try {
+  617     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 618     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:11:44.810Z - GET /api/quotes - ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:618:163
+
+  615 logToFile(`GET /api/quotes - WHERE: ${JSON.stringify(where)}`);
+  616 try {
+  617     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 618     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:57.075Z - GET /api/quotes - Calling prisma.quote.findMany...
+2026-03-14T07:13:57.082Z - GET /api/quotes - DATABASE ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:57.223Z - GET /api/quotes - ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:57.261Z - GET /api/quotes - Calling prisma.quote.findMany...
+2026-03-14T07:13:57.270Z - GET /api/quotes - DATABASE ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:57.385Z - GET /api/quotes - ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:58.798Z - GET /api/quotes - Calling prisma.quote.findMany...
+2026-03-14T07:13:58.803Z - GET /api/quotes - DATABASE ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: "TRASH"
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:58.899Z - GET /api/quotes - ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: "TRASH"
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:59.580Z - GET /api/quotes - Calling prisma.quote.findMany...
+2026-03-14T07:13:59.583Z - GET /api/quotes - DATABASE ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.
+2026-03-14T07:13:59.691Z - GET /api/quotes - ERROR: 
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany()` invocation in
+D:\Work\1. Projects\3. My Projects\Chadwick\Quotes\My Workings\Web App\.next\dev\server\chunks\[root-of-the-server]__ca87b961._.js:608:163
+
+  605 console.log('Quotes API Final Where:', JSON.stringify(where));
+  606 try {
+  607     logToFile(`GET /api/quotes - Calling prisma.quote.findMany...`);
+→ 608     const quotes = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$prisma$2e$ts__$5b$app$2d$route$5d$__$28$ecmascript$29$__["default"].quote.findMany({
+            where: {
+              status: {
+                not: "TRASH"
+              }
+            },
+            select: {
+              id: true,
+              quoteNumber: true,
+              revision: true,
+              revisionGroupId: true,
+              clientName: true,
+              clientCompany: true,
+              projectRef: true,
+              description: true,
+              status: true,
+              total: true,
+              ~~~~~
+              createdAt: true,
+              updatedAt: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  projectName: true,
+                  projectStatus: true,
+                  clientName: true,
+                  companyName: true
+                }
+              },
+              modifier: {
+                select: {
+                  name: true
+                }
+              },
+          ?   createdBy?: true,
+          ?   lastModifiedBy?: true,
+          ?   settingsSnapshot?: true,
+          ?   globalDiscount?: true,
+          ?   globalContingency?: true,
+          ?   overrideCopperPricePerKg?: true,
+          ?   overrideLabourRate?: true,
+          ?   overrideOverheadPct?: true,
+          ?   overrideEngineeringPct?: true,
+          ?   overrideTargetMarginPct?: true,
+          ?   overrideConsumablesPct?: true,
+          ?   overrideGstPct?: true,
+          ?   overrideRoundingIncrement?: true,
+          ?   creator?: true,
+          ?   boards?: true,
+          ?   shareLinks?: true,
+          ?   _count?: true
+            },
+            orderBy: {
+              updatedAt: "desc"
+            },
+            skip: 0,
+            take: 25
+          })
+
+Unknown field `total` for select statement on model `Quote`. Available options are marked with ?.

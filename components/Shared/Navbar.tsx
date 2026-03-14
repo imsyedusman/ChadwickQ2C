@@ -13,7 +13,7 @@ import {
     DropdownMenuSeparator, 
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Shield, ChevronDown } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, FileText, Briefcase, Settings } from 'lucide-react';
 
 export default function Navbar() {
     const pathname = usePathname();
@@ -22,6 +22,7 @@ export default function Navbar() {
 
     const isQuotePage = pathname?.startsWith('/quote');
     const isSettings = pathname?.startsWith('/settings');
+    const isProjects = pathname?.startsWith('/projects');
     const isAdmin = pathname === '/admin' || pathname?.startsWith('/admin/');
     const isProfile = pathname === '/profile';
     
@@ -68,35 +69,50 @@ export default function Navbar() {
                                 <Link
                                     href="/"
                                     className={cn(
-                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16",
+                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16 gap-2",
                                         isDashboard
                                             ? "border-blue-500 text-gray-900"
                                             : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                     )}
                                 >
-                                    Dashboard
+                                    <FileText size={18} />
+                                    Quotes
+                                </Link>
+                                <Link
+                                    href="/projects"
+                                    className={cn(
+                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16 gap-2",
+                                        isProjects
+                                            ? "border-blue-500 text-gray-900"
+                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+                                    )}
+                                >
+                                    <Briefcase size={18} />
+                                    Projects
                                 </Link>
                                 <Link
                                     href="/settings"
                                     className={cn(
-                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16",
+                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16 gap-2",
                                         isSettings
                                             ? "border-blue-500 text-gray-900"
                                             : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                     )}
                                 >
+                                    <Settings size={18} />
                                     Settings
                                 </Link>
                                 {user?.role === 'ADMIN' && (
                                     <Link
                                         href="/admin"
                                         className={cn(
-                                            "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16",
+                                            "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16 gap-2",
                                             isAdmin
                                                 ? "border-blue-500 text-gray-900"
                                                 : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
                                         )}
                                     >
+                                        <Shield size={18} />
                                         Admin
                                     </Link>
                                 )}
@@ -108,21 +124,31 @@ export default function Navbar() {
                             <div className="flex items-center gap-4 ml-6 border-l border-gray-200 pl-6 h-4">
                                 <Link
                                     href="/"
-                                    className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                                    className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
                                 >
-                                    Dashboard
+                                    <FileText size={12} />
+                                    Quotes
+                                </Link>
+                                <Link
+                                    href="/projects"
+                                    className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                                >
+                                    <Briefcase size={12} />
+                                    Projects
                                 </Link>
                                 <Link
                                     href="/settings"
-                                    className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                                    className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
                                 >
+                                    <Settings size={12} />
                                     Settings
                                 </Link>
                                 {user?.role === 'ADMIN' && (
                                     <Link
                                         href="/admin"
-                                        className="text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
+                                        className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
                                     >
+                                        <Shield size={12} />
                                         Admin
                                     </Link>
                                 )}

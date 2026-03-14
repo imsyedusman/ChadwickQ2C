@@ -93,6 +93,7 @@ interface QuoteContextType {
     projectRef: string;
     description: string;
     status: string;
+    projectStatus: string | null;
     boards: Board[];
     settings: QuoteSettings; // Global settings
     overrides: QuoteOverrides; // Quote-specific overrides
@@ -130,6 +131,7 @@ interface QuoteContextType {
     updateOverrides: (overrides: Partial<QuoteOverrides>) => Promise<void>;
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
+    updateProjectStatus: (status: string) => Promise<void>;
     updateUiState: (key: string, value: any) => void;
     updateBoardConfig: (boardId: string, config: any) => Promise<void>;
 }
@@ -167,6 +169,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         projectRef: '',
         description: '',
         status: 'DRAFT',
+        projectStatus: null as string | null,
     });
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<QuoteSettings>({
@@ -199,6 +202,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     projectRef: data.projectRef || '',
                     description: data.description || '',
                     status: data.status || 'DRAFT',
+                    projectStatus: data.project?.projectStatus || null,
                 });
 
                 // Load overrides
@@ -490,6 +494,30 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
+    const updateProjectStatus = async (status: string) => {
+        setMetadata(prev => ({ ...prev, projectStatus: status }));
+        setSaving(true);
+
+        try {
+            // Find the project ID first (we should probably have it in metadata)
+            const res = await fetch(`/api/quotes/${quoteId}`);
+            const data = await res.json();
+            const projectId = data.projectId;
+
+            if (projectId) {
+                await fetch(`/api/projects/${projectId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectStatus: status }),
+                });
+            }
+        } catch (error) {
+            console.error("Failed to update project status", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const updateBoardConfig = async (boardId: string, config: any) => {
         try {
             const response = await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
@@ -520,6 +548,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 projectRef: metadata.projectRef,
                 description: metadata.description,
                 status: metadata.status,
+                projectStatus: metadata.projectStatus,
                 boards,
                 settings,
                 overrides,
@@ -540,6 +569,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateOverrides,
                 updateMetadata,
                 updateStatus,
+                updateProjectStatus,
                 updateUiState,
                 updateBoardConfig,
             }}
