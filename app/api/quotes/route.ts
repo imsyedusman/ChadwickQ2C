@@ -15,7 +15,7 @@ export async function GET(request: Request) {
         const quoteNumber = searchParams.get('quoteNumber');
         const revisionGroupId = searchParams.get('revisionGroupId');
         const showTrash = searchParams.get('showTrash') === 'true';
-        
+
         // Pagination
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '25');
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         const where: any = {};
         if (revisionGroupId) where.revisionGroupId = revisionGroupId;
         if (quoteNumber) where.quoteNumber = quoteNumber;
-        
+
         if (search) {
             where.OR = [
                 { quoteNumber: { contains: search, mode: 'insensitive' } },
@@ -85,7 +85,8 @@ export async function GET(request: Request) {
                             items: true
                         }
                     },
-                    modifier: { select: { name: true } }
+                    modifier: { select: { name: true } },
+                    creator: { select: { name: true } }
                 },
                 orderBy: { updatedAt: 'desc' },
                 skip,
@@ -99,7 +100,7 @@ export async function GET(request: Request) {
 
         const quotesWithTotals = quotes.map((quote: any) => {
             if (!settings) return { ...quote, total: 0, totalIncGst: 0, boards: undefined };
-            
+
             const effectiveSettings = {
                 labourRate: quote.overrideLabourRate ?? settings.labourRate,
                 consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
@@ -112,7 +113,7 @@ export async function GET(request: Request) {
             };
 
             const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
-            
+
             // Remove boards from response to keep it light if not needed on dashboard
             const { boards, ...quoteWithoutBoards } = quote;
             return {
@@ -141,14 +142,14 @@ export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { clientName, projectRef, description, projectId, newProject } = body;
-        
+
         const session = await getServerSession(authOptions);
         const userId = (session?.user as any)?.id;
 
         if (!userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
-        
+
         const quoteNumber = await generateNextQuoteNumber();
 
         // Handle Project creation or fetching for auto-population

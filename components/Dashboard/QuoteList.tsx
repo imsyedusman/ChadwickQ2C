@@ -100,7 +100,7 @@ export default function QuoteList() {
     });
     const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
     const [savingId, setSavingId] = useState<string | null>(null);
-    
+
     // Column Persistence
     useEffect(() => {
         const savedVisibility = localStorage.getItem('quotesGridColumnVisibility');
@@ -118,22 +118,22 @@ export default function QuoteList() {
         setColumnVisibility(newVisibility);
         localStorage.setItem('quotesGridColumnVisibility', JSON.stringify(newVisibility));
     };
-    
+
     // Pagination
     const [page, setPage] = useState(1);
-    const [limit] = useState(25);
+    const [limit, setLimit] = useState(25);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
     const router = useRouter();
 
     useEffect(() => {
-        setPage(1); // Reset to first page on filter change
-    }, [view, quoteStatusFilter, projectStatusFilter, search]);
+        setPage(1); // Reset to first page on filter or limit change
+    }, [view, quoteStatusFilter, projectStatusFilter, search, limit]);
 
     useEffect(() => {
         fetchQuotes();
-    }, [view, quoteStatusFilter, projectStatusFilter, search, page]);
+    }, [view, quoteStatusFilter, projectStatusFilter, search, page, limit]);
 
     useEffect(() => {
         fetchSettings();
@@ -150,7 +150,7 @@ export default function QuoteList() {
             if (quoteStatusFilter !== 'ALL') params.append('status', quoteStatusFilter);
             if (projectStatusFilter !== 'ALL') params.append('projectStatus', projectStatusFilter);
             if (search) params.append('search', search);
-            
+
             const url = `/api/quotes?${params}`;
             const res = await fetch(url);
             const result = await res.json();
@@ -198,7 +198,7 @@ export default function QuoteList() {
 
     const handleInlineUpdate = async (quoteId: string, field: string, value: string, projectId?: string) => {
         const originalValue = quotes.find(q => q.id === quoteId)?.[field as keyof Quote] || '';
-        
+
         setSavingId(quoteId);
         try {
             let res: Response;
@@ -264,7 +264,7 @@ export default function QuoteList() {
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
         const isPermanent = view === 'TRASH';
-        
+
         if (isPermanent) {
             if (!confirm('Permanently delete this quote? This will also update the sequential numbering if this was the latest quote. This action cannot be undone.')) return;
         } else {
@@ -274,7 +274,7 @@ export default function QuoteList() {
         try {
             const res = await fetch(`/api/quotes/${id}?permanent=${isPermanent}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete quote');
-            
+
             // Re-fetch to update pagination and grid
             await fetchQuotes();
             router.refresh();
@@ -294,7 +294,7 @@ export default function QuoteList() {
                 return;
             }
             if (!res.ok) throw new Error('Failed to restore quote');
-            
+
             // Re-fetch to update pagination and grid
             await fetchQuotes();
             router.refresh();
@@ -409,8 +409,8 @@ export default function QuoteList() {
                             onClick={() => setView('ACTIVE')}
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
-                                view === 'ACTIVE' 
-                                    ? "bg-white text-blue-600 shadow-sm" 
+                                view === 'ACTIVE'
+                                    ? "bg-white text-blue-600 shadow-sm"
                                     : "text-gray-500 hover:text-gray-700"
                             )}
                         >
@@ -420,8 +420,8 @@ export default function QuoteList() {
                             onClick={() => setView('TRASH')}
                             className={cn(
                                 "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2",
-                                view === 'TRASH' 
-                                    ? "bg-white text-red-600 shadow-sm" 
+                                view === 'TRASH'
+                                    ? "bg-white text-red-600 shadow-sm"
                                     : "text-gray-500 hover:text-gray-700"
                             )}
                         >
@@ -452,7 +452,7 @@ export default function QuoteList() {
                         className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white shadow-sm hover:border-gray-300"
                     />
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                     <Select value={projectStatusFilter} onValueChange={setProjectStatusFilter}>
                         <SelectTrigger className="w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300">
@@ -552,24 +552,24 @@ export default function QuoteList() {
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 {/* Table Header */}
                 <div className={cn(
-                    "grid gap-4 px-6 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-widest",
+                    "grid gap-0 px-6 py-3 bg-gray-50 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-widest items-center",
                     {
-                        "grid-cols-[1.5fr_1.5fr_1fr_1fr_0.8fr_0.8fr_1fr_1fr_auto]": true // We'll use a dynamic grid soon, for now let's just fix the template columns
+                        "grid-cols-[1.5fr_1.5fr_1fr_1fr_0.8fr_0.8fr_1fr_1fr_auto]": true
                     }
                 )}
                     style={{
                         gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                     }}
                 >
-                    <div className="flex items-center gap-2">Quote Number</div>
-                    {columnVisibility.projectName && <div>Project Name</div>}
-                    {columnVisibility.clientName && <div>Client Name</div>}
-                    {columnVisibility.company && <div>Company</div>}
-                    {columnVisibility.projectStatus && <div className="text-center">Proj Status</div>}
-                    {columnVisibility.quoteStatus && <div className="text-center">Quote Status</div>}
-                    {columnVisibility.total && <div className="text-right">Total</div>}
-                    {columnVisibility.internalNotes && <div>Grid Notes</div>}
-                    {columnVisibility.activity && <div className="pl-4">Activity</div>}
+                    <div className="flex items-center gap-2 border-r border-gray-200/60 h-full py-1">Quote Number</div>
+                    {columnVisibility.projectName && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Project Name</div>}
+                    {columnVisibility.clientName && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Client Name</div>}
+                    {columnVisibility.company && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Company</div>}
+                    {columnVisibility.projectStatus && <div className="text-center border-r border-gray-200/60 h-full py-1 px-2">Proj Status</div>}
+                    {columnVisibility.quoteStatus && <div className="text-center border-r border-gray-200/60 h-full py-1 px-2">Quote Status</div>}
+                    {columnVisibility.total && <div className="text-right border-r border-gray-200/60 h-full py-1 pr-4">Total</div>}
+                    {columnVisibility.internalNotes && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Grid Notes</div>}
+                    {columnVisibility.activity && <div className="pl-4 h-full py-1">Activity</div>}
                     <div className="w-10"></div>
                 </div>
 
@@ -583,9 +583,9 @@ export default function QuoteList() {
                         return (
                             <div key={group.quoteNumber} className="flex flex-col">
                                 {/* Parent Row */}
-                                <div
+                                 <div
                                     className={cn(
-                                        "grid gap-4 px-6 py-4 items-center hover:bg-gray-50 transition-all cursor-pointer group animate-in fade-in slide-in-from-top-1 duration-200",
+                                        "grid gap-0 px-6 py-5 items-center hover:bg-gray-50 transition-all cursor-pointer group animate-in fade-in slide-in-from-top-1 duration-200",
                                         !isCollapsed && group.children.length > 0 && "bg-blue-50/20"
                                     )}
                                     style={{
@@ -594,7 +594,7 @@ export default function QuoteList() {
                                     onClick={() => router.push(`/quote/${parent.id}`)}
                                 >
                                     {/* Quote Number */}
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-3 border-r border-gray-100 h-full pr-2">
                                         <div className="flex items-center gap-2">
                                             {group.children.length > 0 && (
                                                 <button
@@ -621,12 +621,12 @@ export default function QuoteList() {
                                         </div>
                                     </div>
 
-                                    {/* Project Name */}
+                                     {/* Project Name */}
                                     {columnVisibility.projectName && (
-                                        <div 
+                                        <div
                                             className={cn(
-                                                "font-semibold text-gray-800 truncate text-sm flex items-center gap-2 group/cell h-full",
-                                                editingCell?.id === parent.id && editingCell?.field === 'projectName' && "bg-blue-50/50 -mx-2 px-2 rounded"
+                                                "font-semibold text-gray-800 truncate text-sm flex items-center gap-2 group/cell h-full border-r border-gray-100 pl-4 pr-2",
+                                                editingCell?.id === parent.id && editingCell?.field === 'projectName' && "bg-blue-50/50"
                                             )}
                                             title={parent.project?.projectName || parent.projectRef || ''}
                                             onDoubleClick={(e) => {
@@ -657,12 +657,12 @@ export default function QuoteList() {
                                         </div>
                                     )}
 
-                                    {/* Client Name */}
+                                     {/* Client Name */}
                                     {columnVisibility.clientName && (
-                                        <div 
+                                        <div
                                             className={cn(
-                                                "text-sm text-gray-600 truncate flex items-center gap-2 group/cell h-full",
-                                                editingCell?.id === parent.id && editingCell?.field === 'clientName' && "bg-blue-50/50 -mx-2 px-2 rounded"
+                                                "text-sm text-gray-600 truncate flex items-center gap-2 group/cell h-full border-r border-gray-100 pl-4 pr-2",
+                                                editingCell?.id === parent.id && editingCell?.field === 'clientName' && "bg-blue-50/50"
                                             )}
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
@@ -692,19 +692,15 @@ export default function QuoteList() {
                                         </div>
                                     )}
 
-                                    {/* Company Name */}
+                                     {/* Company Name */}
                                     {columnVisibility.company && (
-                                        <div 
-                                            className="text-sm text-gray-600 truncate"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditingCell({ id: parent.id, field: 'clientCompany', value: parent.project?.companyName || parent.clientCompany || '' });
-                                            }}
+                                        <div
+                                            className="text-sm text-gray-600 truncate h-full flex items-center border-r border-gray-100 pl-4 pr-2"
                                         >
                                             {editingCell?.id === parent.id && editingCell?.field === 'clientCompany' ? (
                                                 <input
                                                     autoFocus
-                                                    className="w-full px-2 py-1 text-sm border-b-2 border-blue-500 focus:outline-none bg-blue-50/50"
+                                                    className="w-full px-2 py-1 text-sm border-b-2 border-blue-500 focus:outline-none bg-transparent"
                                                     value={editingCell.value}
                                                     onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
                                                     onKeyDown={(e) => {
@@ -714,16 +710,22 @@ export default function QuoteList() {
                                                     onBlur={() => handleInlineUpdate(parent.id, 'clientCompany', editingCell.value)}
                                                 />
                                             ) : (
-                                                <span className="hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">
+                                                <span
+                                                    className="hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingCell({ id: parent.id, field: 'clientCompany', value: parent.project?.companyName || parent.clientCompany || '' });
+                                                    }}
+                                                >
                                                     {parent.project?.companyName || parent.clientCompany || <span className="text-gray-300">---</span>}
                                                 </span>
                                             )}
                                         </div>
                                     )}
 
-                                    {/* Project Status */}
+                                     {/* Project Status */}
                                     {columnVisibility.projectStatus && (
-                                        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex justify-center border-r border-gray-100 h-full items-center px-2" onClick={(e) => e.stopPropagation()}>
                                             {parent.projectId ? (
                                                 <Select
                                                     value={parent.project?.projectStatus}
@@ -749,9 +751,9 @@ export default function QuoteList() {
                                         </div>
                                     )}
 
-                                    {/* Quote Status */}
+                                     {/* Quote Status */}
                                     {columnVisibility.quoteStatus && (
-                                        <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex justify-center border-r border-gray-100 h-full items-center px-2" onClick={(e) => e.stopPropagation()}>
                                             <Select
                                                 value={parent.status}
                                                 onValueChange={(val) => handleInlineUpdate(parent.id, 'status', val)}
@@ -772,17 +774,17 @@ export default function QuoteList() {
                                         </div>
                                     )}
 
-                                    {/* Total */}
+                                     {/* Total */}
                                     {columnVisibility.total && (
-                                        <div className="text-right font-bold text-gray-900 text-sm">
+                                        <div className="text-right font-bold text-gray-900 text-sm border-r border-gray-100 h-full flex items-center justify-end pr-4">
                                             ${totalPrice.toLocaleString()}
                                         </div>
                                     )}
 
-                                    {/* Internal Grid Notes */}
+                                     {/* Internal Grid Notes */}
                                     {columnVisibility.internalNotes && (
-                                        <div 
-                                            className="text-xs text-gray-500 truncate italic cursor-text hover:bg-gray-100/50 px-2 py-1 rounded transition-colors group/note"
+                                        <div
+                                            className="text-xs text-gray-500 truncate italic cursor-text hover:bg-white/80 px-4 py-2 rounded transition-colors group/note border-r border-gray-100 h-full flex items-center bg-gray-50/50 mx-2"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setEditingCell({ id: parent.id, field: 'gridInternalNotes', value: parent.gridInternalNotes || '' });
@@ -909,17 +911,17 @@ export default function QuoteList() {
                                         {group.children.map((child: Quote) => {
                                             const childTotal = child.totalIncGst || 0;
                                             return (
-                                                <div
-                                                    key={child.id}
-                                                    className={cn(
-                                                        "grid gap-4 px-6 py-2 items-center hover:bg-white transition-all cursor-pointer group/child border-b border-gray-50 last:border-0",
-                                                    )}
-                                                    style={{
-                                                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
-                                                    }}
-                                                    onClick={() => router.push(`/quote/${child.id}`)}
-                                                >
-                                                    <div className="flex items-center gap-3 pl-8">
+                                                    <div
+                                                        key={child.id}
+                                                        className={cn(
+                                                            "grid gap-0 px-6 py-2 items-center hover:bg-white transition-all cursor-pointer group/child border-b border-gray-50 last:border-0",
+                                                        )}
+                                                        style={{
+                                                            gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                                                        }}
+                                                        onClick={() => router.push(`/quote/${child.id}`)}
+                                                    >
+                                                        <div className="flex items-center gap-3 pl-8 border-r border-gray-100 h-full py-2">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50" />
                                                         <div>
                                                             <div className="text-xs font-bold text-gray-500">
@@ -930,42 +932,42 @@ export default function QuoteList() {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    {columnVisibility.projectName && (
-                                                        <div className="text-xs text-gray-400 truncate italic">
-                                                            {child.description || 'No description'}
-                                                        </div>
-                                                    )}
-                                                    {columnVisibility.clientName && (
-                                                        <div className="text-xs text-gray-400 truncate">
-                                                            {child.project?.clientName || child.clientName || '---'}
-                                                        </div>
-                                                    )}
-                                                    {columnVisibility.company && (
-                                                        <div className="text-xs text-gray-400 truncate">
-                                                            {child.project?.companyName || child.clientCompany || '---'}
-                                                        </div>
-                                                    )}
-                                                    {columnVisibility.projectStatus && <div />}
-                                                    {columnVisibility.quoteStatus && (
-                                                        <div className="flex justify-center">
-                                                            <span className={cn(
-                                                                "text-[8px] font-bold px-1.5 py-0.25 rounded border uppercase tracking-tighter opacity-70",
-                                                                getStatusDisplay(child.status).className
-                                                            )}>
-                                                                {getStatusDisplay(child.status).label}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {columnVisibility.total && (
-                                                        <div className="text-right text-xs font-bold text-gray-400">
-                                                            ${childTotal.toLocaleString()}
-                                                        </div>
-                                                    )}
-                                                    {columnVisibility.internalNotes && (
-                                                        <div className="text-[10px] text-gray-400 truncate italic">
-                                                            {child.gridInternalNotes}
-                                                        </div>
-                                                    )}
+                                                        {columnVisibility.projectName && (
+                                                            <div className="text-xs text-gray-400 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2">
+                                                                {child.description || 'No description'}
+                                                            </div>
+                                                        )}
+                                                        {columnVisibility.clientName && (
+                                                            <div className="text-xs text-gray-400 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2">
+                                                                {child.project?.clientName || child.clientName || '---'}
+                                                            </div>
+                                                        )}
+                                                        {columnVisibility.company && (
+                                                            <div className="text-xs text-gray-400 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2">
+                                                                {child.project?.companyName || child.clientCompany || '---'}
+                                                            </div>
+                                                        )}
+                                                        {columnVisibility.projectStatus && <div className="border-r border-gray-100 h-full flex items-center" />}
+                                                        {columnVisibility.quoteStatus && (
+                                                            <div className="flex justify-center border-r border-gray-100 h-full items-center px-2">
+                                                                <span className={cn(
+                                                                    "text-[8px] font-bold px-1.5 py-0.25 rounded border uppercase tracking-tighter opacity-70",
+                                                                    getStatusDisplay(child.status).className
+                                                                )}>
+                                                                    {getStatusDisplay(child.status).label}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {columnVisibility.total && (
+                                                            <div className="text-right text-xs font-bold text-gray-400 border-r border-gray-100 h-full flex items-center justify-end pr-4">
+                                                                ${childTotal.toLocaleString()}
+                                                            </div>
+                                                        )}
+                                                        {columnVisibility.internalNotes && (
+                                                            <div className="text-[10px] text-gray-400 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2 bg-gray-50/30 mx-2">
+                                                                {child.gridInternalNotes}
+                                                            </div>
+                                                        )}
                                                     {columnVisibility.activity && (
                                                         <div className="pl-4 flex items-center gap-2 opacity-50">
                                                             <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-500">
@@ -977,7 +979,7 @@ export default function QuoteList() {
                                                         </div>
                                                     )}
                                                     <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-                                                         <button
+                                                        <button
                                                             onClick={(e) => handleDelete(e, child.id)}
                                                             className="p-1 px-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-[9px] font-bold uppercase tracking-wider transition-colors"
                                                         >
@@ -1012,32 +1014,55 @@ export default function QuoteList() {
                     </div>
                 )}
 
-                {/* Pagination Footer */}
-                {totalPages > 1 && (
+                 {/* Pagination Footer */}
+                {(totalPages > 1 || limit !== 25) && (
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-                        <div className="text-sm text-gray-500">
-                            Showing <span className="font-semibold text-gray-900">{((page - 1) * limit) + 1}</span> to <span className="font-semibold text-gray-900">{Math.min(page * limit, total)}</span> of <span className="font-semibold text-gray-900">{total}</span> quotes
+                        <div className="flex items-center gap-8">
+                            <div className="text-sm text-gray-500">
+                                Showing <span className="font-semibold text-gray-900">{total > 0 ? ((page - 1) * limit) + 1 : 0}</span> to <span className="font-semibold text-gray-900">{Math.min(page * limit, total)}</span> of <span className="font-semibold text-gray-900">{total}</span> quotes
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Per Page</span>
+                                <Select 
+                                    value={limit.toString()} 
+                                    onValueChange={(val) => {
+                                        setLimit(parseInt(val));
+                                        setPage(1);
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-[70px] bg-white border-gray-200 rounded-lg text-xs shadow-sm">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl">
+                                        <SelectItem value="25">25</SelectItem>
+                                        <SelectItem value="50">50</SelectItem>
+                                        <SelectItem value="100">100</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
+
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setPage(prev => Math.max(1, prev - 1))}
                                 disabled={page === 1}
-                                className="h-9 px-3 rounded-xl border-gray-200"
+                                className="h-9 px-3 rounded-xl border-gray-200 bg-white"
                             >
                                 <ChevronLeft size={16} />
                                 Previous
                             </Button>
                             <div className="flex items-center gap-1">
                                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                    // Basic pagination logic: show current page and a few around it
+                                    // Basic pagination logic
                                     let startPage = Math.max(1, page - 2);
                                     let endPage = Math.min(totalPages, startPage + 4);
                                     if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                                    
+
                                     const p = startPage + i;
-                                    if (p > totalPages) return null;
+                                    if (p > totalPages || p < 1) return null;
 
                                     return (
                                         <Button
@@ -1047,7 +1072,7 @@ export default function QuoteList() {
                                             onClick={() => setPage(p)}
                                             className={cn(
                                                 "h-9 w-9 rounded-xl p-0",
-                                                page === p ? "bg-blue-600 hover:bg-blue-700" : "border-gray-200"
+                                                page === p ? "bg-blue-600 hover:bg-blue-700" : "border-gray-200 bg-white"
                                             )}
                                         >
                                             {p}
@@ -1059,8 +1084,8 @@ export default function QuoteList() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-                                disabled={page === totalPages}
-                                className="h-9 px-3 rounded-xl border-gray-200"
+                                disabled={page === totalPages || totalPages === 0}
+                                className="h-9 px-3 rounded-xl border-gray-200 bg-white"
                             >
                                 Next
                                 <ChevronRight size={16} />
@@ -1070,9 +1095,9 @@ export default function QuoteList() {
                 )}
             </div>
 
-            <NewQuoteDialog 
-                isOpen={isNewQuoteDialogOpen} 
-                onClose={() => setIsNewQuoteDialogOpen(false)} 
+            <NewQuoteDialog
+                isOpen={isNewQuoteDialogOpen}
+                onClose={() => setIsNewQuoteDialogOpen(false)}
             />
         </div>
     );
