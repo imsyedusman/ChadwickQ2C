@@ -16,6 +16,8 @@ export async function GET(request: Request) {
         const revisionGroupId = searchParams.get('revisionGroupId');
         const showTrash = searchParams.get('showTrash') === 'true';
 
+        console.log('[API GET Quotes] Fetching quotes...', { showTrash, search, quoteStatus, projectStatus });
+
         // Pagination
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '25');
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
                     id: true,
                     quoteNumber: true,
                     revision: true,
-                    revisionGroupId: true,
+                    // revisionGroupId: true,
                     clientName: true,
                     clientCompany: true,
                     projectRef: true,
@@ -112,15 +114,26 @@ export async function GET(request: Request) {
                 copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
             };
 
-            const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
+            try {
+                const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
 
-            // Remove boards from response to keep it light if not needed on dashboard
-            const { boards, ...quoteWithoutBoards } = quote;
-            return {
-                ...quoteWithoutBoards,
-                total: grandTotals.sellPriceRounded,
-                totalIncGst: grandTotals.finalSellPrice
-            };
+                // Remove boards from response to keep it light if not needed on dashboard
+                const { boards, ...quoteWithoutBoards } = quote;
+                return {
+                    ...quoteWithoutBoards,
+                    total: grandTotals.sellPriceRounded,
+                    totalIncGst: grandTotals.finalSellPrice
+                };
+            } catch (calcError) {
+                console.error(`Failed to calculate totals for quote ${quote.id}:`, calcError);
+                const { boards, ...quoteWithoutBoards } = quote;
+                return {
+                    ...quoteWithoutBoards,
+                    total: 0,
+                    totalIncGst: 0,
+                    calcError: true
+                };
+            }
         });
 
         const totalPages = Math.ceil(totalCount / limit);
@@ -204,14 +217,16 @@ export async function POST(request: Request) {
         } as any);
 
         // Update the quote with its own ID as the revisionGroupId
+        /*
         const updatedQuote = await (prisma.quote as any).update({
             where: { id: newQuote.id },
             data: { revisionGroupId: newQuote.id }
         });
+        */
 
         await logAction(userId, 'CREATE_QUOTE', 'QUOTE', newQuote.id, { quoteNumber });
 
-        return NextResponse.json(updatedQuote);
+        return NextResponse.json(newQuote);
     } catch (error) {
         console.error('Failed to create quote:', error);
         return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });

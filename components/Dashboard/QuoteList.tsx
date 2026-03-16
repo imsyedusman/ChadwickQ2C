@@ -40,6 +40,7 @@ interface Quote {
     id: string;
     quoteNumber: string;
     revision: number;
+    revisionGroupId: string | null;
     clientName: string | null;
     clientCompany: string | null;
     projectRef: string | null;
@@ -345,37 +346,35 @@ export default function QuoteList() {
     }
 
     const groupedQuotes = useMemo(() => {
-        const getBaseQuoteNumber = (num: string) => {
-            // Standard format is QYY-NNNN or QYY-NNNN-SUFFIX
-            const match = num.match(/^(Q\d{2}-\d{4})/);
-            return match ? match[1] : num;
-        };
-
         const groups: Record<string, Quote[]> = {};
+        
         filteredQuotes.forEach((q: Quote) => {
-            const base = getBaseQuoteNumber(q.quoteNumber);
-            if (!groups[base]) {
-                groups[base] = [];
+            // AUTHORITATIVE GROUPING: Use revisionGroupId if available
+            // FALLBACK (for data consistency): Strip suffix if missing (Q26-0263-A -> Q26-0263)
+            const fallbackKey = q.quoteNumber.split('-').slice(0, 2).join('-');
+            const groupId = q.revisionGroupId || fallbackKey;
+            
+            if (!groups[groupId]) {
+                groups[groupId] = [];
             }
-            groups[base].push(q);
+            groups[groupId].push(q);
         });
 
-        const result: QuoteGroup[] = Object.entries(groups).map(([baseNumber, quotesInGroup]) => {
-            // Sort by revision ascending to find the lowest (parent)
+        const result: QuoteGroup[] = Object.entries(groups).map(([groupId, quotesInGroup]) => {
+            // Sort by revision ascending: 0 (parent) always first
             const sortedByRev = [...quotesInGroup].sort((a, b) => (a.revision || 0) - (b.revision || 0));
             const parent = sortedByRev[0];
+            const children = sortedByRev.slice(1);
 
-            // All others are children, sorted by revision descending (newest first)
-            const children = sortedByRev.slice(1).sort((a, b) => (b.revision || 0) - (a.revision || 0));
-
-            // Find highest revision and latest update
+            // Highest revision strictly for the group
             const highestRevision = Math.max(...quotesInGroup.map((q: Quote) => q.revision || 0));
+            
             const latestUpdate = quotesInGroup.reduce((latest: string, q: Quote) =>
                 (new Date(q.updatedAt) > new Date(latest)) ? q.updatedAt : latest
                 , quotesInGroup[0]?.updatedAt || new Date().toISOString());
 
             return {
-                quoteNumber: baseNumber,
+                quoteNumber: parent.quoteNumber.replace(/-[A-Z]+$/, ''),
                 parent,
                 children,
                 latestUpdate,
@@ -585,31 +584,37 @@ export default function QuoteList() {
                                 {/* Parent Row */}
                                  <div
                                     className={cn(
-                                        "grid gap-0 px-6 py-5 items-center hover:bg-gray-50 transition-all cursor-pointer group animate-in fade-in slide-in-from-top-1 duration-200",
+                                        "grid gap-0 px-6 py-5 items-center hover:bg-gray-50 transition-all group animate-in fade-in slide-in-from-top-1 duration-200",
                                         !isCollapsed && group.children.length > 0 && "bg-blue-50/20"
                                     )}
                                     style={{
                                         gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                                     }}
-                                    onClick={() => router.push(`/quote/${parent.id}`)}
                                 >
-                                    {/* Quote Number */}
-                                    <div className="flex items-center gap-3 border-r border-gray-100 h-full pr-2">
+                                    {/* Quote Number - NAVIGATION TRIGGER */}
+                                    <div 
+                                        className="flex items-center gap-3 border-r border-gray-100 h-full pr-2 cursor-pointer group/nav"
+                                        onClick={() => router.push(`/quote/${parent.id}`)}
+                                    >
                                         <div className="flex items-center gap-2">
                                             {group.children.length > 0 && (
                                                 <button
-                                                    onClick={(e) => toggleGroup(e, group.quoteNumber)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        toggleGroup(e, group.parent.id);
+                                                    }}
                                                     className="p-1 hover:bg-gray-200 rounded text-gray-400 transition-all hover:scale-110 active:scale-95"
                                                 >
-                                                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                                    {collapsedGroups[group.parent.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                                                 </button>
                                             )}
                                         </div>
                                         <div>
-                                            <div className="font-bold text-gray-900 flex items-center gap-2 text-sm">
+                                            <div className="font-bold text-gray-900 flex items-center gap-2 text-sm group-hover/nav:text-blue-600 group-hover/nav:underline">
                                                 {formatQuoteNumber(parent.quoteNumber, parent.revision)}
-                                                {parent.revision === group.highestRevision && group.children.length > 0 && (
-                                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-green-500 text-white rounded-full uppercase tracking-tighter">
+                                                {/* Only show 'Latest' on parent if no children exist */}
+                                                {group.children.length === 0 && (
+                                                    <span className="text-[8px] font-black px-1.5 py-0.5 bg-green-500 text-white rounded-full uppercase tracking-tighter no-underline inline-block">
                                                         Latest
                                                     </span>
                                                 )}
@@ -906,87 +911,251 @@ export default function QuoteList() {
                                 </div>
 
                                 {/* Child Rows */}
-                                {!isCollapsed && group.children.length > 0 && (
-                                    <div className="flex flex-col bg-gray-50/20 border-t border-gray-50/50">
+                                {!collapsedGroups[group.parent.id] && group.children.length > 0 && (
+                                    <div className="flex flex-col relative">
+                                        {/* Vertical Connector Line */}
+                                        <div className="absolute left-[36px] top-0 bottom-6 w-px bg-blue-100/60 z-10" />
+                                        
                                         {group.children.map((child: Quote) => {
                                             const childTotal = child.totalIncGst || 0;
                                             return (
                                                     <div
                                                         key={child.id}
                                                         className={cn(
-                                                            "grid gap-0 px-6 py-2 items-center hover:bg-white transition-all cursor-pointer group/child border-b border-gray-50 last:border-0",
+                                                            "grid gap-0 px-6 py-3 items-center hover:bg-white transition-all group/child border-b border-gray-100 last:border-0 relative",
+                                                            child.revision === group.highestRevision && "bg-green-50/10"
                                                         )}
                                                         style={{
                                                             gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                                                         }}
-                                                        onClick={() => router.push(`/quote/${child.id}`)}
                                                     >
-                                                        <div className="flex items-center gap-3 pl-8 border-r border-gray-100 h-full py-2">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400/50" />
-                                                        <div>
-                                                            <div className="text-xs font-bold text-gray-500">
-                                                                {formatQuoteNumber(child.quoteNumber, child.revision)}
-                                                            </div>
-                                                            <div className="text-[9px] text-gray-400 font-medium">
-                                                                {format(new Date(child.updatedAt), 'dd/MM/yy HH:mm')}
+                                                        {/* Quote Number with indent and connector stub - NAVIGATION TRIGGER */}
+                                                        <div 
+                                                            className="flex items-center gap-3 pl-[32px] border-r border-gray-100 h-full py-2 relative cursor-pointer group/nav"
+                                                            onClick={() => router.push(`/quote/${child.id}`)}
+                                                        >
+                                                            {/* Horizontal branch from vertical line */}
+                                                            <div className="absolute left-[-1px] top-1/2 w-4 h-px bg-blue-100/60" />
+                                                            
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400/30 shrink-0" />
+                                                            <div>
+                                                                <div className="text-xs font-bold text-gray-600 flex items-center gap-2 group-hover/nav:text-blue-600 group-hover/nav:underline">
+                                                                    {formatQuoteNumber(child.quoteNumber, child.revision)}
+                                                                    {child.revision === group.highestRevision && (
+                                                                        <span className="text-[7px] font-black px-1 py-0.25 bg-green-500 text-white rounded-full uppercase tracking-tighter no-underline">
+                                                                            Latest
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-[9px] text-gray-400 font-medium">
+                                                                    {format(new Date(child.updatedAt), 'dd/MM/yy HH:mm')}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
+                                                        
+                                                        {/* Project Name */}
                                                         {columnVisibility.projectName && (
-                                                            <div className="text-xs text-gray-400 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2">
-                                                                {child.description || 'No description'}
+                                                            <div
+                                                                className={cn(
+                                                                    "text-xs text-gray-500 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2 group/cell",
+                                                                    editingCell?.id === child.id && editingCell?.field === 'projectName' && "bg-blue-50/50"
+                                                                )}
+                                                                onDoubleClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ id: child.id, field: 'projectName', value: child.project?.projectName || child.projectRef || '' });
+                                                                }}
+                                                            >
+                                                                {editingCell?.id === child.id && editingCell?.field === 'projectName' ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        className="w-full px-2 py-1 text-xs border-b border-blue-500 focus:outline-none bg-transparent"
+                                                                        value={editingCell.value}
+                                                                        onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') handleInlineUpdate(child.id, 'projectName', editingCell.value, child.projectId || undefined);
+                                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                                        }}
+                                                                        onBlur={() => handleInlineUpdate(child.id, 'projectName', editingCell.value, child.projectId || undefined)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="flex items-center gap-2">
+                                                                        <span className="truncate group-hover/child:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">{child.project?.projectName || child.projectRef || 'No description'}</span>
+                                                                        <Pencil size={10} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         )}
+
+                                                        {/* Client Name */}
                                                         {columnVisibility.clientName && (
-                                                            <div className="text-xs text-gray-400 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2">
-                                                                {child.project?.clientName || child.clientName || '---'}
+                                                            <div
+                                                                className={cn(
+                                                                    "text-xs text-gray-500 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2 group/cell",
+                                                                    editingCell?.id === child.id && editingCell?.field === 'clientName' && "bg-blue-50/50"
+                                                                )}
+                                                                onDoubleClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ id: child.id, field: 'clientName', value: child.project?.clientName || child.clientName || '' });
+                                                                }}
+                                                            >
+                                                                {editingCell?.id === child.id && editingCell?.field === 'clientName' ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        className="w-full px-2 py-1 text-xs border-b border-blue-500 focus:outline-none bg-transparent"
+                                                                        value={editingCell.value}
+                                                                        onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') handleInlineUpdate(child.id, 'clientName', editingCell.value);
+                                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                                        }}
+                                                                        onBlur={() => handleInlineUpdate(child.id, 'clientName', editingCell.value)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="flex items-center gap-2">
+                                                                        <span className="truncate group-hover/child:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">{child.project?.clientName || child.clientName || '---'}</span>
+                                                                        <Pencil size={10} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         )}
+
+                                                        {/* Company */}
                                                         {columnVisibility.company && (
-                                                            <div className="text-xs text-gray-400 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2">
-                                                                {child.project?.companyName || child.clientCompany || '---'}
-                                                            </div>
-                                                        )}
-                                                        {columnVisibility.projectStatus && <div className="border-r border-gray-100 h-full flex items-center" />}
-                                                        {columnVisibility.quoteStatus && (
-                                                            <div className="flex justify-center border-r border-gray-100 h-full items-center px-2">
-                                                                <span className={cn(
-                                                                    "text-[8px] font-bold px-1.5 py-0.25 rounded border uppercase tracking-tighter opacity-70",
-                                                                    getStatusDisplay(child.status).className
-                                                                )}>
-                                                                    {getStatusDisplay(child.status).label}
+                                                            <div className="text-xs text-gray-500 truncate border-r border-gray-100 h-full flex items-center pl-4 pr-2 group/cell">
+                                                                <span 
+                                                                    className="truncate hover:text-blue-600 cursor-pointer border-b border-transparent hover:border-blue-200 pb-0.5 transition-all"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setEditingCell({ id: child.id, field: 'clientCompany', value: child.project?.companyName || child.clientCompany || '' });
+                                                                    }}
+                                                                >
+                                                                    {child.project?.companyName || child.clientCompany || '---'}
                                                                 </span>
                                                             </div>
                                                         )}
+
+                                                        {/* Project Status */}
+                                                        {columnVisibility.projectStatus && (
+                                                            <div className="flex justify-center border-r border-gray-100 h-full items-center px-2" onClick={(e) => e.stopPropagation()}>
+                                                                {child.projectId ? (
+                                                                    <Select
+                                                                        value={child.project?.projectStatus}
+                                                                        onValueChange={(val) => handleInlineUpdate(child.id, 'projectStatus', val, child.projectId!)}
+                                                                    >
+                                                                        <SelectTrigger className={cn(
+                                                                            "h-6 px-1.5 text-[8px] font-bold rounded border uppercase tracking-tighter w-[70px]",
+                                                                            getProjectStatusDisplay(child.project!.projectStatus).className
+                                                                        )} onClick={(e) => e.stopPropagation()}>
+                                                                            <SelectValue />
+                                                                        </SelectTrigger>
+                                                                        <SelectContent className="rounded-xl">
+                                                                            <SelectItem value="Budget">Budget</SelectItem>
+                                                                            <SelectItem value="Tender">Tender</SelectItem>
+                                                                            <SelectItem value="Live">Live</SelectItem>
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                ) : (
+                                                                    <div className="text-[8px] font-bold px-1.5 py-0.5 rounded border border-gray-100 text-gray-400 uppercase tracking-tighter bg-gray-50/50">
+                                                                        Legacy
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Quote Status */}
+                                                        {columnVisibility.quoteStatus && (
+                                                            <div className="flex justify-center border-r border-gray-100 h-full items-center px-2" onClick={(e) => e.stopPropagation()}>
+                                                                <Select
+                                                                    value={child.status}
+                                                                    onValueChange={(val) => handleInlineUpdate(child.id, 'status', val)}
+                                                                >
+                                                                    <SelectTrigger className={cn(
+                                                                        "h-6 px-1.5 text-[8px] font-bold rounded border uppercase tracking-tighter w-[70px]",
+                                                                        getStatusDisplay(child.status).className
+                                                                    )} onClick={(e) => e.stopPropagation()}>
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent className="rounded-xl">
+                                                                        <SelectItem value="DRAFT">Draft</SelectItem>
+                                                                        <SelectItem value="SENT">Sent</SelectItem>
+                                                                        <SelectItem value="WON">Won</SelectItem>
+                                                                        <SelectItem value="LOST">Lost</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Total */}
                                                         {columnVisibility.total && (
-                                                            <div className="text-right text-xs font-bold text-gray-400 border-r border-gray-100 h-full flex items-center justify-end pr-4">
+                                                            <div className="text-right text-xs font-bold text-gray-600 border-r border-gray-100 h-full flex items-center justify-end pr-4">
                                                                 ${childTotal.toLocaleString()}
                                                             </div>
                                                         )}
+
+                                                        {/* Internal Notes */}
                                                         {columnVisibility.internalNotes && (
-                                                            <div className="text-[10px] text-gray-400 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2 bg-gray-50/30 mx-2">
-                                                                {child.gridInternalNotes}
+                                                            <div
+                                                                className="text-[10px] text-gray-400 truncate italic border-r border-gray-100 h-full flex items-center pl-4 pr-2 bg-gray-50/10 mx-2 group/cell cursor-text"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setEditingCell({ id: child.id, field: 'gridInternalNotes', value: child.gridInternalNotes || '' });
+                                                                }}
+                                                            >
+                                                                {editingCell?.id === child.id && editingCell?.field === 'gridInternalNotes' ? (
+                                                                    <input
+                                                                        autoFocus
+                                                                        className="w-full px-2 py-1 text-[10px] border border-blue-500 rounded focus:outline-none bg-white font-normal non-italic"
+                                                                        value={editingCell.value}
+                                                                        onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter') handleInlineUpdate(child.id, 'gridInternalNotes', editingCell.value);
+                                                                            if (e.key === 'Escape') setEditingCell(null);
+                                                                        }}
+                                                                        onBlur={() => handleInlineUpdate(child.id, 'gridInternalNotes', editingCell.value)}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    />
+                                                                ) : (
+                                                                    <span className="truncate">{child.gridInternalNotes || <span className="text-gray-200">...</span>}</span>
+                                                                )}
                                                             </div>
                                                         )}
-                                                    {columnVisibility.activity && (
-                                                        <div className="pl-4 flex items-center gap-2 opacity-50">
-                                                            <div className="w-4 h-4 rounded-full bg-gray-100 flex items-center justify-center text-[8px] font-bold text-gray-500">
-                                                                {getInitials(child.modifier?.name || child.creator?.name, child.modifier?.email || child.creator?.email)}
+
+                                                        {/* Activity */}
+                                                        {columnVisibility.activity && (
+                                                            <div className="pl-4 flex items-center gap-2 opacity-70">
+                                                                <div className="w-4 h-4 rounded-full bg-blue-50 flex items-center justify-center text-[8px] font-bold text-blue-600 border border-blue-100">
+                                                                    {getInitials(child.modifier?.name || child.creator?.name, child.modifier?.email || child.creator?.email)}
+                                                                </div>
+                                                                <span className="text-[8px] text-gray-400">
+                                                                    {formatDistanceToNow(new Date(child.updatedAt), { addSuffix: true }).replace('about ', '')}
+                                                                </span>
                                                             </div>
-                                                            <span className="text-[8px] text-gray-400">
-                                                                {formatDistanceToNow(new Date(child.updatedAt), { addSuffix: true }).replace('about ', '')}
-                                                            </span>
+                                                        )}
+
+                                                        {/* Actions */}
+                                                        <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-gray-100 rounded-lg text-gray-400 flex items-center justify-center transition-colors">
+                                                                        <MoreHorizontal size={14} />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
+                                                                    <DropdownMenuItem onClick={(e) => handleDuplicate(e, child.id)} className="rounded-md gap-3 py-2">
+                                                                        <Copy size={16} className="text-blue-500" />
+                                                                        Duplicate Version
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator className="my-1" />
+                                                                    <DropdownMenuItem onClick={(e) => handleDelete(e, child.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50">
+                                                                        <Trash2 size={16} />
+                                                                        Move to Trash
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
                                                         </div>
-                                                    )}
-                                                    <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-                                                        <button
-                                                            onClick={(e) => handleDelete(e, child.id)}
-                                                            className="p-1 px-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded text-[9px] font-bold uppercase tracking-wider transition-colors"
-                                                        >
-                                                            Delete
-                                                        </button>
                                                     </div>
-                                                </div>
                                             );
                                         })}
                                     </div>

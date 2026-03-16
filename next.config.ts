@@ -7,3 +7,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+// Restarting dev server to release Prisma lock

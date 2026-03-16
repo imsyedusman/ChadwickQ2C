@@ -397,6 +397,16 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const updateItem = async (itemId: string, updates: Partial<Item>) => {
+        // Optimistic Update
+        const previousBoards = JSON.parse(JSON.stringify(boards));
+        
+        setBoards(prev => prev.map(board => ({
+            ...board,
+            items: board.items.map(item => 
+                item.id === itemId ? { ...item, ...updates } : item
+            )
+        })));
+
         try {
             const res = await fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
                 method: 'PUT',
@@ -404,25 +414,40 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 body: JSON.stringify(updates),
             });
 
-            if (res.ok) {
-                await fetchQuoteData();
-            }
+            if (!res.ok) throw new Error('Failed to update item');
+            
+            // Optionally re-fetch to ensure sync, but the local state is already advanced
+            // await fetchQuoteData(); 
         } catch (error) {
             console.error('Failed to update item', error);
+            // Rollback
+            setBoards(previousBoards);
+            alert('Failed to update item. Restored previous state.');
         }
     };
 
     const removeItem = async (itemId: string) => {
+        // Optimistic Update
+        const previousBoards = JSON.parse(JSON.stringify(boards));
+
+        setBoards(prev => prev.map(board => ({
+            ...board,
+            items: board.items.filter(item => item.id !== itemId)
+        })));
+
         try {
             const res = await fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
                 method: 'DELETE',
             });
 
-            if (res.ok) {
-                await fetchQuoteData();
-            }
+            if (!res.ok) throw new Error('Failed to remove item');
+            
+            // await fetchQuoteData();
         } catch (error) {
             console.error('Failed to remove item', error);
+            // Rollback
+            setBoards(previousBoards);
+            alert('Failed to remove item. Restored previous state.');
         }
     };
 

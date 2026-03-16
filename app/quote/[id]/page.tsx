@@ -99,8 +99,9 @@ function QuoteBuilderContent() {
                             <span className="text-xs uppercase tracking-wider font-semibold">Quote</span>
                         </div>
 
-                        {/* Quote No */}
-                        <div className="font-bold text-gray-900">{formattedQuoteNumber || 'Q-...'}</div>
+                        <div className="flex items-center gap-2">
+                            <div className="font-bold text-gray-900">{formattedQuoteNumber || 'Q-...'}</div>
+                        </div>
                         <div className="h-4 w-px bg-gray-200" />
 
                         {/* Client */}
@@ -165,17 +166,24 @@ function QuoteBuilderContent() {
                                 <ChevronUp size={16} />
                             </button>
 
-                            <div className="group relative">
-                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                                    Quote No
-                                </label>
-                                <input
-                                    type="text"
-                                    value={quoteNumber ?? ""}
-                                    onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
-                                    className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
-                                    placeholder="Q-..."
-                                />
+                            <div className="group relative flex items-center gap-3 pr-4">
+                                <div className="relative">
+                                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                        Quote No
+                                    </label>
+                                    <div className="flex items-baseline">
+                                        <input
+                                            type="text"
+                                            value={quoteNumber ?? ""}
+                                            onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
+                                            className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
+                                            placeholder="Q-..."
+                                        />
+                                        {formattedQuoteNumber && formattedQuoteNumber.includes('-') && (
+                                            <span className="text-xl font-bold text-gray-400">-{formattedQuoteNumber.split('-').pop()}</span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="h-8 w-px bg-gray-200" />

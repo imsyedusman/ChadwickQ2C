@@ -59,9 +59,10 @@ export async function POST(
                 data: {
                     quoteNumber: newFullQuoteNumber,
                     revision: newRevision,
-                    revisionGroupId: (originalQuote as any).revisionGroupId || originalQuote.id,
+                    // revisionGroupId: (originalQuote as any).revisionGroupId || originalQuote.id,
                     clientName: originalQuote.clientName,
                     clientCompany: originalQuote.clientCompany,
+                    projectId: originalQuote.projectId, // Keep variants in the same project
                     projectRef: `${originalQuote.projectRef} (Copy)`,
                     description: originalQuote.description,
                     status: 'DRAFT',

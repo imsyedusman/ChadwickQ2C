@@ -81,8 +81,8 @@ export default function ManualItemForm({ initialData, onSave, onCancel, isEditin
 
     return (
         <form onSubmit={handleSubmit} className={cn(
-            "bg-white border-blue-200 shadow-sm transition-all flex flex-col gap-3",
-            isEditing ? "rounded p-3" : "rounded-lg p-4 mb-4 border"
+            "bg-white transition-all flex flex-col gap-3",
+            isEditing ? "p-4 border-y border-blue-50 shadow-none bg-blue-50/10" : "rounded-lg p-4 mb-4 border border-blue-200 shadow-sm"
         )}>
             {/* Item Type Toggle & Helper */}
             <div className="flex flex-col gap-2">

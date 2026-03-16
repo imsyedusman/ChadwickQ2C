@@ -200,7 +200,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
 
         if (editingItemId === item.id) {
             return (
-                <div key={item.id} className="p-4 border-b border-gray-100 bg-blue-50/30">
+                <div key={item.id} className="p-0 border-b border-blue-100 bg-blue-50/5 transition-all duration-200 min-h-[140px] flex flex-col justify-center">
                     <ManualItemForm
                         isEditing
                         initialData={{
