@@ -399,13 +399,18 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const updateItem = async (itemId: string, updates: Partial<Item>) => {
         // Optimistic Update
         const previousBoards = JSON.parse(JSON.stringify(boards));
-        
-        setBoards(prev => prev.map(board => ({
-            ...board,
-            items: board.items.map(item => 
-                item.id === itemId ? { ...item, ...updates } : item
-            )
-        })));
+        let boardId: string | null = null;
+
+        setBoards(prev => prev.map(board => {
+            const hasItem = board.items.some(item => item.id === itemId);
+            if (hasItem) boardId = board.id;
+            return {
+                ...board,
+                items: board.items.map(item =>
+                    item.id === itemId ? { ...item, ...updates } : item
+                )
+            };
+        }));
 
         try {
             const res = await fetch(`/api/quotes/${quoteId}/items/${itemId}`, {
@@ -415,9 +420,15 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
 
             if (!res.ok) throw new Error('Failed to update item');
-            
-            // Optionally re-fetch to ensure sync, but the local state is already advanced
-            // await fetchQuoteData(); 
+
+            // Consume the returned items array (includes GC automation items)
+            const data = await res.json();
+            if (Array.isArray(data) && boardId) {
+                const finalBoardId = boardId;
+                setBoards(prev => prev.map(b =>
+                    b.id === finalBoardId ? { ...b, items: data } : b
+                ));
+            }
         } catch (error) {
             console.error('Failed to update item', error);
             // Rollback

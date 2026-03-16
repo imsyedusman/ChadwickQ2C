@@ -84,6 +84,13 @@ export async function PUT(
             await AutomationService.applyAtsRules(freshItem.boardId);
         }
 
+        // Hook: General Control Automation
+        // Fires whenever any Switchboard item qty is updated
+        if (freshItem?.boardId) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyGeneralControlRules(freshItem.boardId);
+        }
+
         // Hook: MCCB Trip Base Pairing (Update)
         // Run sync if item is Switchboard (covers Trip and Base) to ensure quantity sync
         if (freshItem?.category === 'Switchboard') {
@@ -207,6 +214,9 @@ export async function DELETE(
         if (item?.category === 'Switchboard' || item?.partNumber) {
             await AutomationService.applyAtsRules(boardId);
         }
+
+        // Hook: General Control Automation (Post-Delete)
+        await AutomationService.applyGeneralControlRules(boardId);
 
         // Return the full updated list of items to ensure frontend is in sync
         const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');

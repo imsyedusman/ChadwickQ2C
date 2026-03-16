@@ -134,6 +134,12 @@ export async function POST(
             }
         }
 
+        // Hook: General Control Automation (fires on any item add to board)
+        {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyGeneralControlRules(boardId);
+        }
+
         return NextResponse.json(newItem);
     } catch (error) {
         console.error('Failed to create/update item:', error);

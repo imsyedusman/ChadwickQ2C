@@ -72,6 +72,34 @@ export const ATS_ACCESSORIES = {
     BUSBAR_400: 'LV432620'
 } as const;
 
+export const GENERAL_CONTROL_SKUS = {
+    FUSE: 'CHD-FUSE-20A-DIN',
+    WIRING: 'CHD-WIRING-CONTROL'
+} as const;
+
+export const GENERAL_CONTROL_WIRING_MAP: Record<string, number> = {
+    'PBELKIT4': 0,
+    'CHD-GC-EM-LIGHT-KIT': 0,
+    'A9C20134': 10,
+    'CHD-GC-4NC-CONTACTOR': 10,
+    'CHD-GC-LIGHT-CONTACTOR-23A': 10,
+    'CCT15854': 4,
+    'CHD-GC-TIME-1CH': 4,
+    'CCT15443': 6,
+    'CHD-GC-TIME-2CH': 6,
+    'CCT15940': 10,
+    'CHD-GC-TIME-4CH': 10,
+    'CCT15369': 6,
+    'CHD-GC-PE-PROVISION': 6,
+    'XB4BD33': 6,
+    'CHD-GC-BYPASS': 6,
+    'CHD-GC-RELAY-4P': 10,
+    'RM17TG00': 6,
+    'CHD-GC-PFR': 6,
+    'XB5AVM4': 2,
+    'CHD-GC-LED-IND': 2
+};
+
 export interface SystemRuleMetadata {
     id: string;
     handler: string;
@@ -136,6 +164,12 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
         handler: 'syncBoardItems',
         reason: 'Required for Digital Metering.',
         quantityExplanation: 'Scaled strictly based on the number of Digital Meters on the board.'
+    },
+    'GENERAL_CONTROL_AUTOMATION': {
+        id: 'GENERAL_CONTROL_AUTOMATION',
+        handler: 'applyGeneralControlRules',
+        reason: 'Adds control circuits (fuse + wiring) for identified General Control items.',
+        quantityExplanation: 'Fuse qty = Total items. Wiring qty = Sum(qty * wires-per-unit).'
     }
 };
 
@@ -169,6 +203,10 @@ export class AutomationService {
             // 4. MCCB Accessories (Handles/Shields)
             console.log(`[Automation Pipeline] 4. Syncing MCCB Accessories`);
             await this.syncBoardAccessories(boardId);
+
+            // 5. General Control Automation
+            console.log(`[Automation Pipeline] 5. Applying General Control Rules`);
+            await this.applyGeneralControlRules(boardId);
 
             console.log(`[Automation Pipeline] Reconciliation Complete for board ${boardId}`);
         } catch (error) {
@@ -825,15 +863,123 @@ export class AutomationService {
                 }
             }
         }
+    }
 
-        // B. Cleanup (Remove unused)
-        for (const item of systemItems) {
-            const part = (item as any).partNumber;
-            if (!requirements.has(part)) {
-                await prisma.item.delete({
-                    where: { id: item.id }
-                });
-            }
+    /**
+     * Applies General Control Automation Rules.
+     * Calculates required Fuse and Wiring quantities based on selectable GC items.
+     * Idempotent and transaction-safe.
+     */
+    static async applyGeneralControlRules(boardId: string) {
+        const SYSTEM_TAG = 'GENERAL_CONTROL';
+
+        // 1. Fetch Board Items
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+
+        if (!board) return;
+
+        const items = board.items;
+
+        // 2. Identify Selectable General Control Items
+        // Source Group: category="Switchboard", subcategory contains "General Control"
+        // EXCLUDE: Auto-added fuse/wiring items (by SKU)
+        const selectableItems = items.filter(i => 
+            i.category === 'Switchboard' && 
+            (i.subcategory || '').includes('General Control') &&
+            i.partNumber !== GENERAL_CONTROL_SKUS.FUSE &&
+            i.partNumber !== GENERAL_CONTROL_SKUS.WIRING
+        );
+
+        console.log(`[GC Automation] Board ${boardId} — Found ${selectableItems.length} selectable GC items:`,
+            selectableItems.map(i => `${i.partNumber}(qty=${i.quantity})`));
+
+        // 3. Calculate Requirements
+        let totalQty = 0;
+        let totalWires = 0;
+
+        for (const item of selectableItems) {
+            const qty = Number(item.quantity) || 0;
+            totalQty += qty;
+
+            const wiresPerUnit = GENERAL_CONTROL_WIRING_MAP[item.partNumber || ''] ?? 0;
+            totalWires += (qty * wiresPerUnit);
         }
+
+        console.log(`[GC Automation] FuseQty=${totalQty}, WireQty=${totalWires}`);
+
+        const requirements = new Map<string, number>();
+        if (totalQty > 0) requirements.set(GENERAL_CONTROL_SKUS.FUSE, totalQty);
+        if (totalWires > 0) requirements.set(GENERAL_CONTROL_SKUS.WIRING, totalWires);
+
+        // 4. Sync System Items
+        // Detect managed items by: systemTag match OR known GC output SKU
+        // (catches items created before the systemTag was in place)
+        const GC_OUTPUT_SKUS = new Set<string>([GENERAL_CONTROL_SKUS.FUSE, GENERAL_CONTROL_SKUS.WIRING]);
+        const systemItems = items.filter(i =>
+            i.isSystemManaged &&
+            ((i as any).systemTag === SYSTEM_TAG || GC_OUTPUT_SKUS.has(i.partNumber || ''))
+        );
+
+        await prisma.$transaction(async (tx) => {
+            // A. Update or Create
+            for (const [partNumber, qty] of requirements.entries()) {
+                const existing = systemItems.find(i => i.partNumber === partNumber);
+
+                if (existing) {
+                    // Update only if quantity changed (Idempotency)
+                    if (Number(existing.quantity) !== qty) {
+                        await tx.item.update({
+                            where: { id: existing.id },
+                            data: {
+                                quantity: qty,
+                                cost: Number(existing.unitPrice) * qty
+                            }
+                        });
+                        console.log(`[GC Automation] Updated ${partNumber} to Qty ${qty}`);
+                    }
+                } else {
+                    // Create New from Catalog
+                    const catalogItem = await tx.catalogItem.findFirst({
+                        where: { partNumber: partNumber }
+                    });
+
+                    if (catalogItem) {
+                        await tx.item.create({
+                            data: {
+                                boardId,
+                                category: catalogItem.category || 'Switchboard',
+                                subcategory: catalogItem.subcategory || 'Miscellaneous',
+                                name: catalogItem.partNumber || partNumber,
+                                partNumber,
+                                description: catalogItem.description,
+                                unitPrice: catalogItem.unitPrice,
+                                labourHours: catalogItem.labourHours,
+                                quantity: qty,
+                                cost: Number(catalogItem.unitPrice) * qty,
+                                isSystemManaged: true,
+                                autoAdded: true,
+                                systemTag: SYSTEM_TAG,
+                                systemRuleType: 'GENERAL_CONTROL_AUTOMATION',
+                                notes: 'System Managed'
+                            } as any
+                        });
+                        console.log(`[GC Automation] Created ${partNumber} (Qty ${qty})`);
+                    } else {
+                        console.error(`[GC Automation] Missing Catalog Item for auto-required: ${partNumber}`);
+                    }
+                }
+            }
+
+            // B. Cleanup (Remove if no longer required)
+            for (const item of systemItems) {
+                if (!requirements.has(item.partNumber || '')) {
+                    await tx.item.delete({ where: { id: item.id } });
+                    console.log(`[GC Automation] Removed orphaned item ${item.partNumber}`);
+                }
+            }
+        });
     }
 }

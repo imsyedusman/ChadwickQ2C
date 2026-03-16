@@ -35,18 +35,25 @@ export async function POST(
         });
 
         if (existingItem) {
-            // Item already exists - increment quantity instead of creating duplicate
-            const newQuantity = existingItem.quantity + (quantity || 1);
-            const updatedItem = await prisma.item.update({
+            // Item already exists - update to the user's requested quantity (set, not increment)
+            const newQuantity = quantity || 1;
+            await prisma.item.update({
                 where: { id: existingItem.id },
                 data: {
                     quantity: newQuantity,
                     cost: newQuantity * existingItem.unitPrice,
-                    isSheetmetal: isSheetmetal // Update flag in case it changed in catalog
+                    isSheetmetal: isSheetmetal
                 },
             });
 
-            return NextResponse.json(updatedItem);
+            // Hook: General Control Automation (must run even on update path)
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyGeneralControlRules(boardId);
+
+            // Return full enriched item list so UI picks up auto-created fuse/wiring items
+            const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
+            const allItems = await fetchEnrichedBoardItems(boardId);
+            return NextResponse.json(allItems);
         }
 
         if (catalogItem) {
@@ -160,6 +167,12 @@ export async function POST(
         if (newItem.category === 'Switchboard' || newItem.partNumber) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyAtsRules(boardId);
+        }
+
+        // Hook: General Control Automation
+        if (boardId) {
+            const { AutomationService } = await import('@/lib/automation');
+            await AutomationService.applyGeneralControlRules(boardId);
         }
 
         // Return the full updated list of items for the board to ensure frontend is in sync
