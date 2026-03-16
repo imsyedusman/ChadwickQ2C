@@ -31,6 +31,7 @@ export async function PUT(
                 name: name !== undefined ? name : undefined,
                 description: description !== undefined ? description : undefined,
                 cost: newCost,
+                isSystemManaged: (quantity !== undefined || unitPrice !== undefined) ? false : undefined,
             },
         });
 
@@ -122,31 +123,18 @@ export async function DELETE(
             select: { name: true, boardId: true, category: true, productFrame: true, partNumber: true }
         });
 
-        // Enforce MCCB Accessory Rules (Server-Side)
+        // Check if it's a handle that needs an override persisted
         const { getAccessoryType, getAccessoryFrame } = await import('@/lib/automation');
-
-        const accessoryType = getAccessoryType(item?.name || '');
-
-        if (accessoryType === 'SHIELD') {
-            return NextResponse.json({ error: 'Terminal Shields cannot be manually deleted.' }, { status: 400 });
+        if (!item) {
+            return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
+
+        const accessoryType = getAccessoryType(item.name);
 
         if (accessoryType === 'HANDLE') {
             const frame = getAccessoryFrame(item?.name || '');
-
-            // Allow delete ONLY for NSX100-250 (LV429338T)
-            // Block all others
-            if (item?.name !== 'LV429338T') {
-                return NextResponse.json({ error: 'This Rotary Handle is system-managed and cannot be deleted.' }, { status: 400 });
-            }
-
-            // If it IS LV429338T, we allow delete BUT we must persist an override
-            // so automation doesn't add it back.
-            // We append 'NSX100-250' to the board's disabled frames list in settings.
             if (frame === 'NSX100-250') {
                 const boardId = item.boardId;
-
-                // Fetch current settings
                 const quoteReq = await prisma.board.findUnique({
                     where: { id: boardId },
                     select: { quote: { select: { id: true, settingsSnapshot: true } } }
@@ -165,8 +153,6 @@ export async function DELETE(
 
                     if (!currentDisabled.includes('NSX100-250')) {
                         settings.mccbOverrides[boardId].disableRotaryHandleFrames = [...currentDisabled, 'NSX100-250'];
-
-                        // Save back to Quote
                         await prisma.quote.update({
                             where: { id: quoteReq.quote.id },
                             data: { settingsSnapshot: JSON.stringify(settings) }
@@ -195,37 +181,41 @@ export async function DELETE(
             }
         }
 
-        // Hook: MCCB Accessory Automation (Post-Delete)
-        // If we just deleted a breaker, we need to sync.
-        // If we deleted an accessory (only allowed for NSX100 handle), we do NOT sync immediately to avoid re-creation loop logic? 
-        // actually syncBoardAccessories respects overrides now, so it's safe to run.
-        if (item?.productFrame || (item?.name && ['LV429338T', 'LV432598T', '33873'].includes(item.name))) {
-            const { AutomationService } = await import('@/lib/automation');
-            await AutomationService.syncBoardAccessories(item.boardId);
+        const boardId = item?.boardId;
+        if (!boardId) {
+            return NextResponse.json({ success: true }); // Fallback if item was missing
         }
+
+        // Hook: MCCB Accessory Automation (Post-Delete)
+        // syncBoardAccessories now handles 1:1 and cleanup of orphans
+        const { AutomationService } = await import('@/lib/automation');
+        await AutomationService.syncBoardAccessories(boardId);
 
         // Hook: MCCB Trip Base Pairing (Post-Delete)
         if (item?.category === 'Switchboard') {
-            const { AutomationService } = await import('@/lib/automation');
-            await AutomationService.syncMccbTripBasePairs(item.boardId);
+            await AutomationService.syncMccbTripBasePairs(boardId);
 
             // Hook: Generic Pairing Automation (MCB Chassis -> Link) - Post Delete
-            // If we deleted a chassis, we must recalc links.
-            // Check if name/partNumber started with SAU or category is Switchboard
             const mightBeChassis = (item?.name?.startsWith('SAU') || item?.category === 'Switchboard');
             if (mightBeChassis) {
-                const { warnings } = await AutomationService.applyPairingRules(item.boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
+                const { warnings } = await AutomationService.applyPairingRules(boardId, 'MCB_CHASSIS_TO_NE_LINK_165A');
                 if (warnings.length > 0) console.warn(`[API] Pairing Warnings (Delete): ${warnings.join(', ')}`);
             }
         }
 
         // Hook: ATS Accessory Automation (Post-Delete)
         if (item?.category === 'Switchboard' || item?.partNumber) {
-            const { AutomationService } = await import('@/lib/automation');
-            await AutomationService.applyAtsRules(item.boardId);
+            await AutomationService.applyAtsRules(boardId);
         }
 
-        return NextResponse.json({ success: true });
+        // Return the full updated list of items to ensure frontend is in sync
+        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
+        const allItems = await fetchEnrichedBoardItems(boardId);
+
+        return NextResponse.json({
+            success: true,
+            items: allItems
+        });
     } catch (error) {
         console.error('Failed to delete item', error);
         return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 });

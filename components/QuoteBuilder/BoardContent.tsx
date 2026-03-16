@@ -229,31 +229,31 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             );
         }
 
-        // Use database flag for system management, fallback to name-check only if necessary (or remove legacy check)
-        let isAuto = item.isSystemManaged || isAutoManaged(item.name) || item.isDefault;
-
+        // Use database flag for system management, fallback to name-check only if necessary
+        let isAuto = item.isSystemManaged || (item as any).autoAdded || isAutoManaged(item.name) || item.isDefault;
 
         const autoManaged = isAuto;
         const formulaPriced = isFormulaPriced(item.name);
 
         // Lock Logic:
-        // 1. Qty is always locked if autoManaged.
-        // 2. Delete is locked if autoManaged UNLESS it's the specific NSX100 Handle (LV429338T).
-        // 3. Delete is ALWAYS locked for Shields (LV429517, LV432593, 33628) - explicitly checked for safety.
-
+        // 1. Qty is locked for system items UNLESS they were auto-added (accessories).
+        // 2. Delete is locked similarly.
+        
         const isShield = ['LV429517', 'LV432593', '33628'].includes(item.name);
-        // Explicitly allowed handle (NSX100-250)
         const isNSX100Handle = item.name === 'LV429338T';
         const isOtherHandle = ['LV432598T', '33873'].includes(item.name);
 
-        const isQtyLocked = !!autoManaged;
-        const isDeleteLocked = isShield || (!!autoManaged && !isNSX100Handle);
+        // Relax locks for newly introduced autoAdded items (MCCB Accessories)
+        const isAutoAccessory = (item as any).autoAdded === true || item.systemTag === 'MCCB_ACCESSORIES';
+        
+        const isQtyLocked = !!autoManaged && !isAutoAccessory;
+        const isDeleteLocked = !!autoManaged && !isAutoAccessory;
 
         // Determine Tooltip Text
         let lockTooltip = "";
-        if (isShield) lockTooltip = "Auto included. Quantity = 2 per breaker. Required by standard.";
-        else if (isOtherHandle) lockTooltip = "Auto included. Quantity = 1 per breaker. Required for this breaker frame.";
-        else if (isNSX100Handle) lockTooltip = "Optional for this breaker range. Can be excluded if not required."; // Though this won't show lock icon, we put it on Auto badge
+        if (isShield) lockTooltip = "Auto included (2 per breaker).";
+        else if (isOtherHandle) lockTooltip = "Auto included (1 per breaker).";
+        else if (isNSX100Handle) lockTooltip = "Optional handle. Can be excluded.";
 
         // Determine Pricing Method
         // 1. Dynamic Copper Pricing (Highest Priority for Busbars)
@@ -275,6 +275,11 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             displayUnitPrice = copperResult.unitPrice;
             displayTotalPrice = copperResult.totalPrice;
             isCopper = true;
+        }
+
+        if (Number(item.quantity) === 0) {
+            displayUnitPrice = 0;
+            displayTotalPrice = 0;
         }
 
         return (
@@ -426,21 +431,11 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </div>
                 </div>
 
-                {/* Actions: Toggle for NSX100 Handle, Lock for others */}
-                {isNSX100Handle ? (
+                {/* Actions: Delete locked for auto-added if not manual */}
+                {isAutoAccessory || isNSX100Handle ? (
                     <div className="flex items-center gap-2 px-2" title={lockTooltip}>
-                        <span className="text-xs text-gray-400">Include</span>
-                        {/* Toggle Switch */}
-                        <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={true} // Always ON if it exists in list
-                                onChange={() => toggleNSX100Handle(true)} // Disable
-                            />
-                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
-                        </label>
-                        {/* Hidden Trash Spacer to keep alignment */}
+                        {/* No toggle anymore, just a placeholder or spacer */}
+                        <div className="w-9 h-5" />
                     </div>
                 ) : (
                     <SystemItemHoverCard item={item} boardItems={items}>

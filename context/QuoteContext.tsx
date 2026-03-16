@@ -427,6 +427,16 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const removeItem = async (itemId: string) => {
+        // Find which board this item belongs to BEFORE deleting it from state
+        // This ensures we know which board to update with the refreshed items
+        let boardId: string | null = null;
+        for (const board of boards) {
+            if (board.items.some(i => i.id === itemId)) {
+                boardId = board.id;
+                break;
+            }
+        }
+
         // Optimistic Update
         const previousBoards = JSON.parse(JSON.stringify(boards));
 
@@ -442,7 +452,21 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
             if (!res.ok) throw new Error('Failed to remove item');
             
-            // await fetchQuoteData();
+            const data = await res.json();
+            // Data structure is { success: true, items: [...] }
+            if (data.success && Array.isArray(data.items)) {
+                setBoards(prev => prev.map(b => {
+                    // Update the specific board we identified earlier
+                    if (boardId && b.id === boardId) {
+                        return { ...b, items: data.items };
+                    }
+                    // Fallback: If we couldn't identify the board or it's cross-item board refresh
+                    if (!boardId && b.items.some(i => i.id === itemId)) {
+                        return { ...b, items: data.items };
+                    }
+                    return b;
+                }));
+            }
         } catch (error) {
             console.error('Failed to remove item', error);
             // Rollback

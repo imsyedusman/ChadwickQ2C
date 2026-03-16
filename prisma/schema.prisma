@@ -245,6 +245,7 @@ model Item {
   updatedAt   DateTime @updatedAt
 
   isSystemManaged Boolean @default(false)
+  autoAdded       Boolean @default(false)
   systemTag       String?  // e.g. "MCCB_ACCESSORIES", "MCCB_TRIP_BASE"
   partNumber      String?
   productFrame    String? // e.g. "NSX100-250", "NSX400-630"
@@ -253,7 +254,12 @@ model Item {
   // Automation Provenance
   systemRuleType  String? // e.g. "MCB_CHASSIS_TO_NE_LINK_165A"
 
-  @@unique([boardId, systemRuleType, partNumber])
+  // 1:1 Relationship
+  parentItemId    String?
+  parentItem      Item?    @relation("ItemDependencies", fields: [parentItemId], references: [id], onDelete: Cascade)
+  children        Item[]   @relation("ItemDependencies")
+
+  @@unique([boardId, systemRuleType, partNumber, parentItemId])
 }
 
 model CatalogItem {
