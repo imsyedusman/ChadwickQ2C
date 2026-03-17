@@ -42,7 +42,9 @@ export async function POST(
                 data: {
                     quantity: newQuantity,
                     cost: newQuantity * existingItem.unitPrice,
-                    isSheetmetal: isSheetmetal
+                    isSheetmetal: isSheetmetal,
+                    // Ensure partNumber is backfilled if found in catalog
+                    partNumber: existingItem.partNumber || catalogItem?.partNumber || null
                 },
             });
 

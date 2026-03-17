@@ -906,12 +906,10 @@ export class AutomationService {
         if (totalWires > 0) requirements.set(GENERAL_CONTROL_SKUS.WIRING, totalWires);
 
         // 4. Sync System Items
-        // Detect managed items by: systemTag match OR known GC output SKU
-        // (catches items created before the systemTag was in place)
-        const GC_OUTPUT_SKUS = new Set<string>([GENERAL_CONTROL_SKUS.FUSE, GENERAL_CONTROL_SKUS.WIRING]);
+        // Detect managed items STRICTLY by: systemTag match
+        // DO NOT rely on SKUs like CHD-FUSE-20A-DIN as they are shared with other automations.
         const systemItems = items.filter(i =>
-            i.isSystemManaged &&
-            ((i as any).systemTag === SYSTEM_TAG || GC_OUTPUT_SKUS.has(i.partNumber || ''))
+            i.isSystemManaged && (i as any).systemTag === SYSTEM_TAG
         );
 
         await prisma.$transaction(async (tx) => {

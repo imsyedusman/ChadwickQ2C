@@ -68,7 +68,27 @@ const DIGITAL_METER_PARTS = [
     'A9MEM3155', 'A9MEM3355', 'A9MEM3255', 'METSEPM3250', 'METSEPM5110',
     'METSEPM5350', 'METSEPM5560', 'METSEPM8240', 'EM2172RVV53XOSX',
     'EM24DINAV93XISX', 'EM24DINAV53DISX', 'MF72421', 'NEMO96HD1000',
-    'NEMO96HD1300', 'EM27072DMV53X2SN', '48250402', '48250500', '48250501'
+    'NEMO96HD1300', 'EM27072DMV53X2SN', '48250402', '48250500', '48250501',
+    '48290505', '48290200', '48290504', '48290101', '48290102', '48290506',
+    '48290204', '48290105', '48290106', '48290110', '48290111', '48290128',
+    '48290130', '48290500', '48290501', '48290502', '48290503', '48290112',
+    '15197', '17066', 'A9N15636', 'METSEPM2220', 'METSEPM2220R', 'METSEPM2230',
+    'METSEPM3200', 'METSEPM3210', 'METSEPM3255', 'METSEPM5310', 'METSEPM5310R',
+    'METSEPM5320', 'METSEPM5320R', 'METSEPM5330', 'METSEPM5340', 'METSEPM5350P',
+    'METSEPM5563', 'METSEPM5563RD', 'METSEPM5580', 'METSEPM8210', 'METSEPM8213',
+    'METSEPM8214', 'METSEEMD461R', 'METSEPM8240-NMI', 'METSEPM8240DEMO',
+    'METSEPM8243', 'METSEPM8244', 'METSEPM8244-NMI', 'LV434001', 'LV434002',
+    'LV434201', 'LV434205', 'LV454444', 'TRV00217', 'A9MEM3165', 'PM820UMG',
+    'PM850UMG', 'FSR2DK2X05A', 'H8163-0800-4-3', 'H8186-CB', 'LV434000',
+    'A9MEM1520', 'A9MEM1521', 'A9MEM1522', 'A9MEM1540', 'A9MEM1541', 'A9MEM1542',
+    'A9MEM1560', 'A9MEM1563', 'A9MEM1570', 'A9MEM1573', 'A9MEM1580', 'A9MEM1590',
+    'A9MEM1591', 'A9MEM1592', 'A9MEM1593', 'A9MEM2000', 'A9MEM2000T', 'A9MEM2010',
+    'A9MEM2105', 'A9MEM2110', 'A9MEM2150', 'A9MEM2155', 'A9MEM3100', 'A9MEM3110',
+    'A9MEM3115', 'A9MEM3150', 'A9MEM3150-NMI', 'A9MEM3155-NMI', 'A9MEM3200',
+    'A9MEM3210', 'A9MEM3215', 'A9MEM3250', 'A9MEM3250-NMI', 'A9MEM3255-NMI',
+    'A9MEM3265', 'A9MEM3265-NMI', 'A9MEM3275', 'A9MEM3275-NMI', 'A9MEM3300',
+    'A9MEM3310', 'A9MEM3350', 'A9MEM3350-NMI', 'A9MEM3355-NMI', 'A9MEM3365',
+    'A9MEM3375', 'A9MEM3455', 'A9MEM3465', 'A9MEM3555', 'AH06'
 ];
 
 const CT_PARTS = [
@@ -403,100 +423,129 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // Enforce strict existence:
     const requiredDM = [WIRING_DIGITAL, FUSE_20A_DIN, TEST_LINKS];
+    console.log('[DM Auto Debug] Checking catalog for:', requiredDM);
     const catCheck = await prisma.catalogItem.findMany({
         where: { partNumber: { in: requiredDM } },
-        select: { partNumber: true }
+        select: { partNumber: true, unitPrice: true, description: true }
     });
     const foundCatParts = catCheck.map(c => c.partNumber);
+    console.log('[DM Auto Debug] Found in catalog:', foundCatParts);
     for (const req of requiredDM) {
         if (!foundCatParts.includes(req)) {
-            console.warn(`[WARNING] Digital Meter Auto: CatalogItem missing for part '${req}'. Auto-add might fail.`);
+            console.warn(`[DM Auto Debug] [WARNING] Digital Meter Auto: CatalogItem missing for part '${req}'. Auto-add might fail.`);
+        } else {
+            const details = catCheck.find(c => c.partNumber === req);
+            console.log(`[DM Auto Debug] Catalog Detail for ${req}: Desc="${details?.description}", Price=${details?.unitPrice}`);
         }
     }
 
-    // Extract `totalMeters` strictly excluding composite children
+    // Extract `totalMeters` strictly using partNumber
     let totalMeters = 0;
+    console.log('[DM Auto Debug] Scanning existingItems for digital meters...');
     for (const item of existingItems) {
-        if (DIGITAL_METER_PARTS.includes(item.name) && item.systemTag !== 'COMPOSITE') {
-            totalMeters += Number(item.quantity) || 0;
+        if (item.partNumber && DIGITAL_METER_PARTS.includes(item.partNumber)) {
+            if (item.systemTag === 'COMPOSITE') {
+                console.log(`[DM Auto Debug] Skipping meter ${item.partNumber} because it is a COMPOSITE parent.`);
+                continue;
+            }
+            const qty = Number(item.quantity) || 0;
+            console.log(`[DM Auto Debug] Detected Meter: ${item.partNumber}, Qty: ${qty}`);
+            totalMeters += qty;
         }
     }
 
-    console.log('totalMeters found:', totalMeters);
+    console.log('[DM Auto Debug] Final totalMeters count:', totalMeters);
 
     // 1. Compute and Apply Derived Quantities 
     const dmTargets = new Map<string, number>();
     if (totalMeters > 0) {
-        dmTargets.set(WIRING_DIGITAL, totalMeters);
-        dmTargets.set(FUSE_20A_DIN, totalMeters * 3);
+        const wiringQty = totalMeters;
+        const fuseQty = wiringQty * 3; // Dependency: Fuse Qty = Wiring Qty * 3
+        console.log(`[DM Auto Debug] Derived Quantities: Wiring=${wiringQty}, Fuses=${fuseQty}, TestLinks=${totalMeters}, CTs=${totalMeters * 3}`);
+
+        dmTargets.set(WIRING_DIGITAL, wiringQty);
+        dmTargets.set(FUSE_20A_DIN, fuseQty);
         dmTargets.set(TEST_LINKS, totalMeters);
+        dmTargets.set('TAIBB405A', totalMeters * 3);
+    } else {
+        console.log('[DM Auto Debug] No meters detected. dmTargets will be empty.');
     }
 
-    // 2. CT Balancing logic
-    let expectedCT = totalMeters * 3;
-    let selectedCT = 0;
-    for (const item of existingItems) {
-        if (CT_PARTS.includes(item.name)) {
-            selectedCT += Number(item.quantity) || 0;
-        }
-    }
-
-    let remainingCT = Math.max(0, expectedCT - selectedCT);
-    if (remainingCT > 0) {
-        dmTargets.set('TAIBB405A', remainingCT);
-    }
+    // Note: CT Balancing logic removed in favor of strict proportional scaling per meter.
+    // Manual CTs are still protected by the cleanup logic which only touches systemTag='DIGITAL_METER'.
 
     // Apply creation / updates to targets natively
     let digitalMetersChanged = false;
 
     for (const [part, requiredQty] of dmTargets.entries()) {
-        const existingChild = existingItems.find(i => i.name === part && i.systemTag === 'DIGITAL_METER');
+        // Search first for an item already tagged as DIGITAL_METER
+        // If not found, look for an untagged isSystemManaged item with the same part number to "adopt" it
+        const existingChild = existingItems.find(i => 
+            (i.partNumber === part || i.name === part) && 
+            (i.systemTag === 'DIGITAL_METER' || (!i.systemTag && i.isSystemManaged))
+        );
 
-        console.log(`[DM Auto] Target: ${part}, requiredQty: ${requiredQty}, existing: ${existingChild ? Number(existingChild.quantity) : 'none'}`);
+        console.log(`[DM Auto Debug] Targeting ${part}: RequiredQty=${requiredQty}, FoundExisting=${existingChild ? 'YES (ID: ' + existingChild.id + ', Qty: ' + Number(existingChild.quantity) + ')' : 'NO'}`);
 
         if (existingChild) {
-            // Always update quantity to requiredQty. Use Decimal-safe comparison.
-            if (Number(existingChild.quantity) !== requiredQty) {
-                console.log(`[DM Auto] Updating ${part} from ${Number(existingChild.quantity)} to ${requiredQty}`);
-                await prisma.item.update({
-                    where: { id: existingChild.id },
-                    data: { quantity: requiredQty, cost: Number(existingChild.unitPrice || 0) * requiredQty }
-                });
-                digitalMetersChanged = true;
+            const currentQty = Number(existingChild.quantity) || 0;
+            const needsQtyUpdate = currentQty !== requiredQty;
+            const needsTagUpdate = existingChild.systemTag !== 'DIGITAL_METER';
+
+            if (needsQtyUpdate || needsTagUpdate) {
+                console.log(`[DM Auto Debug] Updating ${part}: Qty(${currentQty}->${requiredQty}), Tag(${existingChild.systemTag}->DIGITAL_METER)`);
+                try {
+                    await prisma.item.update({
+                        where: { id: existingChild.id },
+                        data: { 
+                            quantity: requiredQty, 
+                            cost: Number(existingChild.unitPrice || 0) * requiredQty,
+                            systemTag: 'DIGITAL_METER',
+                            systemRuleType: 'DIGITAL_METER_AUTOMATION'
+                        } as any
+                    });
+                    console.log(`[DM Auto Debug] Update SUCCESS for ${part}`);
+                    digitalMetersChanged = true;
+                } catch (err: any) {
+                    console.error(`[DM Auto Debug] Update FAILED for ${part}:`, err.message);
+                }
+            } else {
+                console.log(`[DM Auto Debug] Item ${part} already correctly managed. Skipping update.`);
             }
         } else {
-            console.log(`[DM Auto] Creating new item for ${part} with qty ${requiredQty}`);
-            // Find manually added item to avoid overwriting? Request said: "Do NOT touch manually added CTs. Never override manually added items."
-            // If user manually added FUSE_20A_DIN, do we override it or consider it separate?
-            // The safest is to only touch items we create.
-            // Wait, if it's NOT system managed, we shouldn't create a new conflicting one or we should create a new line item?
-            // The composite logic creates a new item if not found. Let's do the same here unless a system managed one exists.
+            console.log(`[DM Auto Debug] No existing ${part} found with systemTag="DIGITAL_METER". Attempting to create...`);
             const catItem = await prisma.catalogItem.findFirst({
                 where: { partNumber: part }
             });
             if (catItem) {
-                await prisma.item.create({
-                    data: {
-                        boardId,
-                        category: catItem.category || 'Switchboard',
-                        subcategory: catItem.subcategory || 'Control',
-                        name: catItem.partNumber || part,
-                        partNumber: part,
-                        description: catItem.description || 'Digital Meter Accessory',
-                        quantity: requiredQty,
-                        unitPrice: catItem.unitPrice,
-                        labourHours: catItem.labourHours,
-                        cost: Number(catItem.unitPrice || 0) * requiredQty,
-                        isSystemManaged: true,
-                        isDefault: true,
-                        systemTag: 'DIGITAL_METER',
-                        systemRuleType: 'DIGITAL_METER_AUTOMATION',
-                        notes: 'System Managed'
-                    } as any
-                });
-                digitalMetersChanged = true;
+                console.log(`[DM Auto Debug] Catalog resolution for ${part}: SUCCESS. Creating item...`);
+                try {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: catItem.category || 'Switchboard',
+                            subcategory: catItem.subcategory || 'Control',
+                            name: catItem.partNumber || part,
+                            partNumber: part,
+                            description: catItem.description || 'Digital Meter Accessory',
+                            quantity: requiredQty,
+                            unitPrice: catItem.unitPrice,
+                            labourHours: catItem.labourHours,
+                            cost: Number(catItem.unitPrice || 0) * requiredQty,
+                            isSystemManaged: true,
+                            isDefault: true,
+                            systemTag: 'DIGITAL_METER',
+                            systemRuleType: 'DIGITAL_METER_AUTOMATION',
+                            notes: 'System Managed'
+                        } as any
+                    });
+                    console.log(`[DM Auto Debug] Creation SUCCESS for ${part}`);
+                    digitalMetersChanged = true;
+                } catch (err: any) {
+                    console.error(`[DM Auto Debug] Creation FAILED for ${part}:`, err.message);
+                }
             } else {
-                console.warn(`[DM Auto Error] Could not create ${part}. Catalog item not found.`)
+                console.warn(`[DM Auto Debug] [ERROR] Could not create ${part}. Catalog item not found.`)
             }
         }
     }
@@ -506,7 +555,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const dmItemsToRemove = existingItems.filter(i =>
         i.systemTag === 'DIGITAL_METER' &&
         i.isSystemManaged === true &&
-        !dmTargets.has(i.name)
+        !dmTargets.has(i.partNumber || i.name)
     );
 
     if (dmItemsToRemove.length > 0) {
