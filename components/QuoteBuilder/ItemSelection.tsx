@@ -113,8 +113,10 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     {item.brand && item.subcategory && <span>•</span>}
 
                     {item.subcategory && (
-                        <span className="text-gray-400 truncate max-w-[200px]">
-                            {item.subcategory.split(' > ').pop()}
+                        <span className="text-gray-400 truncate max-w-[200px]" title={item.subcategory}>
+                            {item.subcategory.startsWith('Miscellaneous') && item.subcategory.split(' > ').length > 1
+                                ? item.subcategory.split(' > ').slice(-2).join(' > ')
+                                : item.subcategory.split(' > ').pop()}
                         </span>
                     )}
 
@@ -453,8 +455,8 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             if (selectedL3) {
                 shouldFetch = true;
             }
-            // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist)
-            else if (selectedL2 && l3Options.length === 0) {
+            // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist OR it's Miscellaneous)
+            else if (selectedL2 && (l3Options.length === 0 || selectedL1 === 'Miscellaneous')) {
                 shouldFetch = true;
             }
             // Case 3: 1-level hierarchy (L1 selected, and no L2 options exist)

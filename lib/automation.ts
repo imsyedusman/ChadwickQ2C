@@ -79,25 +79,16 @@ export const GENERAL_CONTROL_SKUS = {
 
 export const GENERAL_CONTROL_WIRING_MAP: Record<string, number> = {
     'PBELKIT4': 0,
-    'CHD-GC-EM-LIGHT-KIT': 0,
+    'CHD-FUSE-20A-DIN': 0,
     'A9C20134': 10,
-    'CHD-GC-4NC-CONTACTOR': 10,
-    'CHD-GC-LIGHT-CONTACTOR-23A': 10,
     'CCT15854': 4,
-    'CHD-GC-TIME-1CH': 4,
     'CCT15443': 6,
-    'CHD-GC-TIME-2CH': 6,
     'CCT15940': 10,
-    'CHD-GC-TIME-4CH': 10,
     'CCT15369': 6,
-    'CHD-GC-PE-PROVISION': 6,
     'XB4BD33': 6,
-    'CHD-GC-BYPASS': 6,
     'CHD-GC-RELAY-4P': 10,
     'RM17TG00': 6,
-    'CHD-GC-PFR': 6,
-    'XB5AVM4': 2,
-    'CHD-GC-LED-IND': 2
+    'XB5AVM4': 2
 };
 
 export interface SystemRuleMetadata {
@@ -253,9 +244,9 @@ export class AutomationService {
             Object.values(ACCESSORY_MAP).flatMap(g => [g.shield, g.handle])
         );
 
-        const breakers = allItems.filter(item => 
-            !item.isSystemManaged && 
-            item.productFrame && 
+        const breakers = allItems.filter(item =>
+            !item.isSystemManaged &&
+            item.productFrame &&
             item.productFrame in ACCESSORY_MAP &&
             !ACCESSORY_SKUS.has(item.name) &&
             item.subcategory !== 'MCCB Accessories'
@@ -278,15 +269,15 @@ export class AutomationService {
                 if (req.disabled) continue;
 
                 // Find existing accessory for THIS breaker
-                const existing = allItems.find(i => 
-                    (i as any).parentItemId === breaker.id && 
+                const existing = allItems.find(i =>
+                    (i as any).parentItemId === breaker.id &&
                     i.name === req.sku &&
                     (i as any).systemTag === SYSTEM_TAG
                 );
 
                 if (existing) {
                     processedAccessoryIds.add(existing.id);
-                    
+
                     // Update ONLY if parent quantity changed OR it's still system managed
                     // Update ONLY if it's still system managed
                     if (existing.isSystemManaged) {
@@ -341,9 +332,9 @@ export class AutomationService {
         // 4. Cleanup Orphans
         // Delete items with SYSTEM_TAG that are NOT in processedAccessoryIds 
         // AND have a parent (or should have one).
-        const systemAccessories = allItems.filter(i => 
-            (i as any).systemTag === SYSTEM_TAG && 
-            ((i as any).isSystemManaged || (i as any).autoAdded) 
+        const systemAccessories = allItems.filter(i =>
+            (i as any).systemTag === SYSTEM_TAG &&
+            ((i as any).isSystemManaged || (i as any).autoAdded)
         );
 
         for (const item of systemAccessories) {
@@ -884,11 +875,11 @@ export class AutomationService {
         const items = board.items;
 
         // 2. Identify Selectable General Control Items
-        // Source Group: category="Switchboard", subcategory contains "General Control"
+        // Source Group: items whose partNumber is explicitly defined in the map
         // EXCLUDE: Auto-added fuse/wiring items (by SKU)
-        const selectableItems = items.filter(i => 
-            i.category === 'Switchboard' && 
-            (i.subcategory || '').includes('General Control') &&
+        const selectableItems = items.filter(i =>
+            i.partNumber &&
+            (i.partNumber in GENERAL_CONTROL_WIRING_MAP) &&
             i.partNumber !== GENERAL_CONTROL_SKUS.FUSE &&
             i.partNumber !== GENERAL_CONTROL_SKUS.WIRING
         );

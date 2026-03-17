@@ -1,0 +1,21 @@
+﻿Known Schneider GC Items:
+- XB4BD33: category=Switchboard, subcategory=, brand=Schneider Electric
+- RM17TG00: category=Switchboard, subcategory=Circuit Breakers > ATS > Accessories, brand=Schneider Electric
+- A9C20134: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- CCT15369: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- CCT15854: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- CCT15940: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- XB5AVM4: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- CCT15443: category=Switchboard, subcategory=, brand=Schneider Electric
+
+Other DB items with Miscellaneous in cat/subcat (up to 10):
+- DSD340-TNS-275A: category=Switchboard, subcategory=Miscellaneous > Surge Protection Equipment > Surge Diverter, brand=COLTERLEC
+- LC1D115U7: category=Switchboard, subcategory=Miscellaneous > Contactor > 3P, brand=Schneider Electric
+- LC1D95U7: category=Switchboard, subcategory=Miscellaneous > Contactor > 3P, brand=Schneider Electric
+- NSYCR100WU2C: category=Switchboard, subcategory=Miscellaneous > General Control > Temperature, brand=Schneider Electric
+- MISC-MISC: category=Basics, subcategory=Miscellaneous, brand=null
+- PBELKIT4: category=Switchboard, subcategory=Miscellaneous > General Control > Extras, brand=Schneider Electric
+- TDS-MT-277: category=Switchboard, subcategory=Miscellaneous > Surge Protection Equipment > Surge Diverter, brand=COLTERLEC
+- MISC-DELIVERY-UTE: category=Basics, subcategory=Miscellaneous, brand=null
+- DSF-6A-275V: category=Switchboard, subcategory=Miscellaneous > Surge Protection Equipment > Surge Filter, brand=COLTERLEC
+- NSYCCOTHD: category=Switchboard, subcategory=Miscellaneous > General Control > Temperature, brand=Schneider Electric

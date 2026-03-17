@@ -11,11 +11,22 @@ async function testGC() {
         console.log(`Starting General Control Automation Test on board: ${boardId}`);
 
         // 1. Create a dummy board
+        await prisma.quote.create({
+            data: {
+                id: 'dummy-quote-id-' + boardId,
+                projectId: null,
+                quoteNumber: 'TEST-' + Date.now(),
+                version: 1,
+                status: 'Draft',
+                markup: 0,
+            } as any
+        });
+
         await prisma.board.create({
             data: {
                 id: boardId,
                 name: 'Test General Control Board',
-                quoteId: 'dummy-quote-id' // Ensure a quote exists or handled
+                quoteId: 'dummy-quote-id-' + boardId
             } as any
         });
 
@@ -118,12 +129,18 @@ async function testGC() {
         console.log('\nALL TESTS PASSED!');
 
     } catch (e) {
-        console.error('TEST FAILED:', e);
+        console.error('\n*** TEST FAILED ***\n');
+        console.error(e);
     } finally {
         // Cleanup test board
         console.log(`Cleaning up test board ${boardId}...`);
-        await prisma.item.deleteMany({ where: { boardId } });
-        await prisma.board.delete({ where: { id: boardId } });
+        try {
+            await prisma.item.deleteMany({ where: { boardId } });
+            await prisma.board.delete({ where: { id: boardId } });
+            await prisma.quote.delete({ where: { id: 'dummy-quote-id-' + boardId } });
+        } catch (cleanupError) {
+            console.error('Cleanup failed (expected if creation failed):', cleanupError.message);
+        }
         await prisma.$disconnect();
     }
 }
