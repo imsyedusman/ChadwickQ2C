@@ -271,6 +271,8 @@ export async function POST(request: Request) {
                     await tx.catalogItem.update({
                         where: { id: existing.id },
                         data: {
+                            category: item.category,
+                            subcategory: item.subcategory,
                             unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
                             labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
                             description: item.description, // Allow description updates
