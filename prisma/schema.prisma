@@ -65,9 +65,17 @@ model Quote {
   projectId     String?
   project       Project? @relation(fields: [projectId], references: [id])
 
+  clientId      String?
+  client        Client?  @relation(fields: [clientId], references: [id])
+  contactId     String?
+  contact       Contact? @relation(fields: [contactId], references: [id])
+
   gridInternalNotes String? @db.Text
 
   @@unique([quoteNumber, revision])
+  @@index([clientId])
+  @@index([contactId])
+  @@index([projectId])
 }
 
 model Project {
@@ -78,9 +86,98 @@ model Project {
   projectReference   String?
   projectDescription String?
   projectStatus      ProjectStatus @default(Budget)
+  
+  // Pipedrive Integration
+  pipedrive_deal_id  Int?     @unique
+  clientId           String?
+  client             Client?  @relation(fields: [clientId], references: [id])
+  contactId          String?
+  contact            Contact? @relation(fields: [contactId], references: [id])
+  source             String?
+  import_batch_id    String?
+  importBatch        ImportBatch? @relation(fields: [import_batch_id], references: [id])
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   quotes             Quote[]
+
+  @@index([pipedrive_deal_id])
+  @@index([clientId])
+  @@index([contactId])
+  @@index([source, import_batch_id])
+}
+
+model Client {
+  id               String   @id @default(uuid())
+  name             String
+  pipedrive_org_id Int?     @unique
+  source           String   @default("pipedrive")
+  import_batch_id String?
+  importBatch      ImportBatch? @relation(fields: [import_batch_id], references: [id])
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  contacts         Contact[]
+  projects         Project[]
+  quotes           Quote[]
+
+  @@index([pipedrive_org_id])
+  @@index([source, import_batch_id])
+}
+
+model Contact {
+  id                  String   @id @default(uuid())
+  name                String
+  email               String?
+  phone               String?
+  pipedrive_person_id Int?     @unique
+  
+  clientId            String?
+  client              Client?  @relation(fields: [clientId], references: [id])
+  
+  source              String   @default("pipedrive")
+  import_batch_id    String?
+  importBatch         ImportBatch? @relation(fields: [import_batch_id], references: [id])
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  projects            Project[]
+  quotes              Quote[]
+
+  @@index([pipedrive_person_id])
+  @@index([clientId])
+  @@index([source, import_batch_id])
+}
+
+model ImportBatch {
+  id                      String   @id @default(uuid())
+  source                  String   @default("pipedrive")
+  status                  String   @default("PENDING") // PENDING, SUCCESS, FAILED
+  createdAt               DateTime @default(now())
+  startedAt               DateTime @default(now())
+  lastHeartbeatAt         DateTime @default(now())
+  completedAt             DateTime?
+  
+  // Attempted Metrics
+  totalClientsAttempted   Int      @default(0)
+  totalContactsAttempted  Int      @default(0)
+  totalProjectsAttempted  Int      @default(0)
+  
+  // Committed Metrics
+  totalClientsCommitted   Int      @default(0)
+  totalContactsCommitted  Int      @default(0)
+  totalProjectsCommitted  Int      @default(0)
+  
+  skippedDeals            Int      @default(0)
+  errorLog                Json?    // Structured error log { skippedDeals: [], validationErrors: [], etc }
+  
+  clients                 Client[]
+  contacts                Contact[]
+  projects                Project[]
+
+  @@index([status, lastHeartbeatAt])
 }
 
 // Authentication & User Management
@@ -246,6 +343,7 @@ model Item {
 
   isSystemManaged Boolean @default(false)
   autoAdded       Boolean @default(false)
+  isIncluded      Boolean @default(true)
   systemTag       String?  // e.g. "MCCB_ACCESSORIES", "MCCB_TRIP_BASE"
   partNumber      String?
   productFrame    String? // e.g. "NSX100-250", "NSX400-630"

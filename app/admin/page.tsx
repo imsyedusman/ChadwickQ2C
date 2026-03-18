@@ -11,7 +11,8 @@ import {
     Settings,
     Database,
     FileText,
-    DollarSign
+    DollarSign,
+    Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +109,18 @@ const ADMIN_SECTIONS = [
                 href: '/admin/templates',
                 icon: <FileText className="w-6 h-6 text-rose-600" />,
                 color: 'bg-rose-50',
+            }
+        ]
+    },
+    {
+        title: 'External Integrations',
+        tools: [
+            {
+                title: 'Pipedrive Integration',
+                description: 'Import and sync clients, contacts, and deals from Pipedrive CRM.',
+                href: '/admin/pipedrive',
+                icon: <Briefcase className="w-6 h-6 text-orange-600" />,
+                color: 'bg-orange-50',
             }
         ]
     }
