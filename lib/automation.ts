@@ -89,7 +89,15 @@ export const GENERAL_CONTROL_WIRING_MAP: Record<string, number> = {
     'CHD-GC-RELAY-4P': 10,
     'RM17TG00': 6,
     'XB5AVM4': 2
+    // 3P Contactors removed - handled by Additional Control Wiring Automation
 };
+
+// --- CONTACTOR 3P CONTROL WIRING AUTOMATION BLOCK ---
+export const CONTROL_WIRING_CONTACTORS = [
+    'LC1D25U7', 'LC1D32U7', 'LC1D40U7', 'LC1D50U7', 'LC1D65U7',
+    'LC1D80U7', 'LC1D95U7', 'LC1D115U7', 'LC1D150U7',
+    'LC1F115U7', 'LC1F150U7', 'LC1F185U7', 'LC1F225U7'
+];
 
 export interface SystemRuleMetadata {
     id: string;
@@ -161,6 +169,12 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
         handler: 'applyGeneralControlRules',
         reason: 'Adds control circuits (fuse + wiring) for identified General Control items.',
         quantityExplanation: 'Fuse qty = Total items. Wiring qty = Sum(qty * wires-per-unit).'
+    },
+    'CONTROL_WIRING_AUTOMATION': {
+        id: 'CONTROL_WIRING_AUTOMATION',
+        handler: 'applyAdditionalControlWiringRules',
+        reason: 'Adds control wiring for 3P Contactors.',
+        quantityExplanation: 'Wiring qty = Total Contactors * 2 wires per unit.'
     }
 };
 
@@ -198,6 +212,10 @@ export class AutomationService {
             // 5. General Control Automation
             console.log(`[Automation Pipeline] 5. Applying General Control Rules`);
             await this.applyGeneralControlRules(boardId);
+
+            // 6. Additional Control Wiring Automation (3P Contactors)
+            console.log(`[Automation Pipeline] 6. Applying Additional Control Wiring Rules (3P Contactors)`);
+            await this.applyAdditionalControlWiringRules(boardId);
 
             console.log(`[Automation Pipeline] Reconciliation Complete for board ${boardId}`);
         } catch (error) {
@@ -967,6 +985,114 @@ export class AutomationService {
                 if (!requirements.has(item.partNumber || '')) {
                     await tx.item.delete({ where: { id: item.id } });
                     console.log(`[GC Automation] Removed orphaned item ${item.partNumber}`);
+                }
+            }
+        });
+
+        // 6. Hook: Additional Control Wiring Automation (Post-GC)
+        // This ensures they stay in sync if GC items change (though they are isolated)
+        await this.applyAdditionalControlWiringRules(boardId);
+    }
+
+    /**
+     * Applies Additional Control Wiring Automation Rules.
+     * Calculates required Wiring quantities based on specific 3P Contactors.
+     * Isolated from General Control via 'CONTROL_WIRING' systemTag.
+     */
+    // --- CONTACTOR 3P CONTROL WIRING AUTOMATION BLOCK ---
+    static async applyAdditionalControlWiringRules(boardId: string) {
+        console.log(`[CONTROL_WIRING] Automation triggered for board: ${boardId}`);
+        const SYSTEM_TAG = 'CONTROL_WIRING';
+        const WIRING_SKU = GENERAL_CONTROL_SKUS.WIRING; // CHD-WIRING-CONTROL
+
+        // 1. Fetch Board Items
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+
+        if (!board) return;
+
+        const items = board.items;
+
+        // 2. Identify 3P Contactors
+        const contactors = items.filter(i =>
+            i.partNumber && CONTROL_WIRING_CONTACTORS.includes(i.partNumber)
+        );
+
+        if (contactors.length > 0) {
+            console.log(`[Control Wiring] Board ${boardId} — Found ${contactors.length} 3P contactors:`,
+                contactors.map(i => `${i.partNumber}(qty=${i.quantity})`));
+        }
+
+        // 3. Calculate Requirements
+        let totalWires = 0;
+        for (const item of contactors) {
+            const qty = Number(item.quantity) || 0;
+            totalWires += (qty * 2);
+        }
+
+        console.log(`[Control Wiring] Computed totalWires=${totalWires}`);
+
+        // 4. Sync System Items
+        // Strictly scoped by systemTag: 'CONTROL_WIRING'
+        const systemItems = items.filter(i =>
+            i.isSystemManaged && (i as any).systemTag === SYSTEM_TAG
+        );
+
+        await prisma.$transaction(async (tx) => {
+            if (totalWires > 0) {
+                const existing = systemItems.find(i => i.partNumber === WIRING_SKU);
+
+                if (existing) {
+                    if (Number(existing.quantity) !== totalWires) {
+                        await tx.item.update({
+                            where: { id: existing.id },
+                            data: {
+                                quantity: totalWires,
+                                cost: Number(existing.unitPrice) * totalWires
+                            }
+                        });
+                        console.log(`[Control Wiring] Updated ${WIRING_SKU} to Qty ${totalWires}`);
+                    }
+                } else {
+                    // Create New from Catalog
+                    const catalogItem = await tx.catalogItem.findFirst({
+                        where: { partNumber: WIRING_SKU }
+                    });
+
+                    if (catalogItem) {
+                        await tx.item.create({
+                            data: {
+                                boardId,
+                                category: catalogItem.category || 'Switchboard',
+                                subcategory: catalogItem.subcategory || 'Miscellaneous',
+                                name: catalogItem.partNumber || WIRING_SKU,
+                                partNumber: WIRING_SKU,
+                                description: catalogItem.description,
+                                unitPrice: catalogItem.unitPrice,
+                                labourHours: catalogItem.labourHours,
+                                quantity: totalWires,
+                                cost: Number(catalogItem.unitPrice) * totalWires,
+                                isSystemManaged: true,
+                                autoAdded: true,
+                                systemTag: SYSTEM_TAG,
+                                systemRuleType: 'CONTROL_WIRING_AUTOMATION',
+                                notes: 'System Managed'
+                            } as any
+                        });
+                        console.log(`[Control Wiring] Added ${WIRING_SKU} (Qty ${totalWires})`);
+                    } else {
+                        console.error(`[Control Wiring] Missing Catalog Item for: ${WIRING_SKU}`);
+                    }
+                }
+            } else {
+                // totalWires = 0 -> Remove if exists
+                if (systemItems.length > 0) {
+                    for (const item of systemItems) {
+                        await tx.item.delete({ where: { id: item.id } });
+                        console.log(`[Control Wiring] Removed ${item.partNumber} (totalWires = 0)`);
+                    }
                 }
             }
         });

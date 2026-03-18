@@ -175,6 +175,7 @@ export async function POST(
         if (boardId) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyGeneralControlRules(boardId);
+            await AutomationService.applyAdditionalControlWiringRules(boardId);
         }
 
         // Return the full updated list of items for the board to ensure frontend is in sync

@@ -89,6 +89,7 @@ export async function PUT(
         if (freshItem?.boardId) {
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyGeneralControlRules(freshItem.boardId);
+            await AutomationService.applyAdditionalControlWiringRules(freshItem.boardId);
         }
 
         // Hook: MCCB Trip Base Pairing (Update)
@@ -217,6 +218,7 @@ export async function DELETE(
 
         // Hook: General Control Automation (Post-Delete)
         await AutomationService.applyGeneralControlRules(boardId);
+        await AutomationService.applyAdditionalControlWiringRules(boardId);
 
         // Return the full updated list of items to ensure frontend is in sync
         const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
