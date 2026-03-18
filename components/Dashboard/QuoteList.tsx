@@ -81,6 +81,7 @@ interface Quote {
 export default function QuoteList() {
     const [quotes, setQuotes] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchInput, setSearchInput] = useState('');
     const [search, setSearch] = useState('');
     const [quoteStatusFilter, setQuoteStatusFilter] = useState<string>('ALL');
     const [projectStatusFilter, setProjectStatusFilter] = useState<string>('ALL');
@@ -135,6 +136,17 @@ export default function QuoteList() {
     useEffect(() => {
         fetchQuotes();
     }, [view, quoteStatusFilter, projectStatusFilter, search, page, limit]);
+
+    useEffect(() => {
+        const next = searchInput.trim();
+        if (!next) {
+            setSearch('');
+            return;
+        }
+
+        const t = setTimeout(() => setSearch(next), 250);
+        return () => clearTimeout(t);
+    }, [searchInput]);
 
     useEffect(() => {
         fetchSettings();
@@ -394,10 +406,6 @@ export default function QuoteList() {
         }));
     };
 
-    if (loading) {
-        return <div className="p-8 text-center text-gray-500">Loading quotes...</div>;
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -446,8 +454,8 @@ export default function QuoteList() {
                     <input
                         type="text"
                         placeholder="Search quotes, clients, or projects..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white shadow-sm hover:border-gray-300"
                     />
                 </div>
@@ -572,7 +580,14 @@ export default function QuoteList() {
                     <div className="w-10"></div>
                 </div>
 
-                <div className="divide-y divide-gray-100 overflow-y-auto max-h-[calc(100vh-280px)]">
+                <div className="divide-y divide-gray-100 overflow-y-auto max-h-[calc(100vh-280px)] relative">
+                    {loading && (
+                        <div className="sticky top-0 z-20 w-full bg-white/80 backdrop-blur-sm border-b border-gray-100">
+                            <div className="px-6 py-4 text-sm text-gray-500">
+                                Loading quotes…
+                            </div>
+                        </div>
+                    )}
                     {groupedQuotes.map((group) => {
                         const isCollapsed = collapsedGroups[group.quoteNumber] || false;
                         const parent = group.parent;
@@ -1171,10 +1186,13 @@ export default function QuoteList() {
                             <div className="p-4 bg-white rounded-full border border-gray-100 shadow-sm">
                                 <Search className="text-gray-300" size={32} />
                             </div>
-                            <p className="text-gray-500 font-medium">No results match your filters.</p>
+                            <p className="text-gray-500 font-medium">
+                                {loading ? 'Searching…' : 'No results match your filters.'}
+                            </p>
                             <Button variant="outline" size="sm" onClick={() => {
                                 setQuoteStatusFilter('ALL');
                                 setProjectStatusFilter('ALL');
+                                setSearchInput('');
                                 setSearch('');
                             }}>
                                 Clear all filters
