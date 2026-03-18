@@ -527,7 +527,7 @@ export default function QuoteList() {
                                 onCheckedChange={(v) => toggleColumnVisibility('total', !!v)}
                                 className="rounded-md"
                             >
-                                Total (Sell)
+                                Total (Ex GST)
                             </DropdownMenuCheckboxItem>
                             <DropdownMenuCheckboxItem
                                 checked={columnVisibility.activity}
@@ -566,7 +566,7 @@ export default function QuoteList() {
                     {columnVisibility.company && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Company</div>}
                     {columnVisibility.projectStatus && <div className="text-center border-r border-gray-200/60 h-full py-1 px-2">Proj Status</div>}
                     {columnVisibility.quoteStatus && <div className="text-center border-r border-gray-200/60 h-full py-1 px-2">Quote Status</div>}
-                    {columnVisibility.total && <div className="text-right border-r border-gray-200/60 h-full py-1 pr-4">Total</div>}
+                    {columnVisibility.total && <div className="text-right border-r border-gray-200/60 h-full py-1 pr-4">Total (Ex GST)</div>}
                     {columnVisibility.internalNotes && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Grid Notes</div>}
                     {columnVisibility.activity && <div className="pl-4 h-full py-1">Activity</div>}
                     <div className="w-10"></div>
@@ -576,7 +576,7 @@ export default function QuoteList() {
                     {groupedQuotes.map((group) => {
                         const isCollapsed = collapsedGroups[group.quoteNumber] || false;
                         const parent = group.parent;
-                        const totalPrice = parent.totalIncGst || 0;
+                        const totalPrice = parent.total || 0;
                         const updatedDate = new Date(parent.updatedAt);
 
                         return (

@@ -357,8 +357,10 @@ function QuoteBuilderContent() {
                             <QuoteCostingOverrides />
                             {/* Scrollable Container */}
                             <div className="flex-1 overflow-y-auto">
-                                <CostingView />
-                                <div className="border-t-4 border-gray-200">
+                                {boards.length > 1 && <CostingView />}
+                                <div className={cn(
+                                    boards.length > 1 ? "border-t-4 border-gray-200" : ""
+                                )}>
                                     <GrandTotalView />
                                 </div>
                             </div>
