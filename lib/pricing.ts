@@ -52,6 +52,7 @@ export function calculateBusbarUnitPrice(
 }
 
 export interface PricingItem {
+    name?: string;
     quantity: string | number | Prisma.Decimal;
     unitPrice: number;
     labourHours: number;
@@ -59,6 +60,7 @@ export interface PricingItem {
     subcategory?: string | null;
     isCopperPriced?: boolean;
     totalCopperWeightKgPerMeter?: number | null;
+    isCatalogMatch?: boolean;
 }
 
 export interface PricingBoard {
@@ -119,12 +121,32 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
         return item.unitPrice * qty;
     };
 
+    console.log(`[Pricing] Calculating Board Totals. Items: ${items.length}, Custom: ${isCustomBoard}`);
+
     const sheetmetalSubtotal = items.reduce((sum, item) => {
         if (item.isSheetmetal) {
-            return sum + getItemTotalPrice(item);
+            const price = getItemTotalPrice(item);
+            const qty = getQty(item);
+            const contribution = price; // getItemTotalPrice already multiplies by qty
+            
+            console.log(`[Pricing] Sheetmetal Item: ${item.name || 'Unknown'} | Qty: ${qty} | UnitPrice: ${Number(item.unitPrice).toFixed(2)} | TotalPrice: ${price.toFixed(2)} | Match: ${item.isCatalogMatch !== false}`);
+            
+            return sum + price;
         }
+        
+        // Log potential skips for 1B items or items that look like sheetmetal but aren't flagged
+        if (item.name?.startsWith('1B-') && !item.isSheetmetal) {
+            console.warn(`[Pricing] WARNING: 1B Item ${item.name} is NOT flagged as Sheetmetal! Skipping.`);
+        } else if (!item.isCatalogMatch && item.name && !item.name.includes(' ')) {
+             // console.log(`[Pricing] Non-catalog item: ${item.name}`);
+        }
+
         return sum;
     }, 0);
+
+    if (sheetmetalSubtotal > 0) {
+        console.log(`[Pricing] Final Sheetmetal Subtotal: ${sheetmetalSubtotal.toFixed(2)}`);
+    }
 
     const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
     const cubicSubtotal = items.reduce((sum, item) => {

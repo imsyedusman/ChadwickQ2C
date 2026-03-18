@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canEditQuote } from '@/lib/permissions';
 import { logAction } from '@/lib/audit';
+import { enrichItems } from '@/lib/enrichment';
 
 export async function GET(
     request: Request,
@@ -33,44 +34,15 @@ export async function GET(
             return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
         }
 
-        const partNumbers = new Set<string>();
-        quote.boards.forEach((board: any) => {
-            board.items.forEach((item: any) => {
-                if (item.partNumber) partNumbers.add(item.partNumber);
-            });
-        });
+        // 1. Collect and Enrich all items from all boards in one batch
+        const allItemsRaw = quote.boards.flatMap((b: any) => b.items);
+        const allItemsEnriched = await enrichItems(allItemsRaw);
 
-        const catalogItems = await prisma.catalogItem.findMany({
-            where: {
-                partNumber: { in: Array.from(partNumbers) }
-            },
-            select: {
-                partNumber: true,
-                totalCopperWeightKgPerMeter: true,
-                isCopperPriced: true
-            }
-        });
-
-        const catalogMap = new Map<string, { totalCopperWeightKgPerMeter: number | null, isCopperPriced: boolean }>();
-        catalogItems.forEach(ci => {
-            if (ci.partNumber) {
-                catalogMap.set(ci.partNumber, {
-                    totalCopperWeightKgPerMeter: ci.totalCopperWeightKgPerMeter,
-                    isCopperPriced: ci.isCopperPriced
-                });
-            }
-        });
-
+        // 2. Map enriched items back to their respective boards
+        const itemMap = new Map(allItemsEnriched.map((i: any) => [i.id, i]));
         const enrichedBoards = quote.boards.map((board: any) => ({
             ...board,
-            items: board.items.map((item: any) => {
-                const catalogData = item.partNumber ? catalogMap.get(item.partNumber) : null;
-                return {
-                    ...item,
-                    totalCopperWeightKgPerMeter: catalogData?.totalCopperWeightKgPerMeter ?? null,
-                    isCopperPriced: catalogData?.isCopperPriced ?? false
-                };
-            })
+            items: board.items.map((item: any) => itemMap.get(item.id) || item)
         }));
 
         return NextResponse.json({

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Board, Item } from '@prisma/client';
 import { ExportService } from '@/lib/export-service';
+import { enrichItems } from '@/lib/enrichment';
+import { calculateQuoteTotals } from '@/lib/pricing';
 
 export async function GET(
     request: Request,
@@ -79,127 +81,36 @@ export async function GET(
         });
         console.log("Effective Settings:", JSON.stringify(effectiveSettings, null, 2));
 
-        // Calculate board totals using the same logic as ExportService
-        const calculateBoardTotal = (board: any): number => {
-            const items = board.items || [];
-            let materialCost = 0;
-            let labourHours = 0;
+        // 1. Collect and Enrich all items
+        const allItemsRaw = quote.boards.flatMap(b => b.items);
+        const allItemsEnriched = await enrichItems(allItemsRaw);
 
-            items.forEach((item: any) => {
-                materialCost += (item.unitPrice || 0) * (item.quantity || 0);
-                labourHours += (item.labourHours || 0) * (item.quantity || 0);
-            });
-
-            const labourCost = labourHours * effectiveSettings.labourRate;
-            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
-            const costBase = materialCost + labourCost + consumablesCost;
-            const overheadAmount = costBase * effectiveSettings.overheadPct;
-            const engineeringCost = costBase * effectiveSettings.engineeringPct;
-            let totalCost = costBase + overheadAmount + engineeringCost;
-
-            // --- SURCHARGES ---
-            // REMOVED as per user request (2025-12-04)
-            /*
-            if (board.config) {
-                try {
-                    const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
-                    if (config.enclosureType === 'Custom' && config.material && config.material.includes('Stainless')) {
-                        totalCost *= 1.25; // 25% Surcharge
-                    }
-                } catch (e) { }
-            }
-            */
-
-            const marginFactor = 1 - effectiveSettings.targetMarginPct;
-            const sellPrice = marginFactor > 0 ? totalCost / marginFactor : totalCost;
-            const rInc = effectiveSettings.roundingIncrement;
-            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
-
-            console.warn(`[WARNING] Backend calculateBoardTotal is recalculating board prices from raw items. This does NOT include QuoteContext uplifts (Sheetmetal/Cubic). This route should ideally receive totals from the client to ensure consistency.`);
-            console.log(`Board Calculation: Material=${materialCost}, LabourHrs=${labourHours}, SellPrice=${sellPrice}, Rounded=${sellPriceRounded}`);
-
-            return sellPriceRounded;
-        };
-
-        // Calculate board totals map
-        const boardTotalsMap = quote.boards.map((board: any) => ({
-            boardId: board.id,
-            sellPriceRounded: calculateBoardTotal(board)
+        // 2. Re-distribute enriched items back to boards
+        const itemMap = new Map(allItemsEnriched.map(i => [i.id, i]));
+        const enrichedBoards = quote.boards.map(board => ({
+            ...board,
+            items: board.items.map(item => itemMap.get(item.id) || item)
         }));
 
-        // Calculate grand totals
-        let grandTotal = 0;
-        let totalLabourHours = 0;
-        let totalMaterialCost = 0;
-        let totalLabourCost = 0;
-        let totalConsumablesCost = 0;
-        let totalCostBase = 0;
-        let totalOverheadAmount = 0;
-        let totalEngineeringCost = 0;
-        let totalCost = 0;
+        // 3. Calculate Totals using shared logic (same as UI)
+        const pricingBoards = enrichedBoards.map(b => ({
+            id: b.id,
+            config: b.config ? (typeof b.config === 'string' ? JSON.parse(b.config) : b.config) : {},
+            items: b.items as any[]
+        }));
 
-        quote.boards.forEach((board: any) => {
-            let materialCost = 0;
-            let labourHours = 0;
+        const quoteTotals = calculateQuoteTotals(pricingBoards, effectiveSettings);
 
-            board.items.forEach((item: any) => {
-                materialCost += (item.unitPrice || 0) * (item.quantity || 0);
-                labourHours += (item.labourHours || 0) * (item.quantity || 0);
-            });
-
-            const labourCost = labourHours * effectiveSettings.labourRate;
-            const consumablesCost = materialCost * effectiveSettings.consumablesPct;
-            const costBase = materialCost + labourCost + consumablesCost;
-            const overheadAmount = costBase * effectiveSettings.overheadPct;
-            const engineeringCost = costBase * effectiveSettings.engineeringPct;
-            let boardTotalCost = costBase + overheadAmount + engineeringCost;
-
-            // --- SURCHARGES ---
-            // REMOVED as per user request (2025-12-04)
-            /*
-            if (board.config) {
-                try {
-                    const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
-                    if (config.enclosureType === 'Custom' && config.material && config.material.includes('Stainless')) {
-                        boardTotalCost *= 1.25; // 25% Surcharge
-                    }
-                } catch (e) { }
-            }
-            */
-            const marginFactor = 1 - effectiveSettings.targetMarginPct;
-            const sellPrice = marginFactor > 0 ? boardTotalCost / marginFactor : boardTotalCost;
-            const rInc = effectiveSettings.roundingIncrement;
-            const sellPriceRounded = (rInc && rInc > 0) ? Math.round(sellPrice / rInc) * rInc : sellPrice;
-
-            totalLabourHours += labourHours;
-            totalMaterialCost += materialCost;
-            totalLabourCost += labourCost;
-            totalConsumablesCost += consumablesCost;
-            totalCostBase += costBase;
-            totalOverheadAmount += overheadAmount;
-            totalEngineeringCost += engineeringCost;
-            totalCost += boardTotalCost;
-            grandTotal += sellPriceRounded;
-        });
-
-        const profit = grandTotal - totalCost;
-        const gst = grandTotal * effectiveSettings.gstPct;
-        const finalSellPrice = grandTotal + gst;
+        // Map to format expected by ExportService
+        const boardTotalsMap = Object.entries(quoteTotals.boardTotals).map(([boardId, totals]) => ({
+            boardId,
+            sellPriceRounded: totals.sellPriceRounded
+        }));
 
         const grandTotals = {
-            labourHours: totalLabourHours,
-            materialCost: totalMaterialCost,
-            labourCost: totalLabourCost,
-            consumablesCost: totalConsumablesCost,
-            costBase: totalCostBase,
-            overheadAmount: totalOverheadAmount,
-            engineeringCost: totalEngineeringCost,
-            totalCost: totalCost,
-            profit: profit,
-            sellPrice: grandTotal,
-            sellPriceRounded: grandTotal,
-            gst: gst,
-            finalSellPrice: finalSellPrice
+            ...quoteTotals.grandTotals,
+            gst: quoteTotals.grandTotals.gst,
+            finalSellPrice: quoteTotals.grandTotals.finalSellPrice
         };
 
         const quoteData = {
@@ -208,9 +119,9 @@ export async function GET(
             clientCompany: quote.clientCompany,
             projectRef: quote.projectRef,
             description: quote.description,
-            boards: quote.boards,
+            boards: enrichedBoards,
             totals: {
-                sellPrice: grandTotal
+                sellPrice: grandTotals.sellPrice
             },
             templatePath
         };
