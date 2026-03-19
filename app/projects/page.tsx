@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
     Search, 
@@ -16,7 +16,8 @@ import {
     Trash2, 
     Building2, 
     Calendar, 
-    FileText 
+    FileText,
+    Settings2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,9 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuCheckboxItem,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
     Tooltip,
@@ -64,6 +68,13 @@ interface Project {
     projectDescription: string | null;
     projectStatus: string;
     createdAt: string;
+    pipedrive_deal_id: number | null;
+    dealValue: number | null;
+    currency: string | null;
+    dealCreatedAt: string | null;
+    expectedCloseDate: string | null;
+    quoteFolder: string | null;
+    pipedriveDealUrl: string | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
     _count?: {
@@ -107,6 +118,51 @@ export default function ProjectsPage() {
     const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
     const [isPipedriveConfigured, setIsPipedriveConfigured] = useState(true);
 
+    // Column Visibility State
+    const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+        client: true,
+        company: true,
+        dealValue: true,
+        created: true,
+    });
+
+    // Refs for Synced Scrollbar
+    const tableContainerRef = useRef<HTMLDivElement>(null);
+    const scrollbarRef = useRef<HTMLDivElement>(null);
+
+    // Load column visibility from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('projects_table_columns');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setVisibleColumns(prev => ({ ...prev, ...parsed }));
+            } catch (e) {
+                console.error('Failed to parse saved columns', e);
+            }
+        }
+    }, []);
+
+    // Save column visibility to localStorage
+    const toggleColumn = (column: string) => {
+        const newState = { ...visibleColumns, [column]: !visibleColumns[column] };
+        setVisibleColumns(newState);
+        localStorage.setItem('projects_table_columns', JSON.stringify(newState));
+    };
+
+    // Sync Scrollbar logic
+    const handleTableScroll = () => {
+        if (tableContainerRef.current && scrollbarRef.current) {
+            scrollbarRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+        }
+    };
+
+    const handleScrollbarScroll = () => {
+        if (tableContainerRef.current && scrollbarRef.current) {
+            tableContainerRef.current.scrollLeft = scrollbarRef.current.scrollLeft;
+        }
+    };
+
     // Poll for sync status
     useEffect(() => {
         let interval: NodeJS.Timeout;
@@ -136,14 +192,14 @@ export default function ProjectsPage() {
         return () => clearInterval(interval);
     }, [syncingPipedrive, syncBatchId]);
 
-    const handleSync = async (mode: 'quick' | 'full') => {
+    const handleSync = async (mode: 'quick' | 'full', force: boolean = false) => {
         setSyncingPipedrive(true);
         setSyncProgress(null);
         try {
             const res = await fetch('/api/admin/pipedrive/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode }),
+                body: JSON.stringify({ mode, force }),
             });
             
             if (res.ok) {
@@ -153,7 +209,20 @@ export default function ProjectsPage() {
             } else if (res.status === 409) {
                 const data = await res.json();
                 setSyncBatchId(data.conflict.id);
-                toast.info('A synchronization is already in progress');
+                toast.info(
+                    <div className="flex flex-col gap-2">
+                        <p>A synchronization is already in progress.</p>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="bg-white hover:bg-slate-50 border-slate-200 text-slate-700 h-8 font-bold"
+                            onClick={() => handleSync(mode, true)}
+                        >
+                            Force Sync New Batch
+                        </Button>
+                    </div>,
+                    { duration: 6000 }
+                );
             } else {
                 const data = await res.json().catch(() => ({}));
                 toast.error(data.error || 'Sync failed to start');
@@ -334,7 +403,7 @@ export default function ProjectsPage() {
     };
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-[1600px] mx-auto px-4 py-8">
             <div className="flex justify-between items-end mb-8">
                 <div className="space-y-1">
                     <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Project Management</h1>
@@ -443,14 +512,55 @@ export default function ProjectsPage() {
                             {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <RefreshCcw className="w-4 h-4" />}
                             <span className="hidden sm:inline">Refresh</span>
                         </Button>
+                        
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="rounded-xl border-gray-200 h-9 font-bold text-gray-700 flex items-center gap-2">
+                                    <Settings2 size={16} />
+                                    <span>Columns</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuCheckboxItem 
+                                    checked={visibleColumns.client}
+                                    onCheckedChange={() => toggleColumn('client')}
+                                >
+                                    Client
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem 
+                                    checked={visibleColumns.company}
+                                    onCheckedChange={() => toggleColumn('company')}
+                                >
+                                    Company
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem 
+                                    checked={visibleColumns.dealValue}
+                                    onCheckedChange={() => toggleColumn('dealValue')}
+                                >
+                                    Deal Value
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem 
+                                    checked={visibleColumns.created}
+                                    onCheckedChange={() => toggleColumn('created')}
+                                >
+                                    Created Date
+                                </DropdownMenuCheckboxItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto min-h-[400px]">
-                    <table className="w-full text-left">
+                <div 
+                    ref={tableContainerRef}
+                    onScroll={handleTableScroll}
+                    className="overflow-x-auto min-h-[400px] relative"
+                >
+                    <table className="w-full text-left table-fixed min-w-[1200px]">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 w-10">
+                                <th className="px-6 py-4 w-[60px]">
                                     <input 
                                         type="checkbox" 
                                         checked={projects.length > 0 && selectedIds.length === projects.length}
@@ -458,26 +568,27 @@ export default function ProjectsPage() {
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project / Company</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Quotes</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Client (Contact)</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Details</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Created</th>
-                                <th className="px-6 py-4 w-10"></th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[300px]">Project</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px] text-center">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[100px] text-center">Quotes</th>
+                                {visibleColumns.client && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[180px]">Client</th>}
+                                {visibleColumns.company && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[180px]">Company</th>}
+                                {visibleColumns.dealValue && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[150px] text-right">Deal Value</th>}
+                                {visibleColumns.created && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Created</th>}
+                                <th className="px-6 py-4 w-[80px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50 relative">
+                        <tbody className="divide-y divide-gray-50">
                             {loading && projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-20 text-center">
+                                    <td colSpan={visibleColumns.client && visibleColumns.company && visibleColumns.dealValue && visibleColumns.created ? 9 : 5} className="px-6 py-20 text-center">
                                         <Loader2 className="animate-spin inline-block text-blue-500 mb-2" size={32} />
                                         <p className="text-gray-400 font-medium">Loading projects...</p>
                                     </td>
                                 </tr>
                             ) : projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="px-6 py-20 text-center">
+                                    <td colSpan={9} className="px-6 py-20 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
                                                 <Search size={24} />
@@ -485,15 +596,6 @@ export default function ProjectsPage() {
                                             <p className="text-gray-500 font-bold">
                                                 {search ? "No results match your search" : "No projects found"}
                                             </p>
-                                            {search && (
-                                                <Button 
-                                                    variant="link" 
-                                                    className="text-blue-600 h-auto p-0"
-                                                    onClick={() => updateUrl({ search: '', page: 1 })}
-                                                >
-                                                    Clear filters
-                                                </Button>
-                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -513,28 +615,57 @@ export default function ProjectsPage() {
                                             />
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-start gap-3">
-                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors shadow-sm">
-                                                    <Briefcase size={20} />
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors shadow-sm shrink-0">
+                                                    <Briefcase size={18} />
                                                 </div>
                                                 <div 
-                                                    className="cursor-pointer group/link"
+                                                    className="cursor-pointer group/link min-w-0 flex-1"
                                                     onClick={() => router.push(`/projects/${project.id}`)}
                                                 >
-                                                    <div className="font-bold text-gray-900 leading-tight group-hover/link:text-blue-600 group-hover/link:underline decoration-blue-200 transition-all">{project.projectName}</div>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs text-gray-500 font-medium">
-                                                            {getProjectCompanyDisplay(project)}
-                                                        </span>
-                                                        {(project.companyName || project.client?.name) && (
-                                                            <>
-                                                                <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                                                <span className="text-xs text-blue-600 font-semibold italic">
-                                                                    {getProjectClientDisplay(project)}
-                                                                </span>
-                                                            </>
-                                                        )}
+                                                    <div className="font-bold text-gray-900 leading-tight group-hover/link:text-blue-600 group-hover/link:underline decoration-blue-200 transition-all truncate" title={project.projectName}>
+                                                        {project.projectName}
                                                     </div>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                                    {project.pipedriveDealUrl && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <a 
+                                                                        href={project.pipedriveDealUrl} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="p-1 hover:bg-blue-100 text-blue-600 rounded-md transition-colors"
+                                                                    >
+                                                                        <div className="w-3.5 h-3.5 rounded-sm overflow-hidden">
+                                                                           <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                                                        </div>
+                                                                    </a>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Open Pipedrive Deal</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                    {project.quoteFolder && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <a 
+                                                                        href={project.quoteFolder} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        className="p-1 hover:bg-blue-100 text-slate-500 hover:text-blue-700 rounded-md transition-colors"
+                                                                    >
+                                                                        <FileText size={14} />
+                                                                    </a>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Open Quote Folder</TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
                                                 </div>
                                             </div>
                                         </td>
@@ -551,40 +682,53 @@ export default function ProjectsPage() {
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col items-center">
                                                 <span className="text-sm font-bold text-gray-900">{project._count?.quotes || 0}</span>
-                                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter">Quotes</span>
+                                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter font-medium">Quotes</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
-                                                    <User size={14} className="text-gray-400" />
-                                                    {getProjectContactDisplay(project)}
+                                        {visibleColumns.client && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <User size={14} className="text-gray-400 shrink-0" />
+                                                    <span className="text-sm font-medium text-gray-700 truncate" title={getProjectContactDisplay(project)}>
+                                                        {getProjectContactDisplay(project)}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 mt-1">
-                                                    <Building2 size={12} className="text-gray-400" />
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{getProjectCompanyDisplay(project)}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.company && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Building2 size={14} className="text-gray-400 shrink-0" />
+                                                    <span className="text-sm font-medium text-gray-700 truncate" title={getProjectCompanyDisplay(project)}>
+                                                        {getProjectCompanyDisplay(project)}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1">
-                                                {project.projectReference && (
-                                                    <div className="text-[10px] text-gray-400 uppercase tracking-tighter font-bold flex items-center gap-1">
-                                                        REF: <span className="text-gray-600 font-medium">{project.projectReference}</span>
+                                            </td>
+                                        )}
+                                        {visibleColumns.dealValue && (
+                                            <td className="px-6 py-4 text-right">
+                                                {project.dealValue ? (
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="text-sm font-bold text-gray-900">
+                                                            {project.currency || '$'}{project.dealValue.toLocaleString()}
+                                                        </span>
+                                                        {project.pipedrive_deal_id && (
+                                                            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Pipedrive</span>
+                                                        )}
                                                     </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-300 font-medium italic">—</span>
                                                 )}
-                                                <div className="text-xs text-gray-500 truncate max-w-[200px] italic">
-                                                    {project.projectDescription || 'No description provided'}
+                                            </td>
+                                        )}
+                                        {visibleColumns.created && (
+                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                <div className="text-sm font-semibold text-gray-700">
+                                                    {project.createdAt ? format(new Date(project.createdAt), 'dd MMM yyyy') : '—'}
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="text-sm font-medium text-gray-700">
-                                                {format(new Date(project.createdAt), 'dd MMM yyyy')}
-                                            </div>
-                                            <div className="text-[10px] text-gray-400 uppercase">{format(new Date(project.createdAt), 'h:mm a')}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4 sticky right-0 z-10 bg-white group-hover:bg-[#f8faff] transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <button className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-gray-400 hover:text-gray-600 transition-all border border-transparent">
@@ -592,14 +736,14 @@ export default function ProjectsPage() {
                                                     </button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-48">
-                                                    <DropdownMenuItem onClick={() => handleEditOpen(project)} className="cursor-pointer">
+                                                    <DropdownMenuItem onClick={() => handleEditOpen(project)} className="cursor-pointer font-medium">
                                                         <Edit2 className="mr-2 h-4 w-4 text-gray-400" />
-                                                        Edit Details
+                                                        Edit Project
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => {
                                                         setSelectedProject(project);
                                                         setIsDeleteDialogOpen(true);
-                                                    }} className="text-red-600 cursor-pointer">
+                                                    }} className="text-red-600 cursor-pointer font-medium">
                                                         <Trash2 className="mr-2 h-4 w-4" />
                                                         Delete Project
                                                     </DropdownMenuItem>
@@ -611,6 +755,15 @@ export default function ProjectsPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Sticky Horizontal Scrollbar */}
+                <div 
+                    ref={scrollbarRef}
+                    onScroll={handleScrollbarScroll}
+                    className="overflow-x-auto h-3 bg-gray-50 border-t border-gray-100 sticky bottom-0 z-20"
+                >
+                    <div style={{ width: '1200px', height: '1px' }} />
                 </div>
 
                 {/* Pagination Footer */}

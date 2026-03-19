@@ -20,7 +20,8 @@ export async function PATCH(
         // Valid Project model fields
         const VALID_PROJECT_FIELDS = [
             'projectName', 'projectReference', 'projectDescription', 'projectStatus',
-            'pipedrive_deal_id'
+            'pipedrive_deal_id', 'dealValue', 'currency', 'dealCreatedAt', 
+            'expectedCloseDate', 'quoteFolder', 'pipedriveDealUrl'
         ];
 
         const updates: any = {};

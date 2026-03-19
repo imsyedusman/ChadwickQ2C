@@ -32,7 +32,12 @@ export async function GET(
             person: deal.person_id ? {
                 id: deal.person_id.value,
                 name: deal.person_id.name
-            } : null
+            } : null,
+            value: deal.value,
+            currency: deal.currency,
+            add_time: deal.add_time,
+            expected_close_date: deal.expected_close_date,
+            quote_folder: deal['47359133abef167a5b3ec1276f449c3743ce970f']
         });
     } catch (error) {
         console.error('Pipedrive deal fetch error:', error);

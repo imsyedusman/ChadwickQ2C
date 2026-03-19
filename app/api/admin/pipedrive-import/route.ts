@@ -28,7 +28,12 @@ const dealsMap = {
     pipedrive_deal_id: ['deal_id', 'id'],
     name: ['deal_title', 'title', 'name'],
     org_id: ['deal_organisation_id', 'deal_organization_id', 'org_id', 'organization_id'],
-    person_id: ['deal_contact_person_id', 'person_id', 'contact_person_id']
+    person_id: ['deal_contact_person_id', 'person_id', 'contact_person_id'],
+    value: ['value', 'deal_value', 'deal_value_value'],
+    currency: ['currency', 'deal_currency'],
+    add_time: ['add_time', 'created_date', 'deal_created_date'],
+    expected_close_date: ['expected_close_date', 'close_date', 'deal_expected_close_date'],
+    quote_folder: ['47359133abef167a5b3ec1276f449c3743ce970f', 'quote_folder']
 };
 
 function mapRow(row: any, mapping: Record<string, string[]>): any {

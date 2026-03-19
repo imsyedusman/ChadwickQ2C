@@ -41,6 +41,11 @@ export interface PipedriveDeal {
     name: string;
     org_id: string;
     person_id?: string | null;
+    value?: string | number | null;
+    currency?: string | null;
+    add_time?: string | null;
+    expected_close_date?: string | null;
+    quote_folder?: string | null;
 }
 
 export interface ImportOptions {
@@ -157,8 +162,8 @@ export async function syncPipedriveData(
                 if (!id || !org.name) continue;
                 const client = await tx.client.upsert({
                     where: { pipedrive_org_id: parseInt(id) },
-                    update: { name: org.name, import_batch_id: batch.id, source },
-                    create: { name: org.name, pipedrive_org_id: parseInt(id), import_batch_id: batch.id, source }
+                    update: { name: org.name, importBatch: { connect: { id: batch.id } }, source },
+                    create: { name: org.name, pipedrive_org_id: parseInt(id), importBatch: { connect: { id: batch.id } }, source }
                 });
                 orgMap[id] = client.id;
                 metrics.clients.committed++;
@@ -183,8 +188,23 @@ export async function syncPipedriveData(
 
                 const contact = await tx.contact.upsert({
                     where: { pipedrive_person_id: parseInt(pId) },
-                    update: { name: person.name, email: normalizeValue(person.email)?.toLowerCase(), phone: extractFirstValue(person.phone), clientId, import_batch_id: batch.id, source },
-                    create: { name: person.name, email: normalizeValue(person.email)?.toLowerCase(), phone: extractFirstValue(person.phone), pipedrive_person_id: parseInt(pId), clientId, import_batch_id: batch.id, source }
+                    update: { 
+                        name: person.name, 
+                        email: normalizeValue(person.email)?.toLowerCase(), 
+                        phone: extractFirstValue(person.phone), 
+                        client: clientId ? { connect: { id: clientId } } : undefined, 
+                        importBatch: { connect: { id: batch.id } }, 
+                        source 
+                    },
+                    create: { 
+                        name: person.name, 
+                        email: normalizeValue(person.email)?.toLowerCase(), 
+                        phone: extractFirstValue(person.phone), 
+                        pipedrive_person_id: parseInt(pId), 
+                        client: clientId ? { connect: { id: clientId } } : undefined, 
+                        importBatch: { connect: { id: batch.id } }, 
+                        source 
+                    }
                 });
                 personMap.set(pId, contact.id);
                 metrics.contacts.committed++;
@@ -209,11 +229,114 @@ export async function syncPipedriveData(
                     addError('missingContacts', { deal_id: dId, person_id: normalizeId(deal.person_id) });
                 }
 
-                await tx.project.upsert({
-                    where: { pipedrive_deal_id: parseInt(dId) },
-                    update: { projectName: deal.name, clientId, contactId: contactId || null, import_batch_id: batch.id, source },
-                    create: { projectName: deal.name, pipedrive_deal_id: parseInt(dId), clientId, contactId: contactId || null, import_batch_id: batch.id, source }
+                const dIdNum = parseInt(dId);
+                const projectTx = tx.project as any;
+                const existingProject = await projectTx.findUnique({
+                    where: { pipedrive_deal_id: dIdNum }
                 });
+
+                // 3.1 Strict Field Mapping & Safeguards
+                const dealValue = typeof deal.value === 'number' 
+                    ? deal.value 
+                    : (deal.value ? parseFloat(String(deal.value)) : null);
+                
+                const parseDate = (d: any) => {
+                    if (!d) return null;
+                    try {
+                        const date = new Date(d);
+                        return isNaN(date.getTime()) ? null : date;
+                    } catch { return null; }
+                };
+                const dealCreatedAt = parseDate(deal.add_time);
+                const expectedCloseDate = parseDate(deal.expected_close_date);
+                const quoteFolder = typeof deal.quote_folder === 'string' ? deal.quote_folder.trim() : null;
+                const pipedriveDealUrl = `https://app.pipedrive.com/deal/${dIdNum}`;
+
+                if (existingProject) {
+                    const updateData: any = {};
+                    let changed = false;
+                    const ep = existingProject as any;
+
+                    // 3.2 Stable Field Protection (Update ONLY if null/undefined)
+                    const stableFields = {
+                        projectName: deal.name,
+                        clientId: clientId, // Nested connect handled below
+                        contactId: contactId // Nested connect handled below
+                    };
+
+                    if ((ep.projectName === null || ep.projectName === undefined) && deal.name) {
+                        updateData.projectName = deal.name;
+                        changed = true;
+                    }
+
+                    if ((ep.clientId === null || ep.clientId === undefined) && clientId) {
+                        updateData.client = { connect: { id: clientId } };
+                        changed = true;
+                    }
+
+                    if ((ep.contactId === null || ep.contactId === undefined) && contactId) {
+                        updateData.contact = { connect: { id: contactId } };
+                        changed = true;
+                    }
+
+                    // 3.3 Metadata Fields rule (Hard Guard: Prevent Empty Overwrites + Compare Before Update)
+                    const metadataFields: any = {
+                        dealValue,
+                        currency: deal.currency || null,
+                        dealCreatedAt,
+                        expectedCloseDate,
+                        quoteFolder,
+                        pipedriveDealUrl
+                    };
+
+                    for (const [key, incomingVal] of Object.entries(metadataFields)) {
+                        // Hard Guard: Prevent Empty Overwrites
+                        if (incomingVal === null || incomingVal === undefined || incomingVal === '') continue;
+
+                        const existingVal = ep[key];
+                        let isChanged = false;
+
+                        if (incomingVal instanceof Date && existingVal instanceof Date) {
+                            isChanged = incomingVal.getTime() !== existingVal.getTime();
+                        } else {
+                            isChanged = existingVal !== incomingVal;
+                        }
+
+                        if (isChanged) {
+                            updateData[key] = incomingVal;
+                            changed = true;
+                        }
+                    }
+
+                    if (changed) {
+                        await projectTx.update({
+                            where: { id: existingProject.id },
+                            data: {
+                                ...updateData,
+                                importBatch: { connect: { id: batch.id } },
+                                source
+                            }
+                        });
+                    }
+                } else {
+                    await projectTx.create({
+                        data: {
+                            projectName: deal.name,
+                            pipedrive_deal_id: dIdNum,
+                            client: clientId ? { connect: { id: clientId } } : undefined,
+                            contact: contactId ? { connect: { id: contactId } } : undefined,
+                            dealValue,
+                            currency: deal.currency || null,
+                            dealCreatedAt,
+                            expectedCloseDate,
+                            quoteFolder,
+                            pipedriveDealUrl,
+                            projectStatus: 'Budget',
+                            importBatch: { connect: { id: batch.id } },
+                            source
+                        }
+                    });
+                }
                 metrics.projects.committed++;
                 metrics.projects.linked++;
             }
