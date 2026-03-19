@@ -80,19 +80,30 @@ export default function BackupManager() {
 
             const data = await res.json();
 
-            if (res.ok) {
+            if (res.ok && data.status === 'FULL_SUCCESS') {
+                const { created, updated, deleted } = data.processedCounts;
                 setRestoreStatus({
                     type: 'success',
-                    message: `Successfully restored ${data.details.createdCount} items.${data.details.deletedCount ? ` (Deleted ${data.details.deletedCount} existing items)` : ''}`
+                    message: `Import Completed Successfully! Created: ${created}, Updated: ${updated}${deleted ? `, Deleted: ${deleted}` : ''}.`
+                });
+            } else if (data.status === 'PARTIAL_SUCCESS') {
+                const { created, updated } = data.processedCounts;
+                const { totalBatches, completedBatches } = data.batchProgress;
+                setRestoreStatus({
+                    type: 'error',
+                    message: `Import Partially Completed (${completedBatches}/${totalBatches} batches). Created: ${created}, Updated: ${updated}. Error: ${data.error}`
                 });
             } else {
-                throw new Error(data.error || 'Restore failed');
+                setRestoreStatus({ 
+                    type: 'error', 
+                    message: data.error || data.message || 'Failed to restore backup' 
+                });
             }
         } catch (error: any) {
             console.error('Restore failed:', error);
             setRestoreStatus({ 
                 type: 'error', 
-                message: error.message || 'Failed to restore backup' 
+                message: error.message || 'Failed to parse backup or communication error' 
             });
         } finally {
             setRestoring(false);

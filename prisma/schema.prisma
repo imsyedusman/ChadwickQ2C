@@ -365,7 +365,7 @@ model CatalogItem {
   brand           String?
   category        String?
   subcategory     String?
-  partNumber      String?  @unique
+  partNumber      String?
   description     String
   unitPrice       Float    @default(0)
   labourHours     Float    @default(0)
@@ -388,6 +388,8 @@ model CatalogItem {
   mccbVariant     String? // e.g. "B3", "F3", "N3", "H3", "630bN"
   mccbRole        String? // e.g. "TRIP_UNIT", "BASE"
   components      Json?   // Composite items logic
+
+  @@unique([partNumber, brand])
 }
 
 model MccbTripBaseRule {

@@ -28,79 +28,140 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    const startTime = Date.now();
+    let createdCount = 0;
+    let updatedCount = 0;
+    let deletedCount = 0;
+    let completedBatches = 0;
+
     try {
         const body = await request.json();
-        const { items, type, clearBeforeImport } = body;
+        const { items: rawItems, type, clearBeforeImport, allOrNothing = false } = body;
 
-        if (type !== 'catalog_backup' || !Array.isArray(items)) {
-            return NextResponse.json({ error: 'Invalid backup file format' }, { status: 400 });
+        if (type !== 'catalog_backup' || !Array.isArray(rawItems)) {
+            return NextResponse.json({ 
+                status: 'FAILURE',
+                error: 'Invalid backup file format',
+                type: 'VALIDATION'
+            }, { status: 400 });
         }
 
-        // Transaction to ensure atomicity
-        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-            let deletedCount = 0;
-            let createdCount = 0;
-            let updatedCount = 0;
+        console.log(`[IMPORT] Starting catalog import of ${rawItems.length} items. clearBeforeImport=${clearBeforeImport}`);
 
-            if (clearBeforeImport) {
-                // Delete ALL catalog items
-                const deleted = await tx.catalogItem.deleteMany({});
-                deletedCount = deleted.count;
-                
-                // createMany is efficient for fresh start
-                const itemsToCreate = items.map((item: any) => {
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    const { id, createdAt, updatedAt, ...rest } = item;
-                    return rest;
-                });
-                const created = await tx.catalogItem.createMany({ data: itemsToCreate });
-                createdCount = created.count;
-            } else {
-                // Merge logic with duplicate prevention
-                // For each item, we check if partNumber + brand exists
-                for (const item of items) {
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    const { id, createdAt, updatedAt, ...rest } = item;
-                    
-                    if (!rest.partNumber || !rest.brand) {
-                        // Skip items without unique key info
-                        continue;
-                    }
+        // 1. Normalization & Deterministic Sorting
+        const items = rawItems
+            .filter(item => item.partNumber && item.brand)
+            .map(item => ({
+                ...item,
+                partNumber: String(item.partNumber).trim().toLowerCase(),
+                brand: String(item.brand).trim().toLowerCase()
+            }))
+            .sort((a, b) => {
+                const brandCompare = a.brand.localeCompare(b.brand);
+                if (brandCompare !== 0) return brandCompare;
+                return a.partNumber.localeCompare(b.partNumber);
+            });
 
-                    const existing = await tx.catalogItem.findFirst({
-                        where: {
-                            partNumber: rest.partNumber,
-                            brand: rest.brand
-                        }
-                    });
-
-                    if (existing) {
-                        // Update existing item
-                        await tx.catalogItem.update({
-                            where: { id: existing.id },
-                            data: rest
-                        });
-                        updatedCount++;
-                    } else {
-                        // Create new item
-                        await tx.catalogItem.create({
-                            data: rest
-                        });
-                        createdCount++;
-                    }
-                }
+        // 2. Cross-Batch Dedup: Ensure no duplicates within the request itself
+        const seenInRequest = new Set<string>();
+        const uniqueItems = [];
+        for (const item of items) {
+            const key = `${item.brand}:${item.partNumber}`;
+            if (!seenInRequest.has(key)) {
+                seenInRequest.add(key);
+                uniqueItems.push(item);
             }
+        }
 
-            return { deletedCount, createdCount, updatedCount };
+        if (clearBeforeImport) {
+            // Full clear is a single operation
+            const deleted = await prisma.catalogItem.deleteMany({});
+            deletedCount = deleted.count;
+            console.log(`[IMPORT] Cleared ${deletedCount} existing items.`);
+        }
+
+        // 3. Pre-fetch existing items for matching (optimized memory)
+        const existingItems = await prisma.catalogItem.findMany({
+            select: { id: true, partNumber: true, brand: true }
         });
+        const existingLookup = new Map(
+            existingItems.map(item => [`${(item.brand || '').toLowerCase()}:${(item.partNumber || '').toLowerCase()}`, item.id])
+        );
+
+        // 4. Batch Processing
+        const BATCH_SIZE = 100;
+        const totalBatches = Math.ceil(uniqueItems.length / BATCH_SIZE);
+
+        for (let i = 0; i < uniqueItems.length; i += BATCH_SIZE) {
+            const batchIndex = Math.floor(i / BATCH_SIZE);
+            const batchItems = uniqueItems.slice(i, i + BATCH_SIZE);
+            const batchStartTime = Date.now();
+
+            try {
+                await prisma.$transaction(async (tx) => {
+                    for (const item of batchItems) {
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        const { id, createdAt, updatedAt, ...rest } = item;
+                        const key = `${rest.brand}:${rest.partNumber}`;
+                        const existingId = existingLookup.get(key);
+
+                        if (existingId) {
+                            await tx.catalogItem.update({
+                                where: { id: existingId },
+                                data: rest
+                            });
+                            updatedCount++;
+                        } else {
+                            await tx.catalogItem.create({
+                                data: rest
+                            });
+                            createdCount++;
+                        }
+                    }
+                }, {
+                    timeout: 30000 // 30s safety as backup
+                });
+
+                completedBatches++;
+                const batchDuration = Date.now() - batchStartTime;
+                if (batchDuration > 2000) {
+                    console.warn(`[IMPORT] Batch ${batchIndex + 1}/${totalBatches} SLOW: ${batchDuration}ms`);
+                } else {
+                    console.log(`[IMPORT] Batch ${batchIndex + 1}/${totalBatches} completed in ${batchDuration}ms`);
+                }
+            } catch (batchError: any) {
+                console.error(`[IMPORT] Batch ${batchIndex + 1} FAILED:`, batchError);
+                
+                return NextResponse.json({
+                    status: 'PARTIAL_SUCCESS',
+                    error: `Failed to process batch ${batchIndex + 1}`,
+                    type: 'BATCH_ERROR',
+                    details: String(batchError),
+                    processedCounts: { created: createdCount, updated: updatedCount, deleted: deletedCount },
+                    batchProgress: { totalBatches, completedBatches, failedBatchIndex: batchIndex }
+                }, { status: 500 });
+            }
+        }
+
+        const totalDuration = Date.now() - startTime;
+        console.log(`[IMPORT] Full success. Processed ${uniqueItems.length} items in ${totalDuration}ms.`);
 
         return NextResponse.json({
+            status: 'FULL_SUCCESS',
             message: 'Catalog restored successfully',
-            details: result
+            processedCounts: { created: createdCount, updated: updatedCount, deleted: deletedCount },
+            batchProgress: { totalBatches, completedBatches }
         });
 
     } catch (error) {
         console.error('Catalog Import Error:', error);
-        return NextResponse.json({ error: 'Failed to import catalog', details: String(error) }, { status: 500 });
+        return NextResponse.json({ 
+            status: 'FAILURE',
+            error: 'Failed to import catalog', 
+            type: 'DB_ERROR',
+            details: String(error),
+            processedCounts: { created: createdCount, updated: updatedCount, deleted: deletedCount },
+            batchProgress: { totalBatches: 0, completedBatches }
+        }, { status: 500 });
     }
 }
