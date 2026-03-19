@@ -36,6 +36,8 @@ interface Project {
     projectReference: string | null;
     projectDescription: string | null;
     projectStatus: string;
+    client?: { name: string, source?: string } | null;
+    contact?: { name: string, source?: string } | null;
 }
 
 interface NewQuoteDialogProps {
@@ -128,10 +130,24 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                 }
             }
 
+            // Hard enforcement of Pipedrive semantics at submission layer
+            const finalClientName = isNewProject ? clientName : (selectedProject?.contact?.name ?? "No Contact");
+            const finalCompanyName = isNewProject ? companyName : (selectedProject?.client?.name ?? "No Company");
+
+            // Prevent silent data corruption with validation logs
+            if (process.env.NODE_ENV === 'development') {
+                if (finalClientName === finalCompanyName && finalClientName !== "No Contact") {
+                    console.warn('[NewQuote] Validation Alarm: clientName matches companyName. Possible mapping bug.', { finalClientName, finalCompanyName });
+                }
+                if (finalClientName === "No Contact" && selectedProject?.contact) {
+                    console.error('[NewQuote] Validation Error: clientName is "No Contact" but contact object exists!', selectedProject);
+                }
+            }
+
             const body: any = {
                 description,
-                clientName: isNewProject ? clientName : (selectedProject?.clientName || ''),
-                clientCompany: isNewProject ? companyName : (selectedProject?.companyName || ''),
+                clientName: finalClientName,
+                clientCompany: finalCompanyName,
                 projectRef: isNewProject ? projectName : (selectedProject?.projectName || ''),
             };
 
@@ -235,6 +251,15 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                                                         key={project.id}
                                                         value={project.id}
                                                         onSelect={() => {
+                                                            const mappedClient = getProjectClientDisplay(project as any);
+                                                            const mappedCompany = getProjectCompanyDisplay(project as any);
+                                                            
+                                                            console.log('[NewQuote] Project Selection Diagnostics (Aligned Semantics):');
+                                                            console.log(`  Project: ${project.projectName}`);
+                                                            console.log(`  Organization (Company): ${project.client?.name || 'NULL'}`);
+                                                            console.log(`  Contact Person (Client): ${project.contact?.name || 'NULL'}`);
+                                                            console.log(`  Mapped Results -> Client Field: "${mappedClient}", Company Field: "${mappedCompany}"`);
+                                                            
                                                             setSelectedProject(project);
                                                             setIsComboboxOpen(false);
                                                         }}

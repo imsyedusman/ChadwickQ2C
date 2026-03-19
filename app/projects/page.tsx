@@ -266,10 +266,10 @@ export default function ProjectsPage() {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project/Client</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project / Company</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Quotes</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Contact</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Client (Contact)</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Details</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Created</th>
                                 <th className="px-6 py-4 w-10"></th>
@@ -324,13 +324,13 @@ export default function ProjectsPage() {
                                                     <div className="font-bold text-gray-900 leading-tight group-hover/link:text-blue-600 group-hover/link:underline decoration-blue-200 transition-all">{project.projectName}</div>
                                                     <div className="flex items-center gap-2 mt-1">
                                                         <span className="text-xs text-gray-500 font-medium">
-                                                            {getProjectClientDisplay(project)}
+                                                            {getProjectCompanyDisplay(project)}
                                                         </span>
                                                         {(project.companyName || project.client?.name) && (
                                                             <>
                                                                 <div className="w-1 h-1 rounded-full bg-gray-300" />
                                                                 <span className="text-xs text-blue-600 font-semibold italic">
-                                                                    {getProjectCompanyDisplay(project)}
+                                                                    {getProjectClientDisplay(project)}
                                                                 </span>
                                                             </>
                                                         )}

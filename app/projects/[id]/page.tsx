@@ -137,10 +137,12 @@ export default function ProjectDetail() {
                             <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
                                 <div className="flex items-center gap-2">
                                     <User size={16} className="text-gray-400" />
+                                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Client:</span>
                                     <span className="font-bold text-gray-800">{getProjectClientDisplay(project)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Building2 size={16} className="text-gray-400" />
+                                    <span className="text-xs text-gray-500 uppercase tracking-widest font-bold">Company:</span>
                                     <span className="font-bold text-gray-800 italic">{getProjectCompanyDisplay(project)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">

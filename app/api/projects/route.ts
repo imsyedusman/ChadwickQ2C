@@ -55,10 +55,10 @@ export async function GET(request: Request) {
             where,
             include: {
                 client: {
-                    select: { name: true }
+                    select: { id: true, name: true, source: true }
                 },
                 contact: {
-                    select: { name: true }
+                    select: { id: true, name: true, source: true }
                 },
                 _count: {
                     select: { quotes: true }
