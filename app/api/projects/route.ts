@@ -11,7 +11,7 @@ export async function GET(request: Request) {
         }
 
         const { searchParams } = new URL(request.url);
-        const search = searchParams.get('search') || '';
+        const searchInput = searchParams.get('search')?.trim() || '';
         const checkProjectName = searchParams.get('checkName');
         const checkClientName = searchParams.get('checkClient');
 
@@ -25,34 +25,56 @@ export async function GET(request: Request) {
             return NextResponse.json({ exists: !!existing, project: existing });
         }
 
-        const where = search ? {
+        const page = parseInt(searchParams.get('page') || '1');
+        const limit = parseInt(searchParams.get('limit') || '25');
+        const skip = (page - 1) * limit;
+
+        const where = searchInput ? {
             OR: [
-                { projectName: { contains: search, mode: 'insensitive' } },
-                { clientName: { contains: search, mode: 'insensitive' } },
-                { companyName: { contains: search, mode: 'insensitive' } },
+                { projectName: { contains: searchInput, mode: 'insensitive' } },
+                { clientName: { contains: searchInput, mode: 'insensitive' } },
+                { companyName: { contains: searchInput, mode: 'insensitive' } },
+                { projectReference: { contains: searchInput, mode: 'insensitive' } },
+                {
+                    client: {
+                        name: { contains: searchInput, mode: 'insensitive' }
+                    }
+                },
+                {
+                    contact: {
+                        name: { contains: searchInput, mode: 'insensitive' }
+                    }
+                }
             ]
         } : {};
 
+        // Get total count for filtered results
+        const total = await (prisma as any).project.count({ where });
+
         const projects = await (prisma as any).project.findMany({
             where,
-            select: {
-                id: true,
-                projectName: true,
-                clientName: true,
-                companyName: true,
-                projectReference: true,
-                projectDescription: true,
-                projectStatus: true,
-                createdAt: true,
+            include: {
+                client: {
+                    select: { name: true }
+                },
+                contact: {
+                    select: { name: true }
+                },
                 _count: {
                     select: { quotes: true }
                 }
             },
-            orderBy: { projectName: 'asc' },
-            take: 20,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
         });
 
-        return NextResponse.json(projects);
+        return NextResponse.json({
+            projects,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        });
     } catch (error) {
         console.error('Failed to fetch projects:', error);
         return NextResponse.json({ error: 'Failed to fetch projects' }, { status: 500 });

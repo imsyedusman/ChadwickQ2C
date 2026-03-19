@@ -10,19 +10,28 @@ import {
     Briefcase,
     Plus,
     Clock,
-    ArrowUpRight
+    ArrowUpRight,
+    Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 
+import { 
+    getProjectClientDisplay, 
+    getProjectCompanyDisplay, 
+    getProjectContactDisplay 
+} from '@/lib/project-utils';
+
 interface Project {
     id: string;
     projectName: string;
-    clientName: string;
-    companyName: string;
+    clientName: string | null;
+    companyName: string | null;
     projectStatus: string;
     createdAt: string;
+    client?: { name: string } | null;
+    contact?: { name: string } | null;
     quotes: {
         id: string;
         quoteNumber: string;
@@ -65,8 +74,11 @@ export default function ProjectDetail() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-gray-500 animate-pulse">Loading project details...</div>
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4">
+                <div className="flex flex-col items-center">
+                    <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
+                    <div className="text-gray-500 font-bold uppercase tracking-widest text-xs">Loading project details...</div>
+                </div>
             </div>
         );
     }
@@ -100,7 +112,7 @@ export default function ProjectDetail() {
     };
 
     return (
-        <main className="max-w-[1200px] mx-auto px-6 py-8">
+        <main className="max-w-[1200px] mx-auto px-6 py-8 animate-in fade-in duration-500">
                 {/* Header & Back Button */}
                 <div className="mb-8">
                     <button 
@@ -116,7 +128,7 @@ export default function ProjectDetail() {
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-3xl font-bold text-gray-900">{project.projectName}</h1>
                                 <span className={cn(
-                                    "px-3 py-1 text-xs font-bold rounded-full border uppercase tracking-widest",
+                                    "px-3 py-1 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm",
                                     getProjectStatusDisplay(project.projectStatus).className
                                 )}>
                                     {project.projectStatus}
@@ -125,15 +137,19 @@ export default function ProjectDetail() {
                             <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
                                 <div className="flex items-center gap-2">
                                     <User size={16} className="text-gray-400" />
-                                    <span className="font-medium text-gray-700">{project.clientName}</span>
+                                    <span className="font-bold text-gray-800">{getProjectClientDisplay(project)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Building2 size={16} className="text-gray-400" />
-                                    <span className="font-medium text-gray-700">{project.companyName || 'No Company'}</span>
+                                    <span className="font-bold text-gray-800 italic">{getProjectCompanyDisplay(project)}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Calendar size={16} className="text-gray-400" />
-                                    <span>Created {project.createdAt ? format(new Date(project.createdAt), 'MMMM d, yyyy') : 'Recently'}</span>
+                                    <span className="font-medium">Created {project.createdAt ? format(new Date(project.createdAt), 'MMMM d, yyyy') : 'Recently'}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest">{getProjectContactDisplay(project)}</span>
                                 </div>
                             </div>
                         </div>

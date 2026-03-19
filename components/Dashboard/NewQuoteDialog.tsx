@@ -22,6 +22,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { 
+    getProjectClientDisplay, 
+    getProjectCompanyDisplay, 
+    getProjectContactDisplay 
+} from '@/lib/project-utils';
 
 interface Project {
     id: string;
@@ -63,25 +68,48 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     const fetchProjects = useCallback(async (search: string = '') => {
         setFetchingProjects(true);
         try {
-            const res = await fetch(`/api/projects?search=${encodeURIComponent(search)}`);
+            const query = search.trim();
+            const url = `/api/projects?page=1&limit=25${query ? `&search=${encodeURIComponent(query)}` : ''}`;
+            
+            console.log(`[NewQuote] Fetching projects with search: "${query || 'empty'}"`);
+            
+            const res = await fetch(url);
             if (res.ok) {
                 const data = await res.json();
-                // Filter out duplicates by ID just in case
-                const uniqueProjects = Array.from(new Map(data.map((p: Project) => [p.id, p])).values()) as Project[];
-                setProjects(uniqueProjects);
+                
+                // Debug logs as requested
+                console.log(`[NewQuote] API Result - Total: ${data.total || 0}, Rendered: ${data.projects?.length || 0}`);
+                
+                // data is { projects, total, page, totalPages }
+                const projectsArray = Array.isArray(data.projects) ? data.projects : [];
+                setProjects(projectsArray);
+            } else {
+                console.error('[NewQuote] API error:', res.status);
             }
         } catch (error) {
-            console.error('Failed to fetch projects', error);
+            console.error('[NewQuote] Failed to fetch projects:', error);
         } finally {
             setFetchingProjects(false);
         }
     }, []);
 
+    // Initial fetch when opening
     useEffect(() => {
-        if (isOpen && !isNewProject) {
-            fetchProjects(searchQuery);
+        if (isOpen && !isNewProject && searchQuery === '') {
+            fetchProjects('');
         }
-    }, [isOpen, searchQuery, isNewProject, fetchProjects]);
+    }, [isOpen, isNewProject, fetchProjects]);
+
+    // Debounced search when typing
+    useEffect(() => {
+        if (!isOpen || isNewProject || searchQuery === '') return;
+
+        const timer = setTimeout(() => {
+            fetchProjects(searchQuery);
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [searchQuery, isOpen, isNewProject, fetchProjects]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -226,13 +254,9 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                                                             </span>
                                                         </div>
                                                         <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-xs text-gray-600 font-medium">{project.clientName || 'No Client'}</span>
-                                                            {project.companyName && (
-                                                                <>
-                                                                    <div className="w-1 h-1 rounded-full bg-gray-300" />
-                                                                    <span className="text-xs text-gray-500">{project.companyName}</span>
-                                                                </>
-                                                            )}
+                                                            <span className="text-xs text-gray-600 font-bold">{getProjectClientDisplay(project)}</span>
+                                                            <div className="w-1 h-1 rounded-full bg-gray-300" />
+                                                            <span className="text-xs text-blue-600 font-bold italic">{getProjectCompanyDisplay(project)}</span>
                                                         </div>
                                                     </CommandItem>
                                                 ))}

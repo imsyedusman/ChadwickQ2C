@@ -60,6 +60,8 @@ export async function GET(
         const project = await (prisma as any).project.findUnique({
             where: { id },
             include: {
+                client: true,
+                contact: true,
                 quotes: {
                     include: {
                         boards: {
