@@ -24,7 +24,7 @@ export async function POST() {
             const clientsCount = await tx.client.deleteMany({});
         });
 
-        await logAction(userId, 'RESET_PROJECTS_FULL', 'PROJECT', null, {
+        await logAction(userId, 'RESET_PROJECTS_FULL', 'PROJECT', undefined, {
             description: 'Admin performed full reset of all projects, clients, contacts, and related data'
         });
 

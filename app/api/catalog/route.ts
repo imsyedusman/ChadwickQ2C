@@ -263,8 +263,11 @@ export async function POST(request: Request) {
                     continue;
                 }
 
-                const existing = await tx.catalogItem.findUnique({
-                    where: { partNumber: item.partNumber }
+                const existing = await tx.catalogItem.findFirst({
+                    where: { 
+                        partNumber: item.partNumber,
+                        brand: item.brand
+                    }
                 });
 
                 if (existing) {

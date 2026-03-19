@@ -20,7 +20,7 @@ export async function POST() {
             const quotesCount = await tx.quote.deleteMany({});
         });
 
-        await logAction(userId, 'RESET_QUOTES', 'QUOTE', null, {
+        await logAction(userId, 'RESET_QUOTES', 'QUOTE', undefined, {
             description: 'Admin performed full reset of all quotes and related data'
         });
 
