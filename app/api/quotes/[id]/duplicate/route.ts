@@ -5,6 +5,7 @@ import { generateRevisionNumber } from '@/lib/quote-numbering';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
+import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 
 export async function POST(
     request: Request,
@@ -52,7 +53,26 @@ export async function POST(
             const newRevision = (maxRevisionResult._max.revision ?? 0) + 1;
 
             const session = await getServerSession(authOptions);
-            const userId = session?.user?.id;
+            let userId = (session?.user as any)?.id;
+            const userEmail = (session?.user as any)?.email;
+
+            // --- Robust User Resolution Chain --- (Matching main quote creation)
+            let dbUser = null;
+            if (userId) {
+                dbUser = await (tx as any).user.findUnique({ where: { id: userId } });
+            }
+            if (!dbUser && userEmail) {
+                dbUser = await (tx as any).user.findUnique({ where: { email: userEmail } });
+                if (dbUser) userId = dbUser.id;
+            }
+            if (!dbUser) {
+                dbUser = await getOrCreateDefaultAdminUser();
+                if (dbUser) userId = dbUser.id;
+            }
+
+            if (!dbUser || !userId) {
+                throw new Error('Quote duplication failed: No valid users found in database.');
+            }
 
             // Create the new quote with all boards and items
             return await tx.quote.create({
@@ -124,7 +144,7 @@ export async function POST(
             } as any);
         });
 
-        await logAction((newQuote as any).createdBy, 'DUPLICATE_QUOTE', 'QUOTE', newQuote.id, { 
+        await logAction((newQuote as any).createdBy || (newQuote as any).userId, 'DUPLICATE_QUOTE', 'QUOTE', newQuote.id, { 
             originalId: id, 
             newQuoteNumber: newQuote.quoteNumber 
         });
