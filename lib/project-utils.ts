@@ -10,7 +10,7 @@ export function getProjectCompanyDisplay(project: { client?: { name: string } | 
     return name;
 }
 
-export function getProjectContactDisplay(project: { contact?: { name: string } | null }) {
-    // Contact display remains just the person name (Client)
-    return project.contact?.name || '---';
+export function getProjectContactDisplay(project: { contact?: { name: string } | null, clientName?: string | null }) {
+    // Contact display Priority: contact.name -> clientName -> "No Contact"
+    return project.contact?.name || project.clientName || 'No Contact';
 }

@@ -1,0 +1,6 @@
+﻿--- Database Check: Specific Items ---
+Part "1B-TIERS-400": 0 itemsFound
+Part "1B-SS-NO4": 0 itemsFound
+Part "1B-PB-TIERS": 0 itemsFound
+Part "CU-10X3": 0 itemsFound
+Items with NO brand: 0

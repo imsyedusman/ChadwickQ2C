@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { calculateQuoteTotals } from '@/lib/pricing';
+import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 
 export async function GET(request: Request) {
     try {
@@ -166,10 +167,42 @@ export async function POST(request: Request) {
         const { clientName, projectRef, description, projectId, newProject } = body;
 
         const session = await getServerSession(authOptions);
-        const userId = (session?.user as any)?.id;
+        let userId = (session?.user as any)?.id;
+        const userEmail = (session?.user as any)?.email;
 
-        if (!userId) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // --- Robust User Resolution Chain ---
+        let dbUser = null;
+        
+        // 1. Resolve by Session ID
+        if (userId) {
+            dbUser = await (prisma as any).user.findUnique({ where: { id: userId } });
+        }
+
+        // 2. Resolve by Email if ID resolution failed
+        if (!dbUser && userEmail) {
+            console.log(`[Quote Creation] User ID ${userId} not found. Attempting resolution by email: ${userEmail}`);
+            dbUser = await (prisma as any).user.findUnique({ where: { email: userEmail } });
+            if (dbUser) userId = dbUser.id;
+        }
+
+        // 3. Fallback: Resolve to first available active user (prioritize ADMIN)
+        if (!dbUser) {
+            console.warn(`[Quote Creation] Session user ${userId || userEmail || 'Unknown'} not in DB. Searching for fallback user.`);
+            dbUser = await getOrCreateDefaultAdminUser();
+
+            if (dbUser) {
+                userId = dbUser.id;
+                console.log(`[Quote Creation] Using fallback user: ${dbUser.name} (${userId})`);
+            }
+        }
+
+        // 4. Critical Block: No Users available
+        if (!dbUser || !userId) {
+            console.error('[Quote Creation] CRITICAL FAILURE: No users found in database.');
+            return NextResponse.json({ 
+                error: 'Quote creation failed: No valid users found in database.',
+                details: 'A user record is required to assign quote ownership. Please ensure at least one active user exists.'
+            }, { status: 400 });
         }
 
         const quoteNumber = await generateNextQuoteNumber();
@@ -237,9 +270,21 @@ export async function POST(request: Request) {
         await logAction(userId, 'CREATE_QUOTE', 'QUOTE', newQuote.id, { quoteNumber });
 
         return NextResponse.json(newQuote);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to create quote:', error);
-        return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });
+        
+        // Check for Prisma Foreign Key violation (P2003)
+        if (error.code === 'P2003') {
+            return NextResponse.json({ 
+                error: 'Quote creation failed due to inconsistent data state.',
+                details: 'The assigned creator or project could not be found. This often happens after a database reset.'
+            }, { status: 400 });
+        }
+
+        return NextResponse.json({ 
+            error: 'Failed to create quote', 
+            details: error.message || 'An unexpected error occurred'
+        }, { status: 500 });
     }
 }
 

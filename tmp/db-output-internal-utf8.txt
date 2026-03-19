@@ -1,0 +1,33 @@
+﻿--- Database Check: Internal/Chadwick Items ---
+Found 29 items for brands: chadwick, internal, CHADWICK, INTERNAL
+[chadwick] int-3-phase-cable-set-per-metre-160a (Switchboard) - 3-Phase Cable set per metre     -     160A
+[chadwick] int-3-phase-cable-set-per-metre-200a (Switchboard) - 3-Phase Cable set per metre     -     200A
+[chadwick] int-3-phase-cable-set-per-metre-63a (Switchboard) - 3-Phase Cable set per metre     -     63A
+[chadwick] ipd-wiring-digital (Switchboard) - Wiring - Digital Meters
+[chadwick] ipd-wiring-surge (Switchboard) - Wiring - surge protection device
+[internal] chd-cable-3p-160a (Switchboard) - 3-Phase Cable set per metre - 160A
+[internal] chd-cable-3p-200a (Switchboard) - 3-Phase Cable set per metre - 200A
+[internal] chd-cable-3p-63a (Switchboard) - 3-Phase Cable set per metre - 63A
+[internal] chd-fcl-160a (Switchboard) - 160A FCL's + Line / Load cables
+[internal] chd-fcl-200a (Switchboard) - 200A FCL's + Line / Load cables
+[internal] chd-fuse-20a-din (Switchboard) - Fuse and cartridge - 20A (DIN)
+[internal] chd-gc-4nc-contactor (Switchboard) - Additional 4NC Contactors
+[internal] chd-gc-bypass (Switchboard) - By-pass switch
+[internal] chd-gc-em-light-kit (Switchboard) - Emergency lighting test kit
+[internal] chd-gc-led-ind (Switchboard) - LED indicating lights (each)
+[internal] chd-gc-light-contactor-23a (Switchboard) - Lighting contactor - 23A AC3
+[internal] chd-gc-pe-provision (Switchboard) - Provision for P.E. cell
+[internal] chd-gc-pfr (Switchboard) - PFR
+[internal] chd-gc-relay-4p (Switchboard) - Relay - four pole
+[internal] chd-gc-time-1ch (Switchboard) - Time switch - 1 channel
+[internal] chd-gc-time-2ch (Switchboard) - Time switch - 2 channel
+[internal] chd-gc-time-4ch (Switchboard) - Time switch - 4 channel
+[internal] chd-temp-heater-100w (Switchboard) - Heater, 240VAC, 100W
+[internal] chd-temp-heater-147w (Switchboard) - Heater, 240VAC, 147W
+[internal] chd-temp-heater-55w (Switchboard) - Heater, 240VAC, 55W
+[internal] chd-temp-thermo-dual-60 (Switchboard) - Thermostat, Dual Control, N/C + N/O, 0-60C
+[internal] chd-temp-thermo-nc-60 (Switchboard) - Thermostat, Heater, N/C, 0-60C
+[internal] chd-temp-thermo-no-60 (Switchboard) - Thermostat, Fan/Alarm, N/O, 0-60C
+[internal] chd-wiring-control (Switchboard) - Additional Control wiring (per wire)
+
+Part "1b-tiers-400": 0 items found

@@ -121,9 +121,9 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     )}
 
                     {isCopper && (
-                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
-                            <Zap size={10} className="text-orange-700" />
-                            Copper
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
+                            <Zap size={8} className="text-orange-700" />
+                            Cu
                         </span>
                     )}
 

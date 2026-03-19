@@ -1,0 +1,8 @@
+﻿--- Database Check: Specific Items ---
+Part "1B-TIERS-400": 1 itemsFound
+ - ID: cc512368-ffed-4183-b930-7685c040ae24, Brand: null, Category: Basics, Subcat: Outdoor & Custom Switchboard Enclosures
+Part "1B-SS-NO4": 1 itemsFound
+ - ID: 9e2913e9-6925-44d7-b914-bbc5f52de17b, Brand: null, Category: Basics, Subcat: Outdoor & Custom Switchboard Enclosures
+Part "1B-PB-TIERS": 0 itemsFound
+Part "CU-10X3": 0 itemsFound
+Items with NO brand: 91

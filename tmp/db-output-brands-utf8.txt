@@ -1,0 +1,38 @@
+﻿--- Database Check: Unique Brands ---
+Brands found:
+┌─────────┬───────────────┬──────────────────────┐
+│ (index) │ _count        │ brand                │
+├─────────┼───────────────┼──────────────────────┤
+│ 0       │ { id: 1 }     │ 'carlo gavazzi'      │
+│ 1       │ { id: 24 }    │ 'ipd'                │
+│ 2       │ { id: 1 }     │ 'generic'            │
+│ 3       │ { id: 28073 } │ 'schneider electric' │
+│ 4       │ { id: 17 }    │ 'nhp'                │
+│ 5       │ { id: 13 }    │ 'colterlec'          │
+│ 6       │ { id: 5 }     │ 'chadwick'           │
+│ 7       │ { id: 1 }     │ 'socomec'            │
+│ 8       │ { id: 2 }     │ 'mercs'              │
+│ 9       │ { id: 24 }    │ 'internal'           │
+└─────────┴───────────────┴──────────────────────┘
+
+Sample items:
+[schneider electric] nsysupla4tg - Switchboard
+[schneider electric] 260/32-gy - Switchboard
+[schneider electric] tbum297174 - Switchboard
+[schneider electric] wmc315 - Switchboard
+[schneider electric] 870use10300 - Switchboard
+[schneider electric] sx-dor-ap - Switchboard
+[schneider electric] nsycl405csx - Switchboard
+[schneider electric] ar1mb01cc - Switchboard
+[schneider electric] 3105aben - Switchboard
+[schneider electric] lv429125 - Switchboard
+[schneider electric] rsl1pveu - Switchboard
+[schneider electric] tm1stntcrn52015 - Switchboard
+[schneider electric] m9u21113 - Switchboard
+[schneider electric] lc1k0610f7 - Switchboard
+[schneider electric] 4025xa-pw - Switchboard
+[schneider electric] c63v32m500 - Switchboard
+[schneider electric] xs612b1pbl10ex - Switchboard
+[schneider electric] lv850007x - Switchboard
+[schneider electric] th38e - Switchboard
+[schneider electric] 33239 - Switchboard

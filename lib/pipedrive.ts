@@ -9,7 +9,7 @@ import prisma from './prisma';
  * - Handle null/missing gracefully
  */
 
-async function getPipedriveToken(): Promise<string | null> {
+export async function getPipedriveToken(): Promise<string | null> {
     const settings = await (prisma as any).settings.findUnique({
         where: { id: 'global' },
         select: { pipedriveToken: true }
@@ -62,9 +62,9 @@ export async function listDeals(options: { limit?: number, start?: number, sort?
         const endpoint = `deals?limit=${limit}&start=${start}&sort=${encodeURIComponent(sort)}`;
         const data = await pipedriveFetch(endpoint);
         return data; // Return full response for pagination
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to list Pipedrive deals:', error);
-        return null;
+        throw error; // Propagate error for clear feedback
     }
 }
 

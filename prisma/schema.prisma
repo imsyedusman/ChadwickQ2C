@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// 2026-02-19: Added Dynamic Copper Pricing & Decimal Quantities
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,45 +7,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ProjectStatus {
-  Budget
-  Tender
-  Live
-}
-
 model Quote {
-  id            String   @id @default(uuid())
-  quoteNumber   String   // Auto-generated friendly ID e.g. Q-1001
-  revision      Int      @default(0) // 0 for original, increments for duplicates
-  clientName    String?
-  clientCompany String?
-  projectRef    String?
-  description   String?
-  status        String   @default("DRAFT") // DRAFT, SENT, APPROVED, REJECTED
-  
-  // Revision Grouping
-  revisionGroupId String? // Unifies a family of revisions/duplicates
-  
-  // Ownership tracking
-  createdBy     String?
-  creator       User?    @relation("QuoteCreator", fields: [createdBy], references: [id])
-  lastModifiedBy String?
-  modifier      User?    @relation("QuoteModifier", fields: [lastModifiedBy], references: [id])
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  // JSON snapshots for versioning/history
-  settingsSnapshot String? // JSON string of settings at time of quote
-  
-  // Global Commercial Adjustments
-  globalDiscount    Float @default(0) // Percentage or Fixed amount? Let's assume % for now or handle both in logic
-  globalContingency Float @default(0) // Percentage
-
-  // Dynamic Copper Pricing Overrides
-  overrideCopperPricePerKg Float?
-
-  // Per-Quote Costing Overrides (Optional - falls back to Global Settings if null)
+  id                        String      @id @default(uuid())
+  quoteNumber               String
+  clientName                String?
+  clientCompany             String?
+  projectRef                String?
+  description               String?
+  status                    String      @default("DRAFT")
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
+  settingsSnapshot          String?
+  globalDiscount            Float       @default(0)
+  globalContingency         Float       @default(0)
   overrideLabourRate        Float?
   overrideOverheadPct       Float?
   overrideEngineeringPct    Float?
@@ -58,19 +27,22 @@ model Quote {
   overrideConsumablesPct    Float?
   overrideGstPct            Float?
   overrideRoundingIncrement Int?
-  
-  boards        Board[]
-  shareLinks    ShareLink[]
-
-  projectId     String?
-  project       Project? @relation(fields: [projectId], references: [id])
-
-  clientId      String?
-  client        Client?  @relation(fields: [clientId], references: [id])
-  contactId     String?
-  contact       Contact? @relation(fields: [contactId], references: [id])
-
-  gridInternalNotes String? @db.Text
+  overrideCopperPricePerKg  Float?
+  revision                  Int         @default(0)
+  createdBy                 String?
+  lastModifiedBy            String?
+  revisionGroupId           String?
+  projectId                 String?
+  gridInternalNotes         String?
+  clientId                  String?
+  contactId                 String?
+  boards                    Board[]
+  client                    Client?     @relation(fields: [clientId], references: [id])
+  contact                   Contact?    @relation(fields: [contactId], references: [id])
+  creator                   User?       @relation("QuoteCreator", fields: [createdBy], references: [id])
+  modifier                  User?       @relation("QuoteModifier", fields: [lastModifiedBy], references: [id])
+  project                   Project?    @relation(fields: [projectId], references: [id])
+  shareLinks                ShareLink[]
 
   @@unique([quoteNumber, revision])
   @@index([clientId])
@@ -79,26 +51,23 @@ model Quote {
 }
 
 model Project {
-  id                 String   @id @default(uuid())
+  id                 String        @id @default(uuid())
   projectName        String
   clientName         String?
-  companyName        String?
-  projectReference   String?
-  projectDescription String?
   projectStatus      ProjectStatus @default(Budget)
-  
-  // Pipedrive Integration
-  pipedrive_deal_id  Int?     @unique
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  companyName        String?
+  projectDescription String?
+  projectReference   String?
   clientId           String?
-  client             Client?  @relation(fields: [clientId], references: [id])
   contactId          String?
-  contact            Contact? @relation(fields: [contactId], references: [id])
-  source             String?
   import_batch_id    String?
-  importBatch        ImportBatch? @relation(fields: [import_batch_id], references: [id])
-
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  pipedrive_deal_id  Int?          @unique
+  source             String?
+  client             Client?       @relation(fields: [clientId], references: [id])
+  contact            Contact?      @relation(fields: [contactId], references: [id])
+  importBatch        ImportBatch?  @relation(fields: [import_batch_id], references: [id])
   quotes             Quote[]
 
   @@index([pipedrive_deal_id])
@@ -108,16 +77,14 @@ model Project {
 }
 
 model Client {
-  id               String   @id @default(uuid())
+  id               String       @id @default(uuid())
   name             String
-  pipedrive_org_id Int?     @unique
-  source           String   @default("pipedrive")
-  import_batch_id String?
+  pipedrive_org_id Int?         @unique
+  source           String       @default("pipedrive")
+  import_batch_id  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
   importBatch      ImportBatch? @relation(fields: [import_batch_id], references: [id])
-  
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  
   contacts         Contact[]
   projects         Project[]
   quotes           Quote[]
@@ -127,22 +94,18 @@ model Client {
 }
 
 model Contact {
-  id                  String   @id @default(uuid())
+  id                  String       @id @default(uuid())
   name                String
   email               String?
   phone               String?
-  pipedrive_person_id Int?     @unique
-  
+  pipedrive_person_id Int?         @unique
   clientId            String?
-  client              Client?  @relation(fields: [clientId], references: [id])
-  
-  source              String   @default("pipedrive")
-  import_batch_id    String?
+  source              String       @default("pipedrive")
+  import_batch_id     String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  client              Client?      @relation(fields: [clientId], references: [id])
   importBatch         ImportBatch? @relation(fields: [import_batch_id], references: [id])
-  
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
   projects            Project[]
   quotes              Quote[]
 
@@ -152,91 +115,73 @@ model Contact {
 }
 
 model ImportBatch {
-  id                      String   @id @default(uuid())
-  source                  String   @default("pipedrive")
-  status                  String   @default("PENDING") // PENDING, SUCCESS, FAILED
-  createdAt               DateTime @default(now())
-  startedAt               DateTime @default(now())
-  lastHeartbeatAt         DateTime @default(now())
-  completedAt             DateTime?
-  
-  // Attempted Metrics
-  totalClientsAttempted   Int      @default(0)
-  totalContactsAttempted  Int      @default(0)
-  totalProjectsAttempted  Int      @default(0)
-  
-  // Committed Metrics
-  totalClientsCommitted   Int      @default(0)
-  totalContactsCommitted  Int      @default(0)
-  totalProjectsCommitted  Int      @default(0)
-  
-  skippedDeals            Int      @default(0)
-  errorLog                Json?    // Structured error log { skippedDeals: [], validationErrors: [], etc }
-  
-  clients                 Client[]
-  contacts                Contact[]
-  projects                Project[]
+  id                     String    @id @default(uuid())
+  source                 String    @default("pipedrive")
+  status                 String    @default("PENDING")
+  createdAt              DateTime  @default(now())
+  startedAt              DateTime  @default(now())
+  lastHeartbeatAt        DateTime  @default(now())
+  completedAt            DateTime?
+  totalClientsAttempted  Int       @default(0)
+  totalContactsAttempted Int       @default(0)
+  totalProjectsAttempted Int       @default(0)
+  totalClientsCommitted  Int       @default(0)
+  totalContactsCommitted Int       @default(0)
+  totalProjectsCommitted Int       @default(0)
+  skippedDeals           Int       @default(0)
+  errorLog               Json?
+  clients                Client[]
+  contacts               Contact[]
+  projects               Project[]
 
   @@index([status, lastHeartbeatAt])
 }
 
-// Authentication & User Management
 model User {
-  id            String    @id @default(uuid())
-  name          String?
-  email         String?   @unique
-  password      String?   // Hashed password
-  emailVerified DateTime?
-  image         String?
-  status        String    @default("ACTIVE") // ACTIVE, DISABLED
-  lastLogin     DateTime?
-  
-  roleId        String?
-  role          Role?     @relation(fields: [roleId], references: [id])
-
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Ownership
-  createdQuotes   Quote[] @relation("QuoteCreator")
-  modifiedQuotes  Quote[] @relation("QuoteModifier")
-  
-  // Granular Permissions
+  id              String           @id @default(uuid())
+  name            String?
+  email           String?          @unique
+  password        String?
+  emailVerified   DateTime?
+  image           String?
+  status          String           @default("ACTIVE")
+  lastLogin       DateTime?
+  roleId          String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  accounts        Account[]
+  createdQuotes   Quote[]          @relation("QuoteCreator")
+  modifiedQuotes  Quote[]          @relation("QuoteModifier")
+  sessions        Session[]
+  role            Role?            @relation(fields: [roleId], references: [id])
   userPermissions UserPermission[]
-
-  // NextAuth
-  accounts      Account[]
-  sessions      Session[]
 }
 
 model Role {
   id              String           @id @default(uuid())
-  name            String           @unique // e.g., ADMIN, ESTIMATOR, VIEWER
+  name            String           @unique
   description     String?
-  users           User[]
-  rolePermissions RolePermission[]
-
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+  rolePermissions RolePermission[]
+  users           User[]
 }
 
 model Permission {
   id          String           @id @default(uuid())
-  name        String           @unique // e.g., "quotes:edit", "users:manage"
+  name        String           @unique
   description String?
-  
-  roles       RolePermission[]
-  users       UserPermission[]
-
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  roles       RolePermission[]
+  users       UserPermission[]
 }
 
 model RolePermission {
   roleId       String
   permissionId String
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
 }
@@ -244,27 +189,26 @@ model RolePermission {
 model UserPermission {
   userId       String
   permissionId String
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, permissionId])
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
@@ -280,80 +224,67 @@ model Session {
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String?
-  action    String   // e.g., "LOGIN", "CREATE_QUOTE", "USER_UPDATE"
-  entity    String?  // e.g., "QUOTE", "USER", "CATALOG"
+  action    String
+  entity    String?
   entityId  String?
-  details   String?  @db.Text // JSON string for metadata
+  details   String?
   timestamp DateTime @default(now())
 }
 
 model ShareLink {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   quoteId   String
-  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  token     String   @unique
+  token     String    @unique
   expiresAt DateTime?
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  quote     Quote     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 }
 
 model Board {
-  id          String   @id @default(uuid())
-  quoteId     String
-  quote       Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  name        String
-  type        String?  // MSB, DB, PANEL, etc.
-  order       Int      @default(0)
-  
-  isOptional  Boolean  @default(false)
-  description    String?   @db.Text
-  internalNotes  String?   @db.Text
-  config         String?   @db.Text // JSON string for board specific configs Pre-Selection values (IP, Form, etc.)
-  mccbVariant String?  // e.g. "B3", "F3" (Resolved from Fault Rating)
-  
-  items       Item[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  quoteId       String
+  name          String
+  type          String?
+  order         Int      @default(0)
+  isOptional    Boolean  @default(false)
+  config        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  mccbVariant   String?
+  description   String?
+  internalNotes String?
+  quote         Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  items         Item[]
 }
 
 model Item {
-  id          String   @id @default(uuid())
-  boardId     String
-  board       Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  
-  category    String   // BASICS, SWITCHBOARD, BUSBAR
-  subcategory String?
-  name        String
-  description String?
-  
-  quantity    Decimal  @default(1) @db.Decimal(10, 3) // Changed from Int to Decimal for meters
-  unitPrice   Float    @default(0)
-  labourHours Float    @default(0)
-  cost        Float    @default(0) // Calculated: unitPrice * quantity
-  
-  notes       String?
-  isDefault   Boolean  @default(false) // Was this auto-added?
-  isSheetmetal Boolean @default(false) // Counts towards sheetmetal total?
-  
-  order       Int      @default(0)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  isSystemManaged Boolean @default(false)
-  autoAdded       Boolean @default(false)
-  isIncluded      Boolean @default(true)
-  systemTag       String?  // e.g. "MCCB_ACCESSORIES", "MCCB_TRIP_BASE"
+  id              String   @id @default(uuid())
+  boardId         String
+  category        String
+  subcategory     String?
+  name            String
+  description     String?
+  quantity        Decimal  @default(1) @db.Decimal(10, 3)
+  unitPrice       Float    @default(0)
+  labourHours     Float    @default(0)
+  cost            Float    @default(0)
+  notes           String?
+  isDefault       Boolean  @default(false)
+  isSheetmetal    Boolean  @default(false)
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  isSystemManaged Boolean  @default(false)
   partNumber      String?
-  productFrame    String? // e.g. "NSX100-250", "NSX400-630"
-  mccbVariant     String? // Copied from CatalogItem at creation
-
-  // Automation Provenance
-  systemRuleType  String? // e.g. "MCB_CHASSIS_TO_NE_LINK_165A"
-
-  // 1:1 Relationship
+  productFrame    String?
+  mccbVariant     String?
+  systemTag       String?
+  systemRuleType  String?
+  autoAdded       Boolean  @default(false)
   parentItemId    String?
+  isIncluded      Boolean  @default(true)
+  board           Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   parentItem      Item?    @relation("ItemDependencies", fields: [parentItemId], references: [id], onDelete: Cascade)
   children        Item[]   @relation("ItemDependencies")
 
@@ -361,79 +292,67 @@ model Item {
 }
 
 model CatalogItem {
-  id              String   @id @default(uuid())
-  brand           String?
-  category        String?
-  subcategory     String?
-  partNumber      String?
-  description     String
-  unitPrice       Float    @default(0)
-  labourHours     Float    @default(0)
-  imageUrl        String?
-  isAutoAdd       Boolean  @default(false) // For Basics: Auto-add to new boards?
-  defaultQuantity Int      @default(1)
-  
-  // Dynamic Pricing Fields
+  id                          String   @id @default(uuid())
+  brand                       String?
+  category                    String?
+  subcategory                 String?
+  partNumber                  String?
+  description                 String
+  unitPrice                   Float    @default(0)
+  labourHours                 Float    @default(0)
+  imageUrl                    String?
+  isAutoAdd                   Boolean  @default(false)
+  defaultQuantity             Int      @default(1)
+  notes                       String?
+  meterType                   String?
+  isSheetmetal                Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  productFrame                String?
+  mccbRole                    String?
+  mccbVariant                 String?
+  isCopperPriced              Boolean  @default(false)
   totalCopperWeightKgPerMeter Float?
-  isCopperPriced              Boolean @default(false)
-
-  notes           String?  // Vendor catalog: auto-add logic rules
-  meterType       String?  // Direct, CT, NMI, Special
-  isSheetmetal    Boolean  @default(false)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  productFrame    String? // e.g. "NSX100-250"
-  mccbVariant     String? // e.g. "B3", "F3", "N3", "H3", "630bN"
-  mccbRole        String? // e.g. "TRIP_UNIT", "BASE"
-  components      Json?   // Composite items logic
+  components                  Json?
 
   @@unique([partNumber, brand])
 }
 
 model MccbTripBaseRule {
-  id              String   @id @default(uuid())
-  tripPartNumber  String
-  variant         String   // e.g. "B3", "F3", "N3", "H3"
-  basePartNumber  String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  tripPartNumber String
+  variant        String
+  basePartNumber String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@unique([tripPartNumber, variant])
 }
 
-
 model Settings {
-  id                    String   @id @default("global")
-  labourRate            Float    @default(100)
-  copperPricePerKg      Float    @default(15.0) // New Global Setting
-  consumablesPct        Float    @default(0.03)
-  overheadPct           Float    @default(0.20)
-  engineeringPct        Float    @default(0.20)
-  targetMarginPct       Float    @default(0.18)
-  gstPct                Float    @default(0.10)
-  roundingIncrement     Int      @default(100)
-  minMarginAlertPct     Float    @default(0.05)
-  
-  companyName           String?
-  companyAddress        String?
-  
-  // Pipedrive Integration
-  pipedriveToken        String?  // Securely stored API token
-  
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default("global")
+  labourRate        Float    @default(100)
+  consumablesPct    Float    @default(0.03)
+  overheadPct       Float    @default(0.20)
+  engineeringPct    Float    @default(0.20)
+  targetMarginPct   Float    @default(0.18)
+  gstPct            Float    @default(0.10)
+  roundingIncrement Int      @default(100)
+  minMarginAlertPct Float    @default(0.05)
+  companyName       String?
+  companyAddress    String?
+  updatedAt         DateTime @updatedAt
+  copperPricePerKg  Float    @default(15.0)
+  pipedriveToken    String?
 }
 
 model PairingRule {
-  id              String   @id @default(uuid())
-  ruleType        String   // e.g. "MCB_CHASSIS_TO_NE_LINK_165A"
-  inputPartNumber String
+  id               String   @id @default(uuid())
+  ruleType         String
+  inputPartNumber  String
   outputPartNumber String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([ruleType, inputPartNumber])
 }
@@ -441,8 +360,8 @@ model PairingRule {
 model Template {
   id           String   @id @default(cuid())
   name         String
-  filename     String   // Stored filename on disk
-  originalName String   // Original upload name
+  filename     String
+  originalName String
   size         Int
   isDefault    Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -453,4 +372,10 @@ model QuoteSequence {
   year       Int      @unique
   lastNumber Int
   updatedAt  DateTime @updatedAt
+}
+
+enum ProjectStatus {
+  Budget
+  Tender
+  Live
 }

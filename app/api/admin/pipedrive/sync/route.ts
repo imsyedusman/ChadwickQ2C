@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { listDeals, fetchOrganization, fetchPerson } from '@/lib/pipedrive';
+import { listDeals, fetchOrganization, fetchPerson, getPipedriveToken } from '@/lib/pipedrive';
 
 export async function POST(request: Request) {
     try {
@@ -12,7 +12,16 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { type = 'recent', force = false } = body;
+        const { mode = 'quick', force = false } = body; // mode: 'quick' or 'full'
+
+        // 1. Pre-check: Pipedrive API Key configuration
+        const token = await getPipedriveToken();
+        if (!token) {
+            console.warn('[Pipedrive Sync] BLOCKED: No API token configured.');
+            return NextResponse.json({ 
+                error: 'Pipedrive API key is not configured. Please add it in Admin Settings.' 
+            }, { status: 400 });
+        }
 
         // Atomic Reset & Create using Transaction
         const batch = await (prisma as any).$transaction(async (tx: any) => {
@@ -65,7 +74,7 @@ export async function POST(request: Request) {
             });
         });
 
-        console.log(`[Pipedrive Sync] ${force ? 'FORCED ' : ''}START: ${type} sync (Batch: ${batch.id})`);
+        console.log(`[Pipedrive Sync] ${force ? 'FORCED ' : ''}START: ${mode} sync (Batch: ${batch.id})`);
 
         let totalDealsProcessed = 0;
         let createdCount = 0;
@@ -76,28 +85,36 @@ export async function POST(request: Request) {
         let hasMore = true;
 
         // Determine stop condition
-        const maxDeals = type === 'recent' ? 200 : 10000; // Cap "All" at 10000 for safety
+        const maxDeals = mode === 'quick' ? 50 : 10000; // Strictly 50 for quick, 10000 for full safety
 
         let heartbeatRetryCount = 0;
 
+        // Helper to extract Pipedrive ID safely
+        const extractId = (val: any) => {
+            if (!val) return null;
+            if (typeof val === 'object') return val.value || null;
+            if (typeof val === 'number') return val;
+            if (typeof val === 'string' && /^\d+$/.test(val)) return parseInt(val);
+            return null;
+        };
+
         while (hasMore && totalDealsProcessed < maxDeals) {
-            // Updated heartbeat at start of chunk
+            // Heartbeat at start of chunk
             try {
                 await (prisma as any).importBatch.update({
                     where: { id: batch.id },
                     data: { lastHeartbeatAt: new Date() }
                 });
-                heartbeatRetryCount = 0; // Reset on success
+                heartbeatRetryCount = 0;
             } catch (hbError) {
                 heartbeatRetryCount++;
-                console.error(`[Pipedrive Sync] Heartbeat failure (Count: ${heartbeatRetryCount}):`, hbError);
                 if (heartbeatRetryCount >= 3) {
                     await (prisma as any).importBatch.update({
                         where: { id: batch.id },
                         data: { 
                             status: 'FAILED', 
                             completedAt: new Date(),
-                            errorLog: { message: 'Heartbeat failure threshold exceeded (3 consecutive misses)' }
+                            errorLog: { message: 'Heartbeat failure threshold exceeded' }
                         }
                     });
                     throw new Error('Sync terminated due to persistent heartbeat failures');
@@ -113,27 +130,27 @@ export async function POST(request: Request) {
             const deals = response.data;
             if (deals.length === 0) break;
 
+            console.log(`[Pipedrive Sync] Processing batch of ${deals.length} deals...`);
+
             for (const deal of deals) {
                 try {
                     const dealIdNum = Number(deal.id);
                     const projectName = deal.title;
-                    const pipedrive_org_id = deal.org_id?.value || deal.org_id;
-                    const pipedrive_person_id = deal.person_id?.value || deal.person_id;
-
-                    console.log(`[Pipedrive Sync] Processing deal ${dealIdNum}: ${projectName}`);
+                    const pipedrive_org_id = extractId(deal.org_id);
+                    const pipedrive_person_id = extractId(deal.person_id);
 
                     // 1. Upsert Client (Organization)
                     let clientId = null;
+                    let orgData = null;
                     if (pipedrive_org_id) {
-                        const orgIdNum = Number(pipedrive_org_id);
-                        const orgData = await fetchOrganization(pipedrive_org_id);
+                        orgData = await fetchOrganization(pipedrive_org_id);
                         if (orgData) {
                             const client = await (prisma as any).client.upsert({
-                                where: { pipedrive_org_id: orgIdNum },
+                                where: { pipedrive_org_id: Number(pipedrive_org_id) },
                                 update: { name: orgData.name },
                                 create: {
                                     name: orgData.name,
-                                    pipedrive_org_id: orgIdNum,
+                                    pipedrive_org_id: Number(pipedrive_org_id),
                                     source: 'pipedrive',
                                     import_batch_id: batch.id
                                 }
@@ -144,114 +161,98 @@ export async function POST(request: Request) {
 
                     // 2. Upsert Contact (Person)
                     let contactId = null;
+                    let personData = null;
                     if (pipedrive_person_id) {
-                        const personIdNum = Number(pipedrive_person_id);
-                        const personData = await fetchPerson(pipedrive_person_id);
+                        personData = await fetchPerson(pipedrive_person_id);
                         if (personData) {
                             const contact = await (prisma as any).contact.upsert({
-                                where: { pipedrive_person_id: personIdNum },
+                                where: { pipedrive_person_id: Number(pipedrive_person_id) },
                                 update: { 
-                                    name: personData.name,
-                                    email: personData.email?.[0]?.value || null,
-                                    phone: personData.phone?.[0]?.value || null,
+                                    name: personData.name.trim(),
+                                    email: (personData.email?.[0]?.value || "").trim() || null,
+                                    phone: (personData.phone?.[0]?.value || "").trim() || null,
                                     clientId: clientId || undefined
                                 },
                                 create: {
-                                    name: personData.name,
-                                    email: personData.email?.[0]?.value || null,
-                                    phone: personData.phone?.[0]?.value || null,
-                                    pipedrive_person_id: personIdNum,
+                                    name: personData.name.trim(),
+                                    email: (personData.email?.[0]?.value || "").trim() || null,
+                                    phone: (personData.phone?.[0]?.value || "").trim() || null,
+                                    pipedrive_person_id: Number(pipedrive_person_id),
                                     source: 'pipedrive',
                                     clientId: clientId,
                                     import_batch_id: batch.id
                                 }
                             });
                             contactId = contact.id;
+                        } else {
+                            console.warn(`[Pipedrive Sync] Secondary fetch failed for person ${pipedrive_person_id}. Setting contactId to null.`);
                         }
                     }
 
                     // 3. Upsert Project
-                    const existingProject = await (prisma as any).project.findUnique({
-                        where: { pipedrive_deal_id: dealIdNum }
-                    });
+                    const data = {
+                        projectName: projectName,
+                        clientId: clientId || null,
+                        contactId: contactId || null,
+                        clientName: personData?.name || deal.person_name || null,
+                        companyName: orgData?.name || deal.org_name || null,
+                        import_batch_id: batch.id
+                    };
 
-                    if (existingProject) {
-                        await (prisma as any).project.update({
-                            where: { id: existingProject.id },
-                            data: {
-                                projectName: projectName,
-                                clientId: clientId || existingProject.clientId,
-                                contactId: contactId || existingProject.contactId,
-                                clientName: deal.person_name || existingProject.clientName,
-                                companyName: deal.org_name || existingProject.companyName,
-                            }
-                        });
-                        updatedCount++;
-                    } else {
-                        await (prisma as any).project.create({
-                            data: {
-                                projectName: projectName,
-                                pipedrive_deal_id: dealIdNum,
-                                clientId: clientId,
-                                contactId: contactId,
-                                clientName: deal.person_name,
-                                companyName: deal.org_name,
-                                projectStatus: 'Budget',
-                                source: 'pipedrive',
-                                import_batch_id: batch.id
-                            }
-                        });
-                        createdCount++;
-                    }
+                    await (prisma as any).project.upsert({
+                        where: { pipedrive_deal_id: dealIdNum },
+                        update: data,
+                        create: {
+                            ...data,
+                            pipedrive_deal_id: dealIdNum,
+                            projectStatus: 'Budget',
+                            source: 'pipedrive',
+                        }
+                    });
+                    
+                    // Simple tracking (upsert doesn't tell us if it was create or update easily without return)
+                    // But we can just count total successes
+                    updatedCount++; 
                 } catch (innerError: any) {
                     console.error(`[Pipedrive Sync] Error processing deal ${deal.id}:`, innerError.message);
                     errors++;
                 }
-
                 totalDealsProcessed++;
             }
 
-            // Update heartbeat and progress at end of chunk
-            try {
-                await (prisma as any).importBatch.update({
-                    where: { id: batch.id },
-                    data: { 
-                        lastHeartbeatAt: new Date(),
-                        totalProjectsAttempted: totalDealsProcessed,
-                        totalProjectsCommitted: createdCount + updatedCount
-                    }
-                });
-                heartbeatRetryCount = 0; // Reset on success
-            } catch (hbError) {
-                heartbeatRetryCount++;
-                console.error(`[Pipedrive Sync] Heartbeat failure at end of chunk (Count: ${heartbeatRetryCount}):`, hbError);
-                // We'll let the next chunk's start-of-loop heartbeat handle the threshold
-            }
+            // Update stats at end of chunk
+            await (prisma as any).importBatch.update({
+                where: { id: batch.id },
+                data: { 
+                    totalProjectsAttempted: totalDealsProcessed,
+                    totalProjectsCommitted: updatedCount,
+                    lastHeartbeatAt: new Date()
+                }
+            });
 
             // Pagination Check
-            hasMore = response.additional_data?.pagination?.more_items_in_collection && totalDealsProcessed < maxDeals;
+            hasMore = mode === 'full' && 
+                      response.additional_data?.pagination?.more_items_in_collection && 
+                      totalDealsProcessed < maxDeals;
             start += limit;
         }
 
         // Finalize Batch
-        const finalBatch = await (prisma as any).importBatch.update({
+        await (prisma as any).importBatch.update({
             where: { id: batch.id },
             data: { 
                 status: 'SUCCESS',
                 completedAt: new Date(),
-                totalProjectsCommitted: createdCount + updatedCount,
                 errorLog: errors > 0 ? { errorMessage: `${errors} deals failed to process` } : null
             }
         });
 
-        console.log(`[Pipedrive Sync] Completed. Created: ${createdCount}, Updated: ${updatedCount}, Errors: ${errors}`);
+        console.log(`[Pipedrive Sync] Completed ${mode} sync. Total: ${totalDealsProcessed}, Errors: ${errors}`);
 
         return NextResponse.json({
             success: true,
             summary: {
                 total: totalDealsProcessed,
-                created: createdCount,
-                updated: updatedCount,
                 errors
             },
             batchId: batch.id

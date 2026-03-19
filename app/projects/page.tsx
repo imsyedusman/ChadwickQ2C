@@ -4,19 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
     Search, 
-    ChevronRight,
-    ChevronLeft,
-    AlertCircle,
-    RefreshCcw,
-    User,
-    Briefcase,
-    Loader2,
-    MoreVertical,
-    Edit2,
-    Trash2,
-    Building2,
-    Calendar,
-    FileText
+    ChevronRight, 
+    ChevronLeft, 
+    AlertCircle, 
+    RefreshCcw, 
+    User, 
+    Briefcase, 
+    Loader2, 
+    MoreVertical, 
+    Edit2, 
+    Trash2, 
+    Building2, 
+    Calendar, 
+    FileText 
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
     Dialog,
     DialogContent,
@@ -94,6 +100,71 @@ export default function ProjectsPage() {
         projectStatus: '',
     });
     const [actionLoading, setActionLoading] = useState(false);
+    
+    // Sync state
+    const [syncingPipedrive, setSyncingPipedrive] = useState(false);
+    const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
+    const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
+    const [isPipedriveConfigured, setIsPipedriveConfigured] = useState(true);
+
+    // Poll for sync status
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (syncingPipedrive && syncBatchId) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/admin/pipedrive/sync/status?batchId=${syncBatchId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSyncProgress({
+                            processed: data.totalAttempted,
+                            committed: data.totalCommitted
+                        });
+                        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
+                            setSyncingPipedrive(false);
+                            setSyncBatchId(null);
+                            fetchProjects(); // Refresh table when done
+                            if (data.status === 'SUCCESS') toast.success('Pipedrive sync completed');
+                            else toast.error('Pipedrive sync failed');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status polling error', error);
+                }
+            }, 1500);
+        }
+        return () => clearInterval(interval);
+    }, [syncingPipedrive, syncBatchId]);
+
+    const handleSync = async (mode: 'quick' | 'full') => {
+        setSyncingPipedrive(true);
+        setSyncProgress(null);
+        try {
+            const res = await fetch('/api/admin/pipedrive/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode }),
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setSyncBatchId(data.batchId);
+                toast.success(`Pipedrive ${mode} sync started`);
+            } else if (res.status === 409) {
+                const data = await res.json();
+                setSyncBatchId(data.conflict.id);
+                toast.info('A synchronization is already in progress');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast.error(data.error || 'Sync failed to start');
+                setSyncingPipedrive(false);
+            }
+        } catch (error) {
+            console.error('Sync error', error);
+            toast.error('An error occurred during sync');
+            setSyncingPipedrive(false);
+        }
+    };
 
     // Sync search input with URL if needed (e.g. browser back)
     useEffect(() => {
@@ -102,7 +173,20 @@ export default function ProjectsPage() {
 
     useEffect(() => {
         fetchProjects();
+        checkPipedriveStatus();
     }, [page, pageSize, search]);
+
+    const checkPipedriveStatus = async () => {
+        try {
+            const res = await fetch('/api/admin/pipedrive/status');
+            if (res.ok) {
+                const data = await res.json();
+                setIsPipedriveConfigured(data.isConfigured);
+            }
+        } catch (error) {
+            console.error('Failed to check Pipedrive status', error);
+        }
+    };
 
     // Internal debounced search effect that updates URL
     useEffect(() => {
@@ -132,12 +216,10 @@ export default function ProjectsPage() {
             const res = await fetch(url);
             const data = await res.json();
             
-            // data is { projects, total, page, totalPages }
             setProjects(data.projects || []);
             setTotalProjects(data.total || 0);
             setTotalPages(data.totalPages || 0);
 
-            // Handle out of bounds
             if (data.totalPages > 0 && page > data.totalPages) {
                 updateUrl({ page: 1 });
             }
@@ -203,7 +285,7 @@ export default function ProjectsPage() {
     };
 
     const toggleSelectAll = () => {
-        if (selectedIds.length === projects.length) {
+        if (selectedIds.length === projects.length && projects.length > 0) {
             setSelectedIds([]);
         } else {
             setSelectedIds(projects.map(p => p.id));
@@ -258,10 +340,69 @@ export default function ProjectsPage() {
                     <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Project Management</h1>
                     <p className="text-gray-500">Track opportunities, manage statuses, and view quote history.</p>
                 </div>
-                {/* 
-                   We don't need a Create Project button here because projects are primarily created 
-                   via the New Quote flow. But we can add it if needed.
-                */}
+                
+                <div className="flex items-center gap-3">
+                    {syncingPipedrive && syncProgress && (
+                        <div className="flex flex-col items-end mr-4 animate-pulse">
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-none">Syncing deals...</span>
+                            <span className="text-[10px] font-medium text-gray-400 mt-1">{syncProgress.processed} processed</span>
+                        </div>
+                    )}
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSync('quick')}
+                                    disabled={syncingPipedrive || !isPipedriveConfigured}
+                                    className={cn(
+                                        "flex items-center gap-2 border-gray-200 rounded-xl h-11 px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600",
+                                        !isPipedriveConfigured && "opacity-50 grayscale cursor-not-allowed"
+                                    )}
+                                >
+                                    {syncingPipedrive ? (
+                                        <Loader2 className="animate-spin text-blue-500" size={18} />
+                                    ) : (
+                                        <RefreshCcw size={18} className={cn("text-emerald-500", !isPipedriveConfigured && "text-gray-400")} />
+                                    )}
+                                    Sync Recent Deals (Fast)
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{isPipedriveConfigured ? "Faster, limited to latest 50 deals" : "Please configure Pipedrive API key in Admin Settings"}</p>
+                            </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSync('full')}
+                                    disabled={syncingPipedrive || !isPipedriveConfigured}
+                                    className={cn(
+                                        "flex items-center gap-2 border-gray-200 rounded-xl h-11 px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600",
+                                        !isPipedriveConfigured && "opacity-50 grayscale cursor-not-allowed"
+                                    )}
+                                >
+                                    {syncingPipedrive ? (
+                                        <Loader2 className="animate-spin text-blue-500" size={18} />
+                                    ) : (
+                                        <div className={cn(
+                                            "w-5 h-5 rounded-md overflow-hidden flex items-center justify-center bg-blue-50",
+                                            !isPipedriveConfigured && "bg-gray-100"
+                                        )}>
+                                            <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                        </div>
+                                    )}
+                                    Sync All Deals (Full)
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>{isPipedriveConfigured ? "Slower, syncs entire Pipedrive dataset" : "Please configure Pipedrive API key in Admin Settings"}</p>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
@@ -376,7 +517,6 @@ export default function ProjectsPage() {
                                                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors shadow-sm">
                                                     <Briefcase size={20} />
                                                 </div>
-                                                <div>
                                                 <div 
                                                     className="cursor-pointer group/link"
                                                     onClick={() => router.push(`/projects/${project.id}`)}
@@ -396,7 +536,6 @@ export default function ProjectsPage() {
                                                         )}
                                                     </div>
                                                 </div>
-                                                </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -415,11 +554,15 @@ export default function ProjectsPage() {
                                                 <span className="text-[10px] text-gray-400 uppercase tracking-tighter">Quotes</span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-700">
-                                                    <User size={12} className="text-gray-400" />
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-1.5 text-sm font-bold text-gray-900">
+                                                    <User size={14} className="text-gray-400" />
                                                     {getProjectContactDisplay(project)}
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <Building2 size={12} className="text-gray-400" />
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{getProjectCompanyDisplay(project)}</span>
                                                 </div>
                                             </div>
                                         </td>

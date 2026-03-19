@@ -11,41 +11,9 @@ export default function PipedriveSettingsPage() {
     const [loading, setLoading] = useState(true);
     const [testing, setTesting] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [syncing, setSyncing] = useState(false);
     const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
-    const [syncSummary, setSyncSummary] = useState<{ total: number; created: number; updated: number; errors: number } | null>(null);
-    const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
-    const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number; status: string; minutesSinceActivity?: number } | null>(null);
     const [conflictData, setConflictData] = useState<{ id: string; startedAt: string; lastHeartbeatAt: string; minutesSince: number } | null>(null);
 
-    // Poll for sync status if syncing is true
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (syncing && syncBatchId) {
-            interval = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/admin/pipedrive/sync/status?batchId=${syncBatchId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setSyncProgress({
-                            processed: data.totalAttempted,
-                            committed: data.totalCommitted,
-                            status: data.status
-                        });
-                        
-                        // If it completed or failed, stop polling
-                        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
-                            setSyncing(false);
-                            setSyncBatchId(null);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Failed to poll sync status', error);
-                }
-            }, 2000);
-        }
-        return () => clearInterval(interval);
-    }, [syncing, syncBatchId]);
 
     useEffect(() => {
         fetchSettings();
@@ -57,12 +25,6 @@ export default function PipedriveSettingsPage() {
             if (res.ok) {
                 const data = await res.json();
                 setIsTokenSet(data.pipedriveTokenSet);
-                
-                // If there's an active sync batch, start polling
-                if (data.activeSyncBatchId) {
-                    setSyncBatchId(data.activeSyncBatchId);
-                    setSyncing(true);
-                }
             }
         } catch (error) {
             console.error('Failed to fetch settings', error);
@@ -72,41 +34,6 @@ export default function PipedriveSettingsPage() {
         }
     };
 
-    const handleSync = async (type: 'all' | 'recent' = 'recent', force = false) => {
-        setSyncing(true);
-        setSyncSummary(null);
-        setSyncProgress(null);
-        setConflictData(null);
-        
-        const toastId = force ? toast.loading('Resetting sync process...') : undefined;
-
-        try {
-            const res = await fetch('/api/admin/pipedrive/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type, force }),
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                setSyncBatchId(data.batchId);
-                if (force) toast.dismiss(toastId);
-                toast.success(force ? 'Sync reset successfully' : 'Sync started');
-            } else if (res.status === 409) {
-                const data = await res.json();
-                setConflictData(data.conflict);
-                setSyncing(false);
-                toast.error('A synchronization is already in progress');
-            } else {
-                toast.error('Sync failed to start');
-                setSyncing(false);
-            }
-        } catch (error) {
-            console.error('Sync error', error);
-            toast.error('An error occurred during sync');
-            setSyncing(false);
-        }
-    };
 
     const handleTestConnection = async () => {
         if (!token && !isTokenSet) {
@@ -307,178 +234,6 @@ export default function PipedriveSettingsPage() {
                     </div>
                 </div>
 
-                {/* Data Synchronization Card */}
-                {isTokenSet && (
-                    <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="mb-8">
-                            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-6 h-6 rounded-md shadow-sm" />
-                                Data Synchronization
-                            </h2>
-                            <p className="text-slate-500 text-sm mt-1">
-                                Pull deals from Pipedrive to create or update projects and contacts in bulk.
-                            </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <button
-                                onClick={() => handleSync('recent')}
-                                disabled={syncing}
-                                className={cn(
-                                    "relative flex flex-col items-center justify-center gap-3 p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl hover:bg-white hover:border-blue-200 transition-all group overflow-hidden",
-                                    syncing && "opacity-80 grayscale-[0.5]"
-                                )}
-                            >
-                                <div className="p-3 bg-white rounded-xl shadow-sm group-hover:bg-blue-50 transition-colors relative z-10">
-                                    {syncing ? (
-                                        <Loader2 className="text-blue-600 animate-spin" size={24} />
-                                    ) : (
-                                        <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-6 h-6 rounded-md opacity-80" />
-                                    )}
-                                </div>
-                                <div className="text-center relative z-10">
-                                    <span className="block font-bold text-slate-900">Sync Recent Deals</span>
-                                    <span className="block text-[11px] text-slate-500 mt-1">Updates last 100-200 modified deals</span>
-                                </div>
-                                {syncing && <div className="absolute inset-0 bg-blue-50/10 backdrop-blur-[1px]" />}
-                            </button>
-
-                            <button
-                                onClick={() => handleSync('all')}
-                                disabled={syncing}
-                                className={cn(
-                                    "relative flex flex-col items-center justify-center gap-3 p-6 bg-slate-50 border-2 border-slate-100 rounded-2xl hover:bg-white hover:border-blue-200 transition-all group overflow-hidden",
-                                    syncing && "opacity-80 grayscale-[0.5]"
-                                )}
-                            >
-                                <div className="p-3 bg-white rounded-xl shadow-sm group-hover:bg-blue-50 transition-colors relative z-10">
-                                    {syncing ? (
-                                        <Loader2 className="text-blue-600 animate-spin" size={24} />
-                                    ) : (
-                                        <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-6 h-6 rounded-md opacity-80" />
-                                    )}
-                                </div>
-                                <div className="text-center relative z-10">
-                                    <span className="block font-bold text-slate-900">Sync All Deals</span>
-                                    <span className="block text-[11px] text-slate-500 mt-1">Full paginated sync (Deep Import)</span>
-                                </div>
-                                {syncing && <div className="absolute inset-0 bg-blue-50/10 backdrop-blur-[1px]" />}
-                            </button>
-                        </div>
-
-                        {syncSummary && (
-                            <div className="mt-8 p-6 bg-blue-50/50 border border-blue-100 rounded-2xl animate-in zoom-in-95 duration-300">
-                                <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4 flex items-center justify-center gap-2">
-                                    <CheckCircle2 size={14} />
-                                    Last Sync Result
-                                </h4>
-                                <div className="flex items-center justify-around text-center">
-                                    <div>
-                                        <span className="block text-[10px] font-bold text-blue-400 uppercase tracking-wider">Processed</span>
-                                        <span className="text-2xl font-black text-blue-900 leading-none">{syncSummary.total}</span>
-                                    </div>
-                                    <div className="w-px h-10 bg-blue-100" />
-                                    <div>
-                                        <span className="block text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Created</span>
-                                        <span className="text-2xl font-black text-emerald-600 leading-none">{syncSummary.created}</span>
-                                    </div>
-                                    <div className="w-px h-10 bg-blue-100" />
-                                    <div>
-                                        <span className="block text-[10px] font-bold text-blue-500 uppercase tracking-wider">Updated</span>
-                                        <span className="text-2xl font-black text-blue-700 leading-none">{syncSummary.updated}</span>
-                                    </div>
-                                    {syncSummary.errors > 0 && (
-                                        <>
-                                            <div className="w-px h-10 bg-blue-100" />
-                                            <div>
-                                                <span className="block text-[10px] font-bold text-rose-400 uppercase tracking-wider">Failed</span>
-                                                <span className="text-2xl font-black text-rose-600 leading-none">{syncSummary.errors}</span>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {conflictData && (
-                            <div className="mt-8 p-6 bg-amber-50 border border-amber-200 rounded-2xl animate-in fade-in slide-in-from-top-4 duration-500">
-                                <div className="flex items-start gap-3">
-                                    <ShieldCheck className="text-amber-600 mt-1 shrink-0" size={24} />
-                                    <div className="flex-1">
-                                        <h4 className="text-lg font-bold text-amber-900 leading-tight">Sync Already In Progress</h4>
-                                        <p className="text-sm text-amber-700 mt-1">
-                                            A synchronization (Batch: {conflictData.id.slice(0, 8)}) is currently active. 
-                                            Last activity was <strong>{conflictData.minutesSince} minutes ago</strong>.
-                                        </p>
-                                        <div className="mt-5 flex items-center gap-3">
-                                            <button
-                                                onClick={() => {
-                                                    setSyncBatchId(conflictData.id);
-                                                    setSyncing(true);
-                                                    setConflictData(null);
-                                                }}
-                                                className="px-4 py-2 bg-white border border-amber-300 text-amber-800 rounded-xl text-sm font-bold hover:bg-amber-100 transition-all shadow-sm"
-                                            >
-                                                Track Progress
-                                            </button>
-                                            <button
-                                                onClick={() => handleSync('recent', true)}
-                                                className="px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
-                                            >
-                                                Force Reset Sync
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {syncing && (
-                            <div className="mt-8 p-6 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in duration-500">
-                                <div className="flex flex-col items-center text-center gap-4">
-                                    <div className="flex items-center gap-4 px-6 py-3 bg-white rounded-2xl shadow-sm border border-slate-100">
-                                        <Loader2 className="animate-spin text-blue-600" size={24} />
-                                        <div className="text-left">
-                                            <p className="text-sm font-black text-slate-900 leading-none">
-                                                {syncProgress ? `Syncing: ${syncProgress.status}` : 'Initializing Sync...'}
-                                            </p>
-                                            <p className="text-[11px] font-bold text-slate-400 mt-1">
-                                                Batch ID: {syncBatchId?.slice(0, 8)}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {syncProgress && (
-                                        <div className="w-full space-y-4">
-                                            <div className="flex items-center justify-between px-2">
-                                                <div className="text-left">
-                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Processed</span>
-                                                    <span className="text-xl font-black text-slate-900 leading-none">{syncProgress.processed}</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Updates</span>
-                                                    <span className="text-xl font-black text-emerald-600 leading-none">{syncProgress.committed}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="h-3 bg-white border border-slate-200 rounded-full overflow-hidden p-0.5">
-                                                <div 
-                                                    className="h-full bg-blue-500 rounded-full transition-all duration-700 ease-out shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                                                    style={{ width: `${Math.min(100, Math.max(5, (syncProgress.processed / 200) * 100))}%` }} 
-                                                />
-                                            </div>
-
-                                            <div className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-bold inline-flex">
-                                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-                                                Pipedrive sync is running in the background. You can navigate away from this page safely.
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
 
             </div>
         </div>

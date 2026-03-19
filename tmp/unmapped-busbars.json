@@ -1,0 +1,82 @@
+[
+  {
+    "partNumber": "CT-400A",
+    "description": "CT Chamber - 400A"
+  },
+  {
+    "partNumber": "CT-630A",
+    "description": "CT Chamber - 630A"
+  },
+  {
+    "partNumber": "CT-800A",
+    "description": "CT Chamber - 800A"
+  },
+  {
+    "partNumber": "CT-1200A",
+    "description": "CT Chamber - 1200A"
+  },
+  {
+    "partNumber": "CT-1600A",
+    "description": "CT Chamber - 1600A"
+  },
+  {
+    "partNumber": "CT-2000A",
+    "description": "CT Chamber - 2000A"
+  },
+  {
+    "partNumber": "CT-2500A",
+    "description": "CT Chamber - 2500A"
+  },
+  {
+    "partNumber": "CT-3200A",
+    "description": "CT Chamber - 3200A"
+  },
+  {
+    "partNumber": "ACB-630A",
+    "description": "ACB & Isolators - Up to 630A"
+  },
+  {
+    "partNumber": "ACB-800A",
+    "description": "ACB & Isolators - 800A"
+  },
+  {
+    "partNumber": "ACB-1200A",
+    "description": "ACB & Isolators - 1200A"
+  },
+  {
+    "partNumber": "ACB-1600A",
+    "description": "ACB & Isolators - 1600A"
+  },
+  {
+    "partNumber": "ACB-2000A",
+    "description": "ACB & Isolators - 2000A"
+  },
+  {
+    "partNumber": "ACB-2500A",
+    "description": "ACB & Isolators - 2500A"
+  },
+  {
+    "partNumber": "ACB-3200A",
+    "description": "ACB & Isolators - 3200A"
+  },
+  {
+    "partNumber": "CHASSIS-630A",
+    "description": "Chassis Tee-off - 630A"
+  },
+  {
+    "partNumber": "CHASSIS-800A",
+    "description": "Chassis Tee-off - 800A"
+  },
+  {
+    "partNumber": "CHASSIS-1200A",
+    "description": "Chassis Tee-off - 1200A"
+  },
+  {
+    "partNumber": "CHASSIS-1600A",
+    "description": "Chassis Tee-off - 1600A"
+  },
+  {
+    "partNumber": "MISC-BUSBAR",
+    "description": "Miscellaneous"
+  }
+]

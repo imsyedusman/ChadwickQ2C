@@ -1,0 +1,15 @@
+﻿--- Database Global Count ---
+CatalogItem: 28252
+Item (Quote Instances): 6
+Quote: 3
+Board: 3
+Project: 50
+
+Categories in CatalogItem:
+┌─────────┬───────────────┬───────────────┐
+│ (index) │ _count        │ category      │
+├─────────┼───────────────┼───────────────┤
+│ 0       │ { id: 46 }    │ 'Busbar'      │
+│ 1       │ { id: 28161 } │ 'Switchboard' │
+│ 2       │ { id: 45 }    │ 'Basics'      │
+└─────────┴───────────────┴───────────────┘

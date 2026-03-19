@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { classifyCatalogItem } from '@/lib/catalog-service';
 
 export async function GET() {
     try {
@@ -50,16 +51,45 @@ export async function POST(request: Request) {
 
         // 1. Normalization & Deterministic Sorting
         const items = rawItems
-            .filter(item => item.partNumber && item.brand)
-            .map(item => ({
-                ...item,
-                partNumber: String(item.partNumber).trim().toLowerCase(),
-                brand: String(item.brand).trim().toLowerCase()
-            }))
+            .filter(item => item.partNumber)
+            .map(item => {
+                const brand = item.brand ? String(item.brand).trim().toLowerCase() : null;
+                const partNumber = String(item.partNumber).trim();
+                
+                // Get classification defaults (respecting preserved categories)
+                const classification = classifyCatalogItem(
+                    item.description || '',
+                    partNumber,
+                    item.category || '', // Use incoming category if available
+                    item.subcategory || '',
+                    '',
+                    brand || ''
+                );
+
+                // Lossless Merge: 
+                // 1. Start with schema defaults (via classification)
+                // 2. Override with backup values if they exist and are NOT null/undefined
+                // 3. Special handling for labourHours and copper flags
+
+                return {
+                    ...item, // Keep all raw fields from backup
+                    brand,
+                    partNumber,
+                    // Ensure core derived fields are at least what classification says if missing in backup
+                    category: item.category || classification.category,
+                    subcategory: item.subcategory || classification.subcategory,
+                    meterType: item.meterType || classification.meterType,
+                    isCopperPriced: item.isCopperPriced !== undefined ? item.isCopperPriced : (classification.isCopperPriced ?? false),
+                    totalCopperWeightKgPerMeter: item.totalCopperWeightKgPerMeter !== undefined ? item.totalCopperWeightKgPerMeter : (classification.totalCopperWeightKgPerMeter ?? null),
+                    labourHours: item.labourHours !== undefined ? (parseFloat(item.labourHours) || 0) : (item.labourHours ?? 0)
+                };
+            })
             .sort((a, b) => {
-                const brandCompare = a.brand.localeCompare(b.brand);
+                const brandA = a.brand || '';
+                const brandB = b.brand || '';
+                const brandCompare = brandA.localeCompare(brandB);
                 if (brandCompare !== 0) return brandCompare;
-                return a.partNumber.localeCompare(b.partNumber);
+                return String(a.partNumber).localeCompare(String(b.partNumber));
             });
 
         // 2. Cross-Batch Dedup: Ensure no duplicates within the request itself
@@ -85,7 +115,11 @@ export async function POST(request: Request) {
             select: { id: true, partNumber: true, brand: true }
         });
         const existingLookup = new Map(
-            existingItems.map(item => [`${(item.brand || '').toLowerCase()}:${(item.partNumber || '').toLowerCase()}`, item.id])
+            existingItems.map(item => {
+                const b = item.brand ? item.brand.toLowerCase() : '';
+                const p = item.partNumber ? item.partNumber.toLowerCase() : '';
+                return [`${b}:${p}`, item.id];
+            })
         );
 
         // 4. Batch Processing

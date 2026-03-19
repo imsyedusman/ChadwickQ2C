@@ -11,6 +11,12 @@ import {
     DialogTitle,
     DialogFooter,
 } from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import {
     Select,
@@ -54,6 +60,7 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     const [isNewProject, setIsNewProject] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+    const [isPipedriveConfigured, setIsPipedriveConfigured] = useState(true);
     
     // Form state
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -63,7 +70,7 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     const [projectReference, setProjectReference] = useState('');
     const [projectDescription, setProjectDescription] = useState('');
     const [projectStatus, setProjectStatus] = useState('Budget');
-    const [description, setDescription] = useState('New Quote');
+    const [description, setDescription] = useState('Initial Quote');
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
     const [foundDuplicateProject, setFoundDuplicateProject] = useState<Project | null>(null);
 
@@ -101,8 +108,21 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     useEffect(() => {
         if (isOpen && !isNewProject && searchQuery === '') {
             fetchProjects('');
+            checkPipedriveStatus();
         }
     }, [isOpen, isNewProject, fetchProjects]);
+
+    const checkPipedriveStatus = async () => {
+        try {
+            const res = await fetch('/api/admin/pipedrive/status');
+            if (res.ok) {
+                const data = await res.json();
+                setIsPipedriveConfigured(data.isConfigured);
+            }
+        } catch (error) {
+            console.error('Failed to check Pipedrive status', error);
+        }
+    };
 
     const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
     const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
@@ -233,14 +253,18 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                 body: JSON.stringify(body),
             });
 
-            if (!res.ok) throw new Error('Failed to create quote');
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                const errorMessage = errorData.details || errorData.error || 'Failed to create quote';
+                throw new Error(errorMessage);
+            }
 
             const newQuote = await res.json();
             router.push(`/quote/${newQuote.id}`);
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to create quote', error);
-            alert('Failed to create quote');
+            toast.error(error.message || 'Failed to create quote');
         } finally {
             setLoading(false);
         }
@@ -306,27 +330,41 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                                             />
                                             {fetchingProjects && <Loader2 className="h-4 w-4 animate-spin text-blue-500 ml-2" />}
                                             
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                disabled={syncingPipedrive}
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleSync();
-                                                }}
-                                                className="h-8 px-2 ml-2 hover:bg-blue-50 text-blue-600 gap-1 border border-blue-100 rounded-lg"
-                                            >
-                                                {syncingPipedrive ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                ) : (
-                                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-4 h-4 rounded-sm" />
-                                                )}
-                                                <span className="text-[10px] font-bold uppercase truncate max-w-[60px]">
-                                                    {syncingPipedrive ? 'Syncing' : 'Sync'}
-                                                </span>
-                                            </Button>
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={syncingPipedrive || !isPipedriveConfigured}
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleSync();
+                                                            }}
+                                                            className={cn(
+                                                                "h-8 px-2 ml-2 hover:bg-blue-50 text-blue-600 gap-1 border border-blue-100 rounded-lg",
+                                                                !isPipedriveConfigured && "opacity-50 grayscale cursor-not-allowed"
+                                                            )}
+                                                        >
+                                                            {syncingPipedrive ? (
+                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                            ) : (
+                                                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-4 h-4 rounded-sm" />
+                                                            )}
+                                                            <span className="text-[10px] font-bold uppercase truncate max-w-[60px]">
+                                                                {syncingPipedrive ? 'Syncing' : 'Sync'}
+                                                            </span>
+                                                        </Button>
+                                                    </TooltipTrigger>
+                                                    {!isPipedriveConfigured && (
+                                                        <TooltipContent side="top">
+                                                            <p className="text-xs">Configure Pipedrive API key in Admin Settings</p>
+                                                        </TooltipContent>
+                                                    )}
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         </div>
                                         <CommandList className="max-h-[300px]">
                                             <CommandEmpty>No projects found.</CommandEmpty>
@@ -452,25 +490,7 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                         </div>
                     )}
 
-                    <div className="space-y-3 pt-4 border-t border-gray-100">
-                        <label className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                            <span className="p-1 bg-yellow-100 text-yellow-700 rounded-md">
-                                <Plus size={12} />
-                            </span>
-                            Quote Specific Details
-                        </label>
-                        <div className="space-y-2">
-                            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Revision Description</label>
-                            <input
-                                type="text"
-                                required
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm italic"
-                                placeholder="e.g. Initial Pricing, Revision B, etc."
-                            />
-                        </div>
-                    </div>
+                    {/* Hidden/Default quote details removed as per UX cleanup */}
 
                     <DialogFooter className="pt-2 sticky bottom-0 bg-white">
                         <Button

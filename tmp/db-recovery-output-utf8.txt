@@ -1,0 +1,24 @@
+﻿--- Catalog Category Recovery ---
+Updated 0 items with string brand "null" to actual null.
+Prefix "1A-" -> Basics: 0 items
+Prefix "1B-" -> Basics: 0 items
+Prefix "CT-" -> Basics: 0 items
+Prefix "100A-" -> Basics: 0 items
+Prefix "MISC-" -> Basics: 0 items
+Prefix "BB-" -> Busbar: 0 items
+Prefix "BBC-" -> Busbar: 0 items
+Prefix "MCCB-" -> Busbar: 0 items
+Prefix "ACB-" -> Busbar: 0 items
+Prefix "CHASSIS-" -> Busbar: 0 items
+Prefix "CU-" -> Busbar: 0 items
+
+Recovery Complete.
+Total Basics recovered: 0
+Total Busbar recovered: 0
+
+Final Category Stats:
+┌─────────┬───────────────┬───────────────┐
+│ (index) │ _count        │ category      │
+├─────────┼───────────────┼───────────────┤
+│ 0       │ { id: 28161 } │ 'Switchboard' │
+└─────────┴───────────────┴───────────────┘

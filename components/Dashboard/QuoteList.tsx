@@ -114,69 +114,11 @@ export default function QuoteList() {
     });
     const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
     const [savingId, setSavingId] = useState<string | null>(null);
-    const [syncingPipedrive, setSyncingPipedrive] = useState(false);
-    const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
-    const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Poll for sync status
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        if (syncingPipedrive && syncBatchId) {
-            interval = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/admin/pipedrive/sync/status?batchId=${syncBatchId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setSyncProgress({
-                            processed: data.totalAttempted,
-                            committed: data.totalCommitted
-                        });
-                        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
-                            setSyncingPipedrive(false);
-                            setSyncBatchId(null);
-                        }
-                    }
-                } catch (error) {
-                    console.error('Status polling error', error);
-                }
-            }, 1500);
-        }
-        return () => clearInterval(interval);
-    }, [syncingPipedrive, syncBatchId]);
-
-    const handleSync = async () => {
-        setSyncingPipedrive(true);
-        setSyncProgress(null);
-        try {
-            const res = await fetch('/api/admin/pipedrive/sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ type: 'recent' }),
-            });
-            
-            if (res.ok) {
-                const data = await res.json();
-                setSyncBatchId(data.batchId);
-                toast.success('Pipedrive sync started');
-            } else if (res.status === 409) {
-                const data = await res.json();
-                setSyncBatchId(data.conflict.id);
-                toast.info('A synchronization is already in progress');
-            } else {
-                const data = await res.json().catch(() => ({}));
-                toast.error(data.error || 'Sync failed to start');
-                setSyncingPipedrive(false);
-            }
-        } catch (error) {
-            console.error('Sync error', error);
-            toast.error('An error occurred during sync');
-            setSyncingPipedrive(false);
-        }
-    };
 
     const toggleSelectAll = () => {
         if (selectedIds.length === quotes.length) {
@@ -556,19 +498,6 @@ export default function QuoteList() {
                 </div>
                 {view === 'ACTIVE' && (
                     <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={handleSync}
-                            disabled={syncingPipedrive}
-                            className="flex items-center gap-2 border-gray-200 rounded-xl h-10 shadow-sm hover:bg-slate-50 transition-all font-semibold text-slate-600"
-                        >
-                            {syncingPipedrive ? (
-                                <Loader2 className="animate-spin text-blue-500" size={18} />
-                            ) : (
-                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-5 h-5 rounded-md" />
-                            )}
-                            {syncingPipedrive ? 'Syncing...' : 'Sync Pipedrive'}
-                        </Button>
 
                         <button
                             onClick={handleCreate}

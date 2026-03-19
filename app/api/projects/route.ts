@@ -75,7 +75,7 @@ export async function GET(request: Request) {
                     select: { quotes: true }
                 }
             },
-            orderBy: { updatedAt: 'desc' },
+            orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
         });
