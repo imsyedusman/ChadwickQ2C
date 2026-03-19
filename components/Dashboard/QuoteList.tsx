@@ -72,7 +72,8 @@ interface Quote {
         projectStatus: string;
     } | null;
     total?: number;
-    totalIncGst?: number;
+    totalExGST?: number;
+    totalIncGST?: number;
 }
 
 // Global settings snapshot may not be needed if we assume global settings for dashboard
@@ -606,6 +607,13 @@ export default function QuoteList() {
                                         gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                                     }}
                                 >
+                                    {/* Debug Validation */}
+                                    {(() => {
+                                        if (process.env.NODE_ENV === 'development') {
+                                            console.log(`[QuoteRow] Parent ID: ${parent.id} | EX: ${parent.totalExGST} | INC: ${parent.totalIncGST} | Display: totalExGST`);
+                                        }
+                                        return null;
+                                    })()}
                                     {/* Quote Number - NAVIGATION TRIGGER */}
                                     <div 
                                         className="flex items-center gap-3 border-r border-gray-100 h-full pr-2 cursor-pointer group/nav"
@@ -797,7 +805,7 @@ export default function QuoteList() {
                                      {/* Total */}
                                     {columnVisibility.total && (
                                         <div className="text-right font-bold text-gray-900 text-sm border-r border-gray-100 h-full flex items-center justify-end pr-4">
-                                            ${totalPrice.toLocaleString()}
+                                            ${(parent.totalExGST ?? parent.total ?? 0).toLocaleString()}
                                         </div>
                                     )}
 
@@ -932,7 +940,12 @@ export default function QuoteList() {
                                         <div className="absolute left-[36px] top-0 bottom-6 w-px bg-blue-100/60 z-10" />
                                         
                                         {group.children.map((child: Quote) => {
-                                            const childTotal = child.totalIncGst || 0;
+                                            const childTotal = child.totalExGST ?? child.total ?? 0;
+                                            
+                                            // Debug Validation
+                                            if (process.env.NODE_ENV === 'development') {
+                                                console.log(`[QuoteRow] Child ID: ${child.id} | EX: ${child.totalExGST} | INC: ${child.totalIncGST} | Display: totalExGST`);
+                                            }
                                             return (
                                                     <div
                                                         key={child.id}

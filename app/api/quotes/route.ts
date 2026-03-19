@@ -117,10 +117,13 @@ export async function GET(request: Request) {
             try {
                 const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
 
-                // Remove boards from response to keep it light if not needed on dashboard
                 const { boards, ...quoteWithoutBoards } = quote;
                 return {
                     ...quoteWithoutBoards,
+                    totalExGST: grandTotals.sellPriceRounded,
+                    totalIncGST: grandTotals.finalSellPrice,
+                    gstAmount: grandTotals.gst,
+                    // Legacy support
                     total: grandTotals.sellPriceRounded,
                     totalIncGst: grandTotals.finalSellPrice
                 };
@@ -129,6 +132,10 @@ export async function GET(request: Request) {
                 const { boards, ...quoteWithoutBoards } = quote;
                 return {
                     ...quoteWithoutBoards,
+                    totalExGST: 0,
+                    totalIncGST: 0,
+                    gstAmount: 0,
+                    // Legacy support
                     total: 0,
                     totalIncGst: 0,
                     calcError: true

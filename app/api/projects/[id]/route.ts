@@ -102,6 +102,10 @@ export async function GET(
             const { boards, ...quoteWithoutBoards } = quote;
             return {
                 ...quoteWithoutBoards,
+                totalExGST: grandTotals.sellPriceRounded,
+                totalIncGST: grandTotals.finalSellPrice,
+                gstAmount: grandTotals.gst,
+                // Legacy support
                 total: grandTotals.sellPriceRounded,
                 totalIncGst: grandTotals.finalSellPrice
             };

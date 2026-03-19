@@ -38,7 +38,8 @@ interface Project {
         revision: number;
         status: string;
         total: number;
-        totalIncGst: number;
+        totalExGST: number;
+        totalIncGST: number;
         createdAt: string;
         updatedAt: string;
         modifier?: { name: string };
@@ -172,7 +173,7 @@ export default function ProjectDetail() {
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Combined Value</p>
                         <p className="text-2xl font-bold text-gray-900">
-                            ${(project.quotes?.reduce((acc, q) => acc + (q.totalIncGst || 0), 0) || 0).toLocaleString()}
+                            ${(project.quotes?.reduce((acc, q) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
                         </p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -228,7 +229,7 @@ export default function ProjectDetail() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-sm font-semibold text-gray-900">
-                                                ${(quote.totalIncGst || 0).toLocaleString()}
+                                                ${(quote.totalExGST || quote.total || 0).toLocaleString()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
