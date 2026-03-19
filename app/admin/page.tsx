@@ -12,7 +12,8 @@ import {
     Database,
     FileText,
     DollarSign,
-    Briefcase
+    Briefcase,
+    Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -109,6 +110,18 @@ const ADMIN_SECTIONS = [
                 href: '/admin/templates',
                 icon: <FileText className="w-6 h-6 text-rose-600" />,
                 color: 'bg-rose-50',
+            }
+        ]
+    },
+    {
+        title: 'Data Management',
+        tools: [
+            {
+                title: 'System Data Reset',
+                description: 'Irreversible reset of Quote and Project data for testing purposes.',
+                href: '/admin/reset',
+                icon: <Trash2 className="w-6 h-6 text-red-600" />,
+                color: 'bg-red-50',
             }
         ]
     },
