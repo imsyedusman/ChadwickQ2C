@@ -11,11 +11,15 @@ import {
     Plus,
     Clock,
     ArrowUpRight,
-    Loader2
+    Loader2,
+    Link as LinkIcon,
+    RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
+import { toast } from 'sonner';
+import LinkDealModal from '@/components/Project/LinkDealModal';
 
 import { 
     getProjectClientDisplay, 
@@ -49,29 +53,106 @@ interface Project {
 export default function ProjectDetail() {
     const params = useParams();
     const router = useRouter();
-    const [project, setProject] = useState<Project | null>(null);
+    const [project, setProject] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+
+    const fetchProject = async () => {
+        try {
+            const url = `/api/projects/${params.id}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Failed to fetch project');
+            const result = await res.json();
+            // result is { project, quotes }
+            setProject({ ...result.project, quotes: result.quotes });
+        } catch (error) {
+            console.error('Failed to fetch project:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchProject = async () => {
-            try {
-                const url = `/api/projects/${params.id}`;
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('Failed to fetch project');
-                const result = await res.json();
-                // result is { project, quotes }
-                setProject({ ...result.project, quotes: result.quotes });
-            } catch (error) {
-                console.error('Failed to fetch project:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (params.id) {
             fetchProject();
         }
     }, [params.id]);
+
+    const handleLinkDeal = async (deal: any) => {
+        setIsLinkModalOpen(false);
+        setRefreshing(true);
+        try {
+            // Fetch full deal details
+            const detailRes = await fetch(`/api/pipedrive/deal/${deal.id}`);
+            const fullDeal = await detailRes.json();
+
+            const res = await fetch(`/api/projects/${params.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pipedrive_deal_id: deal.id,
+                    projectName: deal.title,
+                    client: fullDeal.organization ? {
+                        pipedrive_org_id: fullDeal.organization.id,
+                        name: fullDeal.organization.name
+                    } : undefined,
+                    contact: fullDeal.person ? {
+                        pipedrive_person_id: fullDeal.person.id,
+                        name: fullDeal.person.name
+                    } : undefined
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Project linked to Pipedrive deal');
+                fetchProject();
+            } else {
+                toast.error('Failed to link deal');
+            }
+        } catch (error) {
+            toast.error('Error linking deal');
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    const handleRefresh = async () => {
+        if (!project?.pipedrive_deal_id) return;
+
+        setRefreshing(true);
+        try {
+            const detailRes = await fetch(`/api/pipedrive/deal/${project.pipedrive_deal_id}`);
+            const fullDeal = await detailRes.json();
+
+            const res = await fetch(`/api/projects/${params.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectName: fullDeal.title,
+                    client: fullDeal.organization ? {
+                        pipedrive_org_id: fullDeal.organization.id,
+                        name: fullDeal.organization.name
+                    } : undefined,
+                    contact: fullDeal.person ? {
+                        pipedrive_person_id: fullDeal.person.id,
+                        name: fullDeal.person.name
+                    } : undefined
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Refreshed from Pipedrive');
+                fetchProject();
+            } else {
+                toast.error('Failed to refresh');
+            }
+        } catch (error) {
+            toast.error('Error refreshing project');
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -114,6 +195,12 @@ export default function ProjectDetail() {
 
     return (
         <main className="max-w-[1200px] mx-auto px-6 py-8 animate-in fade-in duration-500">
+                <LinkDealModal 
+                    isOpen={isLinkModalOpen} 
+                    onClose={() => setIsLinkModalOpen(false)} 
+                    onSelect={handleLinkDeal} 
+                />
+                
                 {/* Header & Back Button */}
                 <div className="mb-8">
                     <button 
@@ -134,6 +221,12 @@ export default function ProjectDetail() {
                                 )}>
                                     {project.projectStatus}
                                 </span>
+                                {project.pipedrive_deal_id && (
+                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                                        <LinkIcon size={12} />
+                                        Linked Deal #{project.pipedrive_deal_id}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500">
                                 <div className="flex items-center gap-2">
@@ -157,10 +250,35 @@ export default function ProjectDetail() {
                             </div>
                         </div>
                         
-                        <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]">
-                            <Plus size={20} />
-                            New Project Quote
-                        </Button>
+                        <div className="flex items-center gap-3">
+                            {project.pipedrive_deal_id ? (
+                                <Button 
+                                    variant="outline"
+                                    onClick={handleRefresh}
+                                    disabled={refreshing}
+                                    className="border-blue-200 text-blue-600 hover:bg-blue-50 gap-2 h-11 px-5 rounded-xl transition-all"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-5 h-5 rounded-sm" />
+                                        <RefreshCw className={cn(refreshing && "animate-spin")} size={16} />
+                                    </div>
+                                    Refresh from Pipedrive
+                                </Button>
+                            ) : (
+                                <Button 
+                                    variant="outline"
+                                    onClick={() => setIsLinkModalOpen(true)}
+                                    className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 h-11 px-5 rounded-xl transition-all"
+                                >
+                                    <LinkIcon size={18} />
+                                    Link Pipedrive Deal
+                                </Button>
+                            )}
+                            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                                <Plus size={20} />
+                                New Project Quote
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -168,12 +286,12 @@ export default function ProjectDetail() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Quotes</p>
-                        <p className="text-2xl font-bold text-gray-900">{project.quotes.length}</p>
+                        <p className="text-2xl font-bold text-gray-900">{project.quotes?.length || 0}</p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Combined Value</p>
                         <p className="text-2xl font-bold text-gray-900">
-                            ${(project.quotes?.reduce((acc, q) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
+                            ${(project.quotes?.reduce((acc: number, q: any) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
                         </p>
                     </div>
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
@@ -208,7 +326,7 @@ export default function ProjectDetail() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {project.quotes.map((quote) => (
+                                {project.quotes.map((quote: any) => (
                                     <tr 
                                         key={quote.id} 
                                         className="hover:bg-gray-50/50 transition-colors cursor-pointer group"

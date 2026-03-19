@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw, Filter, Settings2, MoreHorizontal, User as UserIcon, Clock, Check, X, Shield, Briefcase, ChevronLeft, Pencil } from 'lucide-react';
+import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw, Filter, Settings2, MoreHorizontal, User as UserIcon, Clock, Check, X, Shield, Briefcase, ChevronLeft, Pencil, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
 import NewQuoteDialog from './NewQuoteDialog';
+import { toast } from 'sonner';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -35,6 +36,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from '@/components/ui/dialog';
 
 interface Quote {
     id: string;
@@ -70,6 +79,8 @@ interface Quote {
         clientName: string | null;
         companyName: string | null;
         projectStatus: string;
+        client?: { name: string } | null;
+        contact?: { name: string } | null;
     } | null;
     total?: number;
     totalExGST?: number;
@@ -103,6 +114,111 @@ export default function QuoteList() {
     });
     const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
     const [savingId, setSavingId] = useState<string | null>(null);
+    const [syncingPipedrive, setSyncingPipedrive] = useState(false);
+    const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
+    const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
+
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
+
+    // Poll for sync status
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (syncingPipedrive && syncBatchId) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/admin/pipedrive/sync/status?batchId=${syncBatchId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSyncProgress({
+                            processed: data.totalAttempted,
+                            committed: data.totalCommitted
+                        });
+                        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
+                            setSyncingPipedrive(false);
+                            setSyncBatchId(null);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status polling error', error);
+                }
+            }, 1500);
+        }
+        return () => clearInterval(interval);
+    }, [syncingPipedrive, syncBatchId]);
+
+    const handleSync = async () => {
+        setSyncingPipedrive(true);
+        setSyncProgress(null);
+        try {
+            const res = await fetch('/api/admin/pipedrive/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'recent' }),
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setSyncBatchId(data.batchId);
+                toast.success('Pipedrive sync started');
+            } else if (res.status === 409) {
+                const data = await res.json();
+                setSyncBatchId(data.conflict.id);
+                toast.info('A synchronization is already in progress');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast.error(data.error || 'Sync failed to start');
+                setSyncingPipedrive(false);
+            }
+        } catch (error) {
+            console.error('Sync error', error);
+            toast.error('An error occurred during sync');
+            setSyncingPipedrive(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === quotes.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(quotes.map(q => q.id));
+        }
+    };
+
+    const toggleSelect = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        setActionLoading(true);
+        const isPermanent = view === 'TRASH';
+        try {
+            const res = await fetch(`/api/quotes?permanent=${isPermanent}`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedIds }),
+            });
+            if (res.ok) {
+                setSelectedIds([]);
+                fetchQuotes();
+                setIsBulkDeleteDialogOpen(false);
+                toast.success(`Successfully deleted ${selectedIds.length} quotes`);
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Failed to delete quotes');
+            }
+        } catch (error) {
+            console.error('Failed to delete quotes', error);
+            toast.error('An error occurred during deletion');
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     // Column Persistence
     useEffect(() => {
@@ -439,13 +555,29 @@ export default function QuoteList() {
                     </div>
                 </div>
                 {view === 'ACTIVE' && (
-                    <button
-                        onClick={handleCreate}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-                    >
-                        <Plus size={20} />
-                        New Quote
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={handleSync}
+                            disabled={syncingPipedrive}
+                            className="flex items-center gap-2 border-gray-200 rounded-xl h-10 shadow-sm hover:bg-slate-50 transition-all font-semibold text-slate-600"
+                        >
+                            {syncingPipedrive ? (
+                                <Loader2 className="animate-spin text-blue-500" size={18} />
+                            ) : (
+                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-5 h-5 rounded-md" />
+                            )}
+                            {syncingPipedrive ? 'Syncing...' : 'Sync Pipedrive'}
+                        </Button>
+
+                        <button
+                            onClick={handleCreate}
+                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 font-bold h-10"
+                        >
+                            <Plus size={20} />
+                            New Quote
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -566,10 +698,18 @@ export default function QuoteList() {
                     }
                 )}
                     style={{
-                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                        gridTemplateColumns: `40px 1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                     }}
                 >
-                    <div className="flex items-center gap-2 border-r border-gray-200/60 h-full py-1">Quote Number</div>
+                    <div className="flex items-center justify-center border-r border-gray-200/60 h-full py-1">
+                        <input 
+                            type="checkbox" 
+                            checked={quotes.length > 0 && selectedIds.length === quotes.length}
+                            onChange={toggleSelectAll}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 border-r border-gray-200/60 h-full py-1 pl-4">Quote Number</div>
                     {columnVisibility.projectName && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Project Name</div>}
                     {columnVisibility.clientName && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Client Name</div>}
                     {columnVisibility.company && <div className="border-r border-gray-200/60 h-full py-1 pl-4">Company</div>}
@@ -604,9 +744,19 @@ export default function QuoteList() {
                                         !isCollapsed && group.children.length > 0 && "bg-blue-50/20"
                                     )}
                                     style={{
-                                        gridTemplateColumns: `1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
+                                        gridTemplateColumns: `40px 1.5fr ${columnVisibility.projectName ? '1.5fr' : ''} ${columnVisibility.clientName ? '1fr' : ''} ${columnVisibility.company ? '1fr' : ''} ${columnVisibility.projectStatus ? '0.8fr' : ''} ${columnVisibility.quoteStatus ? '0.8fr' : ''} ${columnVisibility.total ? '0.8fr' : ''} ${columnVisibility.internalNotes ? '1.2fr' : ''} ${columnVisibility.activity ? '1fr' : ''} 40px`.replace(/\s+/g, ' ')
                                     }}
                                 >
+                                    {/* Selection Checkbox */}
+                                    <div className="flex items-center justify-center border-r border-gray-100 h-full">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(parent.id)}
+                                            onChange={(e) => toggleSelect(e as any, parent.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                        />
+                                    </div>
                                     {/* Debug Validation */}
                                     {(() => {
                                         if (process.env.NODE_ENV === 'development') {
@@ -694,7 +844,7 @@ export default function QuoteList() {
                                             )}
                                             onDoubleClick={(e) => {
                                                 e.stopPropagation();
-                                                setEditingCell({ id: parent.id, field: 'clientName', value: parent.project?.clientName || parent.clientName || '' });
+                                                setEditingCell({ id: parent.id, field: 'clientName', value: parent.project?.contact?.name || parent.project?.clientName || parent.clientName || '' });
                                             }}
                                         >
                                             {editingCell?.id === parent.id && editingCell?.field === 'clientName' ? (
@@ -712,7 +862,7 @@ export default function QuoteList() {
                                             ) : (
                                                 <span className="flex items-center gap-2">
                                                     <span className="truncate group-hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all">
-                                                        {parent.project?.clientName || parent.clientName || <span className="text-gray-300">---</span>}
+                                                        {parent.project?.contact?.name || parent.project?.clientName || parent.clientName || <span className="text-gray-300">---</span>}
                                                     </span>
                                                     <Pencil size={12} className="text-gray-300 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
                                                 </span>
@@ -742,10 +892,10 @@ export default function QuoteList() {
                                                     className="hover:text-blue-600 border-b border-transparent hover:border-blue-200 pb-0.5 transition-all"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        setEditingCell({ id: parent.id, field: 'clientCompany', value: parent.project?.companyName || parent.clientCompany || '' });
+                                                        setEditingCell({ id: parent.id, field: 'clientCompany', value: parent.project?.client?.name || parent.project?.companyName || parent.clientCompany || '' });
                                                     }}
                                                 >
-                                                    {parent.project?.companyName || parent.clientCompany || <span className="text-gray-300">---</span>}
+                                                    {parent.project?.client?.name || parent.project?.companyName || parent.clientCompany || <span className="text-gray-300">---</span>}
                                                 </span>
                                             )}
                                         </div>
@@ -1299,6 +1449,67 @@ export default function QuoteList() {
                 isOpen={isNewQuoteDialogOpen}
                 onClose={() => setIsNewQuoteDialogOpen(false)}
             />
+            {/* Bulk Delete Dialog */}
+            <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-red-600 flex items-center gap-2">
+                            <AlertCircle /> {view === 'TRASH' ? 'Permanently Delete' : 'Move to Trash'} {selectedIds.length} Quotes?
+                        </DialogTitle>
+                        <DialogDescription className="py-2">
+                            <div className="space-y-3">
+                                <p className="font-bold text-gray-900 border-l-4 border-red-500 pl-4 bg-red-50 py-2">
+                                    WARNING: You are about to {view === 'TRASH' ? 'permanently delete' : 'trash'} {selectedIds.length} quotes.
+                                </p>
+                                <p>This action {view === 'TRASH' ? 'cannot' : 'can'} be undone {view === 'TRASH' ? '' : 'from the Trash view'}.</p>
+                            </div>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="ghost" onClick={() => setIsBulkDeleteDialogOpen(false)}>Cancel</Button>
+                        <Button 
+                            variant="destructive" 
+                            onClick={handleBulkDelete}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? <Loader2 className="animate-spin" /> : `${view === 'TRASH' ? 'Delete' : 'Trash'} ${selectedIds.length} Quotes`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Bulk Actions Bar */}
+            {selectedIds.length > 0 && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-6 animate-in slide-in-from-bottom-8 duration-300 z-50">
+                    <div className="flex items-center gap-3 pr-6 border-r border-slate-700">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                            {selectedIds.length}
+                        </div>
+                        <span className="text-sm font-medium">Quotes Selected</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setSelectedIds([])}
+                            className="text-slate-400 hover:text-white hover:bg-slate-800"
+                        >
+                            Clear Selection
+                        </Button>
+                        
+                        <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => setIsBulkDeleteDialogOpen(true)}
+                            className="bg-red-600 hover:bg-red-700 gap-2"
+                        >
+                            <Trash2 size={16} />
+                            {view === 'TRASH' ? 'Delete Permanently' : 'Move to Trash'}
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

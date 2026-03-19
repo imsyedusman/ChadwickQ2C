@@ -119,7 +119,7 @@ const ADMIN_SECTIONS = [
                 title: 'Pipedrive Integration',
                 description: 'Import and sync clients, contacts, and deals from Pipedrive CRM.',
                 href: '/admin/pipedrive',
-                icon: <Briefcase className="w-6 h-6 text-orange-600" />,
+                icon: <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-6 h-6 rounded-md shadow-sm" />,
                 color: 'bg-orange-50',
             }
         ]

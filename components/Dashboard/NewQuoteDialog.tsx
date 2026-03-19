@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, X, Check, ChevronsUpDown, Search, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import {
     Dialog,
     DialogContent,
@@ -49,6 +50,7 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
     const [fetchingProjects, setFetchingProjects] = useState(false);
+    const [syncingPipedrive, setSyncingPipedrive] = useState(false);
     const [isNewProject, setIsNewProject] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [isComboboxOpen, setIsComboboxOpen] = useState(false);
@@ -101,6 +103,67 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
             fetchProjects('');
         }
     }, [isOpen, isNewProject, fetchProjects]);
+
+    const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
+    const [syncProgress, setSyncProgress] = useState<{ processed: number; committed: number } | null>(null);
+
+    // Poll for sync status
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (syncingPipedrive && syncBatchId) {
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/admin/pipedrive/sync/status?batchId=${syncBatchId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSyncProgress({
+                            processed: data.totalAttempted,
+                            committed: data.totalCommitted
+                        });
+                        if (data.status === 'SUCCESS' || data.status === 'FAILED') {
+                            setSyncingPipedrive(false);
+                            setSyncBatchId(null);
+                            // Refresh implicitly
+                            fetchProjects(searchQuery);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status polling error', error);
+                }
+            }, 1500);
+        }
+        return () => clearInterval(interval);
+    }, [syncingPipedrive, syncBatchId]);
+
+    const handleSync = async () => {
+        setSyncingPipedrive(true);
+        setSyncProgress(null);
+        try {
+            const res = await fetch('/api/admin/pipedrive/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'recent' }),
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setSyncBatchId(data.batchId);
+                toast.success('Pipedrive sync started');
+            } else if (res.status === 409) {
+                const data = await res.json();
+                setSyncBatchId(data.conflict.id);
+                toast.info('A synchronization is already in progress');
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast.error(data.error || 'Sync failed to start');
+                setSyncingPipedrive(false);
+            }
+        } catch (error) {
+            console.error('Sync error', error);
+            toast.error('An error occurred during sync');
+            setSyncingPipedrive(false);
+        }
+    };
 
     // Debounced search when typing
     useEffect(() => {
@@ -242,6 +305,28 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                                                 onChange={(e) => setSearchQuery(e.target.value)}
                                             />
                                             {fetchingProjects && <Loader2 className="h-4 w-4 animate-spin text-blue-500 ml-2" />}
+                                            
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                disabled={syncingPipedrive}
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    handleSync();
+                                                }}
+                                                className="h-8 px-2 ml-2 hover:bg-blue-50 text-blue-600 gap-1 border border-blue-100 rounded-lg"
+                                            >
+                                                {syncingPipedrive ? (
+                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                ) : (
+                                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-4 h-4 rounded-sm" />
+                                                )}
+                                                <span className="text-[10px] font-bold uppercase truncate max-w-[60px]">
+                                                    {syncingPipedrive ? 'Syncing' : 'Sync'}
+                                                </span>
+                                            </Button>
                                         </div>
                                         <CommandList className="max-h-[300px]">
                                             <CommandEmpty>No projects found.</CommandEmpty>

@@ -418,6 +418,9 @@ model Settings {
   companyName           String?
   companyAddress        String?
   
+  // Pipedrive Integration
+  pipedriveToken        String?  // Securely stored API token
+  
   updatedAt             DateTime @updatedAt
 }
 

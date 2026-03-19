@@ -19,8 +19,8 @@ export async function PATCH(
 
         // Valid Project model fields
         const VALID_PROJECT_FIELDS = [
-            'projectName', 'clientName', 'companyName', 
-            'projectReference', 'projectDescription', 'projectStatus'
+            'projectName', 'projectReference', 'projectDescription', 'projectStatus',
+            'pipedrive_deal_id'
         ];
 
         const updates: any = {};
@@ -30,13 +30,59 @@ export async function PATCH(
             }
         });
 
+        // Handle Client (Organization) Linking
+        if (body.client) {
+            updates.client = {
+                connectOrCreate: {
+                    where: { pipedrive_org_id: body.client.pipedrive_org_id },
+                    create: {
+                        name: body.client.name,
+                        pipedrive_org_id: body.client.pipedrive_org_id,
+                        source: 'pipedrive'
+                    }
+                }
+            };
+            // Also update the organization name if it already exists but changed
+            if (body.client.pipedrive_org_id) {
+                await (prisma as any).client.updateMany({
+                   where: { pipedrive_org_id: body.client.pipedrive_org_id },
+                   data: { name: body.client.name }
+                });
+            }
+        }
+
+        // Handle Contact (Person) Linking
+        if (body.contact) {
+            updates.contact = {
+                connectOrCreate: {
+                    where: { pipedrive_person_id: body.contact.pipedrive_person_id },
+                    create: {
+                        name: body.contact.name,
+                        pipedrive_person_id: body.contact.pipedrive_person_id,
+                        source: 'pipedrive'
+                    }
+                }
+            };
+            // Also update the person name if it already exists but changed
+            if (body.contact.pipedrive_person_id) {
+                await (prisma as any).contact.updateMany({
+                    where: { pipedrive_person_id: body.contact.pipedrive_person_id },
+                    data: { name: body.contact.name }
+                });
+            }
+        }
+
         if (Object.keys(updates).length === 0) {
             return NextResponse.json({ error: 'No valid fields provided' }, { status: 400 });
         }
 
         const updatedProject = await (prisma as any).project.update({
             where: { id },
-            data: updates
+            data: updates,
+            include: {
+                client: true,
+                contact: true
+            }
         });
 
         return NextResponse.json(updatedProject);
@@ -56,9 +102,11 @@ export async function GET(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         const { id } = await params;
+        
+        console.log(`[API GET Project] Incoming ID: "${id}" (type: ${typeof id})`);
 
         const project = await (prisma as any).project.findUnique({
-            where: { id },
+            where: { id: String(id) },
             include: {
                 client: true,
                 contact: true,
@@ -77,8 +125,11 @@ export async function GET(
         });
 
         if (!project) {
+            console.log(`[API GET Project] NOT FOUND: "${id}"`);
             return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
+
+        console.log(`[API GET Project] Found: "${project.projectName}" with ${project.quotes.length} quotes`);
 
         // Get global settings for calculation
         const settings = await prisma.settings.findUnique({ where: { id: 'global' } });
@@ -111,6 +162,7 @@ export async function GET(
             };
         });
 
+        console.log(`[API GET Project] SUCCESS: Returning project and ${quotesWithTotal.length} calculated quotes`);
         return NextResponse.json({
             project: { ...project, quotes: undefined },
             quotes: quotesWithTotal

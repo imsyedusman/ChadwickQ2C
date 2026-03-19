@@ -33,6 +33,22 @@ export async function GET(request: Request) {
                 { clientName: { contains: search, mode: 'insensitive' } },
                 { clientCompany: { contains: search, mode: 'insensitive' } },
                 { projectRef: { contains: search, mode: 'insensitive' } },
+                // Recursive project search
+                {
+                    project: {
+                        projectName: { contains: search, mode: 'insensitive' }
+                    }
+                },
+                {
+                    project: {
+                        clientName: { contains: search, mode: 'insensitive' }
+                    }
+                },
+                {
+                    project: {
+                        companyName: { contains: search, mode: 'insensitive' }
+                    }
+                }
             ];
         }
 
@@ -48,38 +64,20 @@ export async function GET(request: Request) {
             where.project = { projectStatus };
         }
 
+        console.log(`[API GET Quotes] Request started. Search: "${search}", Status: ${quoteStatus}`);
+
+        // Baseline count
+        const baseCount = await (prisma as any).quote.count();
+        console.log(`[API GET Quotes] Total quotes in DB baseline: ${baseCount}`);
+
         const [quotes, totalCount] = await Promise.all([
             (prisma as any).quote.findMany({
                 where,
-                select: {
-                    id: true,
-                    quoteNumber: true,
-                    revision: true,
-                    // revisionGroupId: true,
-                    clientName: true,
-                    clientCompany: true,
-                    projectRef: true,
-                    description: true,
-                    status: true,
-                    createdAt: true,
-                    updatedAt: true,
-                    projectId: true,
-                    gridInternalNotes: true,
-                    overrideLabourRate: true,
-                    overrideOverheadPct: true,
-                    overrideEngineeringPct: true,
-                    overrideTargetMarginPct: true,
-                    overrideConsumablesPct: true,
-                    overrideGstPct: true,
-                    overrideRoundingIncrement: true,
-                    overrideCopperPricePerKg: true,
+                include: {
                     project: {
-                        select: {
-                            id: true,
-                            projectName: true,
-                            projectStatus: true,
-                            clientName: true,
-                            companyName: true,
+                        include: {
+                            client: true,
+                            contact: true
                         }
                     },
                     boards: {
@@ -96,6 +94,8 @@ export async function GET(request: Request) {
             }),
             (prisma as any).quote.count({ where })
         ]);
+
+        console.log(`[API GET Quotes] Filtered total count: ${totalCount}, Returning ${quotes.length} on page ${page}`);
 
         // Get global settings for calculation
         const settings = await prisma.settings.findUnique({ where: { id: 'global' } });
@@ -145,6 +145,8 @@ export async function GET(request: Request) {
 
         const totalPages = Math.ceil(totalCount / limit);
 
+        console.log(`[API GET Quotes] SUCCESS: Found ${totalCount} quotes, returning ${quotesWithTotals.length} on page ${page}`);
+
         return NextResponse.json({
             data: quotesWithTotals,
             page,
@@ -191,7 +193,7 @@ export async function POST(request: Request) {
                 },
             });
             finalProjectId = createdProject.id;
-            // Auto-populate from new project if fields weren't explicitly provided for the quote
+            // Auto-populate from new project
             if (!finalClientName) finalClientName = createdProject.clientName;
             if (!finalClientCompany) finalClientCompany = createdProject.companyName;
             if (!finalProjectRef) finalProjectRef = createdProject.projectName;
@@ -201,7 +203,8 @@ export async function POST(request: Request) {
                 where: { id: projectId }
             });
             if (project) {
-                // Auto-populate from existing project
+                // Auto-populate from existing project - SNAPSHOT
+                // Prioritize related models (Client/Contact) over legacy string fields
                 if (!finalClientName) finalClientName = project.clientName;
                 if (!finalClientCompany) finalClientCompany = project.companyName;
                 if (!finalProjectRef) finalProjectRef = project.projectName;
@@ -237,5 +240,37 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Failed to create quote:', error);
         return NextResponse.json({ error: 'Failed to create quote' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: Request) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const body = await request.json();
+        const { ids } = body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ error: 'No IDs provided' }, { status: 400 });
+        }
+
+        console.log(`[API DELETE Quotes] Bulk delete request for ${ids.length} quotes`);
+
+        await (prisma as any).quote.deleteMany({
+            where: {
+                id: { in: ids }
+            }
+        });
+
+        return NextResponse.json({ success: true, count: ids.length });
+    } catch (error: any) {
+        console.error('[API DELETE Quotes] Bulk delete error:', error);
+        return NextResponse.json({ 
+            error: 'Failed to delete quotes', 
+            details: error.message 
+        }, { status: 500 });
     }
 }

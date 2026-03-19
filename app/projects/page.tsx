@@ -42,6 +42,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import { 
     getProjectClientDisplay, 
     getProjectCompanyDisplay, 
@@ -74,6 +75,8 @@ export default function ProjectsPage() {
     const search = searchParams.get('search') || '';
 
     const [projects, setProjects] = useState<Project[]>([]);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [totalProjects, setTotalProjects] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -199,6 +202,46 @@ export default function ProjectsPage() {
         }
     };
 
+    const toggleSelectAll = () => {
+        if (selectedIds.length === projects.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(projects.map(p => p.id));
+        }
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.length === 0) return;
+        setActionLoading(true);
+        try {
+            const res = await fetch('/api/projects', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: selectedIds }),
+            });
+            if (res.ok) {
+                setSelectedIds([]);
+                fetchProjects();
+                setIsBulkDeleteDialogOpen(false);
+                toast.success('Successfully deleted selected projects');
+            } else {
+                const data = await res.json();
+                toast.error(data.error || 'Failed to delete projects');
+            }
+        } catch (error) {
+            console.error('Failed to delete projects', error);
+            toast.error('An error occurred during deletion');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'Budget': return 'bg-purple-50 text-purple-700 border-purple-200';
@@ -266,6 +309,14 @@ export default function ProjectsPage() {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
+                                <th className="px-6 py-4 w-10">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={projects.length > 0 && selectedIds.length === projects.length}
+                                        onChange={toggleSelectAll}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                    />
+                                </th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project / Company</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest text-center">Quotes</th>
@@ -278,14 +329,14 @@ export default function ProjectsPage() {
                         <tbody className="divide-y divide-gray-50 relative">
                             {loading && projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-20 text-center">
+                                    <td colSpan={8} className="px-6 py-20 text-center">
                                         <Loader2 className="animate-spin inline-block text-blue-500 mb-2" size={32} />
                                         <p className="text-gray-400 font-medium">Loading projects...</p>
                                     </td>
                                 </tr>
                             ) : projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-20 text-center">
+                                    <td colSpan={8} className="px-6 py-20 text-center">
                                         <div className="flex flex-col items-center gap-2">
                                             <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
                                                 <Search size={24} />
@@ -309,8 +360,17 @@ export default function ProjectsPage() {
                                 projects.map((project) => (
                                     <tr key={project.id} className={cn(
                                         "hover:bg-blue-50/30 transition-colors group",
-                                        loading && "opacity-50 pointer-events-none"
+                                        loading && "opacity-50 pointer-events-none",
+                                        selectedIds.includes(project.id) && "bg-blue-50/50"
                                     )}>
+                                        <td className="px-6 py-4">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedIds.includes(project.id)}
+                                                onChange={() => toggleSelect(project.id)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                            />
+                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-start gap-3">
                                                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors shadow-sm">
@@ -533,38 +593,67 @@ export default function ProjectsPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Dialog */}
-            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            {/* Bulk Delete Dialog */}
+            <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle className="text-red-600 flex items-center gap-2">
-                            <AlertCircle /> Delete Project?
+                            <AlertCircle /> Delete Multiple Projects?
                         </DialogTitle>
                         <DialogDescription className="py-2">
-                            {selectedProject?._count?.quotes && selectedProject._count.quotes > 0 ? (
-                                <div className="space-y-3">
-                                    <p className="font-bold text-gray-900 border-l-4 border-red-500 pl-4 bg-red-50 py-2">
-                                        WARNING: This project has {selectedProject._count.quotes} associated quote{selectedProject._count.quotes > 1 ? 's' : ''}.
-                                    </p>
-                                    <p>Deleting this project will <span className="font-bold underline">permanently delete all associated quotes</span>. This action cannot be undone.</p>
-                                </div>
-                            ) : (
-                                <p>Are you sure you want to delete <span className="font-bold">{selectedProject?.projectName}</span>? This action cannot be undone.</p>
-                            )}
+                            <div className="space-y-3">
+                                <p className="font-bold text-gray-900 border-l-4 border-red-500 pl-4 bg-red-50 py-2">
+                                    WARNING: You are about to delete {selectedIds.length} projects.
+                                </p>
+                                <p>Deleting these projects will <span className="font-bold underline">permanently delete all associated quotes</span>. This action cannot be undone.</p>
+                            </div>
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0">
-                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                        <Button variant="ghost" onClick={() => setIsBulkDeleteDialogOpen(false)}>Cancel</Button>
                         <Button 
                             variant="destructive" 
-                            onClick={handleDelete}
+                            onClick={handleBulkDelete}
                             disabled={actionLoading}
                         >
-                            {actionLoading ? <Loader2 className="animate-spin" /> : 'Delete Permanently'}
+                            {actionLoading ? <Loader2 className="animate-spin" /> : `Delete ${selectedIds.length} Projects`}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Bulk Actions Bar */}
+            {selectedIds.length > 0 && (
+                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-6 animate-in slide-in-from-bottom-8 duration-300 z-50">
+                    <div className="flex items-center gap-3 pr-6 border-r border-slate-700">
+                        <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                            {selectedIds.length}
+                        </div>
+                        <span className="text-sm font-medium">Projects Selected</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setSelectedIds([])}
+                            className="text-slate-400 hover:text-white hover:bg-slate-800"
+                        >
+                            Clear Selection
+                        </Button>
+                        
+                        <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={() => setIsBulkDeleteDialogOpen(true)}
+                            className="bg-red-600 hover:bg-red-700 gap-2"
+                        >
+                            <Trash2 size={16} />
+                            Delete Selected
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

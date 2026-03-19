@@ -10,13 +10,12 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
         
-        let settings = await prisma.settings.findUnique({
+        let settings = await (prisma as any).settings.findUnique({
             where: { id: 'global' },
         });
-// ... (rest of GET)
 
         if (!settings) {
-            settings = await prisma.settings.create({
+            settings = await (prisma as any).settings.create({
                 data: {
                     id: 'global',
                     labourRate: 100,
@@ -26,14 +25,17 @@ export async function GET() {
                     targetMarginPct: 0.18,
                     gstPct: 0.10,
                     roundingIncrement: 100,
-
                     minMarginAlertPct: 0.05,
                     copperPricePerKg: 15.0,
                 },
             });
         }
 
-        return NextResponse.json(settings);
+        return NextResponse.json({
+            ...settings,
+            pipedriveToken: undefined, // Never expose token
+            pipedriveTokenSet: !!(settings as any)?.pipedriveToken
+        });
     } catch (error) {
         return NextResponse.json({ error: 'Failed to fetch settings' }, { status: 500 });
     }
@@ -48,7 +50,7 @@ export async function PUT(request: Request) {
 
         const body = await request.json();
 
-        const settings = await prisma.settings.upsert({
+        const settings = await (prisma as any).settings.upsert({
             where: { id: 'global' },
             update: {
                 labourRate: body.labourRate,
@@ -62,6 +64,7 @@ export async function PUT(request: Request) {
                 companyName: body.companyName,
                 companyAddress: body.companyAddress,
                 copperPricePerKg: body.copperPricePerKg,
+                pipedriveToken: body.pipedriveToken,
             },
             create: {
                 id: 'global',
@@ -76,6 +79,7 @@ export async function PUT(request: Request) {
                 companyName: body.companyName,
                 companyAddress: body.companyAddress,
                 copperPricePerKg: body.copperPricePerKg || 15.0,
+                pipedriveToken: body.pipedriveToken,
             },
         });
 
