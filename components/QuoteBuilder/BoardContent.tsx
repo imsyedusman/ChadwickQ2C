@@ -1,8 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { Trash2, Plus, Minus, ChevronDown, ChevronRight, Edit2, Lock, Clock, FileText, Zap } from 'lucide-react';
+import { generateDescriptionBullets } from '@/lib/description-logic';
+import { 
+    Plus, Minus, Trash2, Edit2, Info, ChevronDown, ChevronRight, Settings2, Zap, Clock, FileText, User, Lock as LockIcon 
+} from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
@@ -25,6 +28,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog";
 
 const CATEGORY_LABELS: Record<string, string> = {
     'Basics': 'Basics',
@@ -89,12 +100,61 @@ interface BoardContentProps {
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
-    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote, addItemToBoard } = useQuote();
+    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote, addItemToBoard, updateBoardDetails } = useQuote();
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
     const [showManualForm, setShowManualForm] = useState(false);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const [localCustomDesc, setLocalCustomDesc] = useState('');
+    const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
+
+    // New unified description state: local draft of bullets
+    const [descriptionDraft, setDescriptionDraft] = useState<{ id?: string; text: string; isManual?: boolean }[]>([]);
 
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
+
+    // Synchronize description draft when dialog opens or config changes
+    useEffect(() => {
+        if (!isDescDialogOpen || !selectedBoard) return;
+
+        const systemBullets = generateDescriptionBullets(selectedBoard as any);
+        const options = (selectedBoard.descriptionOptions as any) || {};
+        const savedDraft = options.draft as { id?: string; text: string; isManual?: boolean }[] | undefined;
+        const editedIds = new Set(options.editedIds || []);
+
+        if (savedDraft && savedDraft.length > 0) {
+            // Update system-linked bullets in the saved draft if they haven't been edited
+            const updatedDraft = savedDraft.map(bullet => {
+                if (bullet.id && !editedIds.has(bullet.id)) {
+                    const latest = systemBullets.find(b => b.id === bullet.id);
+                    if (latest) return { ...bullet, text: latest.text };
+                }
+                return bullet;
+            });
+            setDescriptionDraft(updatedDraft);
+        } else {
+            // Initial draft from system logic
+            setDescriptionDraft(systemBullets);
+        }
+    }, [isDescDialogOpen, selectedBoard?.config, selectedBoard?.descriptionOptions]);
+
+    const saveDescriptionDraft = (newDraft: typeof descriptionDraft, newEditedIds?: string[]) => {
+        if (!selectedBoard) return;
+        const currentOptions = (selectedBoard.descriptionOptions as any) || {};
+        const updates: any = {
+            descriptionOptions: {
+                ...currentOptions,
+                draft: newDraft,
+                editedIds: newEditedIds || currentOptions.editedIds || []
+            }
+        };
+        updateBoardDetails(selectedBoard.id, updates);
+    };
+    // Sync local custom description when board changes or saved in background
+    useEffect(() => {
+        if (selectedBoard) {
+            setLocalCustomDesc(selectedBoard.customDescription || '');
+        }
+    }, [selectedBoard?.id, selectedBoard?.customDescription]);
 
     if (!selectedBoard) {
         return (
@@ -308,7 +368,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             <div className="flex items-center gap-1">
                                 <SystemItemHoverCard item={{ ...item, isFormulaPriced: true } as any} boardItems={items}>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100 transition-colors cursor-help" title="">
-                                        <Lock size={8} className="text-amber-700" />
+                                        <LockIcon size={8} className="text-amber-700" />
                                         Calculated
                                     </span>
                                 </SystemItemHoverCard>
@@ -318,7 +378,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             <div className="flex items-center gap-1">
                                 <SystemItemHoverCard item={item} boardItems={items}>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 hover:bg-blue-100 transition-colors">
-                                        <Lock size={8} className="text-blue-700" />
+                                        <LockIcon size={8} className="text-blue-700" />
                                         {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
                                     </span>
                                 </SystemItemHoverCard>
@@ -425,7 +485,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 className="text-gray-400 cursor-help flex items-center"
                                 title={`Material: ${formatCurrency(displayUnitPrice)} ${isCopper ? '/m' : 'ea'}\nLabor: ${item.quantity} x ${item.labourHours}hr = ${(item.quantity * item.labourHours).toFixed(2)}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((displayTotalPrice) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
                             >
-                                <Clock size={12} />
+                                <LockIcon size={14} />
                             </div>
                         )}
                     </div>
@@ -454,7 +514,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         // But wait, if it's NOT locked, we want the delete button.
                         // If it IS locked, we want the lock icon which triggers explanation.
                         >
-                            {isDeleteLocked ? <Lock size={14} className="cursor-pointer text-gray-300 hover:text-blue-600" /> : null}
+                            {isDeleteLocked ? <LockIcon size={14} className="cursor-pointer text-gray-300 hover:text-blue-600" /> : null}
                         </button>
                     </SystemItemHoverCard>
                 )}
@@ -612,7 +672,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <>
+            <div className="flex flex-col h-full bg-gray-50/30">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <div>
                     <h3 className="font-bold text-gray-800">{selectedBoard.name}</h3>
@@ -759,11 +820,20 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         {val}
                     </span>
                 ))}
+
+                <div className="ml-auto flex items-center gap-3">
+                    <button
+                        onClick={() => setIsDescDialogOpen(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-[11px] font-semibold border border-blue-100 shadow-sm"
+                    >
+                        <FileText size={14} />
+                        DOCX Description
+                    </button>
+                </div>
             </div>
 
             {/* Board Composition Indicators */}
             <BoardComposition items={items} />
-
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 <BoardSummary />
@@ -847,5 +917,147 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 )}
             </div>
         </div>
+
+        {/* DOCX Description Dialog */}
+        <Dialog open={isDescDialogOpen} onOpenChange={setIsDescDialogOpen}>
+            <DialogContent className="max-w-2xl bg-white border-0 shadow-2xl rounded-xl p-0 overflow-hidden">
+                {selectedBoard && (
+                    <>
+                        <DialogHeader className="p-6 bg-gray-50 border-b border-gray-100">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <DialogTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                        <FileText className="text-blue-600" size={24} />
+                                        Board DOCX Description
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-gray-500 mt-1">
+                                        Edit system bullets inline or add your own.
+                                    </DialogDescription>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const systemBullets = generateDescriptionBullets(selectedBoard as any);
+                                        // Reset editedIds but keep manual bullets
+                                        const manualOnly = descriptionDraft.filter(b => b.isManual || !b.id);
+                                        const refreshed = [...systemBullets, ...manualOnly];
+                                        setDescriptionDraft(refreshed);
+                                        saveDescriptionDraft(refreshed, []);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-all border border-blue-100 shadow-sm"
+                                    title="Re-sync system values from latest preselection"
+                                >
+                                    <RefreshCw size={14} />
+                                    Refresh from Specs
+                                </button>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto bg-white">
+                            {descriptionDraft.length === 0 && (
+                                <div className="text-center py-12 border-2 border-dashed border-gray-100 rounded-xl">
+                                    <p className="text-sm text-gray-400">No bullets defined for this board.</p>
+                                </div>
+                            )}
+
+                            <div className="space-y-2.5">
+                                {descriptionDraft.map((bullet, idx) => {
+                                    const options = (selectedBoard.descriptionOptions as any) || {};
+                                    const isEdited = bullet.id && (options.editedIds || []).includes(bullet.id);
+                                    
+                                    return (
+                                        <div key={bullet.id || idx} className="flex gap-3 items-center group">
+                                            <div className="flex-shrink-0 w-8 flex justify-center">
+                                                {bullet.id ? (
+                                                    isEdited ? (
+                                                        <div title="System-linked but modified">
+                                                            <Edit2 size={16} className="text-blue-400" />
+                                                        </div>
+                                                    ) : (
+                                                        <div title="Live-synced to preselection">
+                                                            <Zap size={16} className="text-amber-400" />
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div title="Manual note">
+                                                        <User size={16} className="text-gray-300" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="flex-1 relative">
+                                                <input
+                                                    type="text"
+                                                    value={bullet.text}
+                                                    onChange={(e) => {
+                                                        const newDraft = [...descriptionDraft];
+                                                        newDraft[idx] = { ...newDraft[idx], text: e.target.value };
+                                                        setDescriptionDraft(newDraft);
+                                                    }}
+                                                    onBlur={() => {
+                                                        const options = (selectedBoard.descriptionOptions as any) || {};
+                                                        let newEditedIds = [...(options.editedIds || [])];
+                                                        if (bullet.id && !newEditedIds.includes(bullet.id)) {
+                                                            newEditedIds.push(bullet.id);
+                                                        }
+                                                        saveDescriptionDraft(descriptionDraft, newEditedIds);
+                                                    }}
+                                                    className="w-full text-sm py-2 px-3 border border-gray-100 rounded-lg focus:border-blue-300 focus:ring-4 focus:ring-blue-50 outline-none transition-all text-gray-700 bg-gray-50/30 hover:bg-white"
+                                                />
+                                            </div>
+
+                                            <button
+                                                onClick={() => {
+                                                    const newDraft = descriptionDraft.filter((_, i) => i !== idx);
+                                                    setDescriptionDraft(newDraft);
+                                                    saveDescriptionDraft(newDraft);
+                                                }}
+                                                className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 transition-all"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                onClick={() => {
+                                    const newBullet = { text: "", isManual: true };
+                                    const newDraft = [...descriptionDraft, newBullet];
+                                    setDescriptionDraft(newDraft);
+                                    // Don't save to DB until they blur or close? 
+                                    // Actually, adding an empty bullet is better saved on blur
+                                }}
+                                className="w-full py-2.5 border-2 border-dashed border-gray-100 rounded-xl text-gray-400 hover:text-blue-500 hover:border-blue-200 hover:bg-blue-50/30 transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                            >
+                                <Plus size={14} />
+                                Add Extra Bullet
+                            </button>
+                        </div>
+
+                        <DialogFooter className="p-4 bg-gray-50 border-t border-gray-100 sm:justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
+                                    <Zap size={12} className="text-amber-400" /> Live
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
+                                    <Edit2 size={12} className="text-blue-400" /> Edited
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[10px] text-gray-400 font-medium">
+                                    <User size={12} className="text-gray-300" /> Manual
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsDescDialogOpen(false)}
+                                className="px-6 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all text-sm font-bold shadow-lg"
+                            >
+                                Done
+                            </button>
+                        </DialogFooter>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+        </>
     );
 }

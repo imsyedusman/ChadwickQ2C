@@ -18,6 +18,7 @@ export class ExportService {
             clientCompany: quote.clientCompany,
             projectRef: quote.projectRef,
             description: quote.description,
+            creator: quote.creator, // Pass the creator object { name, email }
             boards: quote.boards.map((board: any) => {
                 let boardTotal;
 
@@ -30,13 +31,14 @@ export class ExportService {
                     boardTotal = providedTotal.sellPriceRounded;
                 } else {
                     // Fallback to calculation ONLY if boardTotals is completely absent
-                    // (e.g. legacy direct API calls that don't pass frontend totals)
                     boardTotal = this.calculateBoardTotal(board, settings);
                 }
 
                 return {
                     ...board,
-                    totalSellPrice: boardTotal
+                    totalSellPrice: boardTotal,
+                    useCustomDescription: board.useCustomDescription,
+                    customDescription: board.customDescription
                 };
             }),
             totals: {

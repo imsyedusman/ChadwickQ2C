@@ -258,10 +258,14 @@ model Board {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   mccbVariant   String?
-  description   String?
-  internalNotes String?
-  quote         Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  items         Item[]
+  description          String?
+  internalNotes        String?
+  useCustomDescription Boolean  @default(false)
+  hideAutoDescription  Boolean  @default(false)
+  customDescription    String?
+  descriptionOptions   Json     @default("{}")
+  quote                Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  items                Item[]
 }
 
 model Item {

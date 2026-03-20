@@ -8,7 +8,16 @@ export async function PUT(
     try {
         const { boardId } = await params;
         const body = await request.json();
-        const { name, type, config, internalNotes } = body;
+        const { 
+            name, 
+            type, 
+            config, 
+            internalNotes, 
+            useCustomDescription, 
+            hideAutoDescription,
+            customDescription, 
+            descriptionOptions 
+        } = body;
 
         // Resolve new MCCB Variant if fault rating changed
         let newMccbVariant = undefined;
@@ -19,15 +28,27 @@ export async function PUT(
                         config.faultRating.includes('70kA') ? 'H3' : 'B3';
         }
 
+        // Build data object dynamically to avoid sending undefined fields
+        const data: any = {};
+        if (name !== undefined) data.name = name;
+        if (type !== undefined) data.type = type;
+        if (internalNotes !== undefined) data.internalNotes = internalNotes;
+        if (useCustomDescription !== undefined) data.useCustomDescription = useCustomDescription;
+        if (hideAutoDescription !== undefined) data.hideAutoDescription = hideAutoDescription;
+        if (customDescription !== undefined) data.customDescription = customDescription?.trim();
+        if (descriptionOptions !== undefined) {
+            data.descriptionOptions = typeof descriptionOptions === 'string' 
+                ? JSON.parse(descriptionOptions) 
+                : descriptionOptions;
+        }
+        if (config !== undefined) {
+            data.config = JSON.stringify(config);
+            data.mccbVariant = newMccbVariant;
+        }
+
         const updatedBoard = await prisma.board.update({
             where: { id: boardId },
-            data: {
-                name,
-                type,
-                internalNotes,
-                config: config ? JSON.stringify(config) : undefined,
-                mccbVariant: newMccbVariant // Update column
-            } as any, // Cast for mccbVariant
+            data,
         });
 
         if (config) {

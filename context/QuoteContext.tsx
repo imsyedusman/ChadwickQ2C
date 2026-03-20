@@ -59,8 +59,13 @@ export interface Board {
     id: string;
     quoteId: string;
     name: string;
+    type: string;
     description: string | null;
     internalNotes: string | null;
+    useCustomDescription: boolean;
+    hideAutoDescription: boolean;
+    customDescription: string | null;
+    descriptionOptions?: any;
     config?: any;
     items: Item[];
 }
@@ -134,6 +139,7 @@ interface QuoteContextType {
     updateProjectStatus: (status: string) => Promise<void>;
     updateUiState: (key: string, value: any) => void;
     updateBoardConfig: (boardId: string, config: any) => Promise<void>;
+    updateBoardDetails: (boardId: string, updates: Partial<Board>) => Promise<void>;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -595,6 +601,23 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
+    const updateBoardDetails = async (boardId: string, updates: Partial<Board>) => {
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updates)
+            });
+
+            if (!response.ok) throw new Error('Failed to update board details');
+
+            await fetchQuoteData();
+        } catch (error) {
+            console.error('Error updating board details:', error);
+            throw error;
+        }
+    };
+
     return (
         <QuoteContext.Provider
             value={{
@@ -632,6 +655,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateProjectStatus,
                 updateUiState,
                 updateBoardConfig,
+                updateBoardDetails,
             }}
         >
             {children}

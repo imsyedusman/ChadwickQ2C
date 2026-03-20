@@ -228,6 +228,10 @@ export default function TemplateManager() {
                             <PlaceholderItem code="{quoteNumber}" label="Quote Number" />
                             <PlaceholderItem code="{date}" label="Today's Date" />
                             <PlaceholderItem code="{totalPrice}" label="Total Sell Price (Ex GST)" />
+                            <li className="mt-2 text-xs opacity-80 font-semibold">Quote Creator:</li>
+                            <PlaceholderItem code="{created_by}" label="Full name" />
+                            <PlaceholderItem code="{created_by_first_name}" label="First name" />
+                            <PlaceholderItem code="{created_by_email}" label="Email address" />
                         </ul>
                     </div>
                     <div>
