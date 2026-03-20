@@ -485,7 +485,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 className="text-gray-400 cursor-help flex items-center"
                                 title={`Material: ${formatCurrency(displayUnitPrice)} ${isCopper ? '/m' : 'ea'}\nLabor: ${item.quantity} x ${item.labourHours}hr = ${(item.quantity * item.labourHours).toFixed(2)}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((displayTotalPrice) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
                             >
-                                <LockIcon size={14} />
+                                <Clock size={14} />
                             </div>
                         )}
                     </div>

@@ -20,7 +20,8 @@ export async function GET(
                     include: {
                         items: true,
                     }
-                }
+                },
+                creator: true
             }
         });
 
@@ -123,6 +124,7 @@ export async function GET(
             totals: {
                 sellPrice: grandTotals.sellPrice
             },
+            creator: quote.creator,
             templatePath
         };
 
