@@ -242,9 +242,16 @@ function addCtItems(
             const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
             if (busbarPartNumber) {
                 // Respect user edits for busbars (don't force-reset to 1)
-                const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
-                const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
-                targetMap(busbarPartNumber, busbarQty);
+                // BUT skip if already added in this sync to prevent compounding / doubling.
+                // Busbars represent the entire board's copper system, so they only need to be initialized once per sync.
+                if (! (targetMap as any).tracker?.has(busbarPartNumber)) {
+                    if (! (targetMap as any).tracker) (targetMap as any).tracker = new Set<string>();
+                    (targetMap as any).tracker.add(busbarPartNumber);
+
+                    const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
+                    const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
+                    targetMap(busbarPartNumber, busbarQty);
+                }
             }
         }
         // Labour
@@ -718,11 +725,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const customPricing = new Map<string, number>(); // Map<PartNumber, UnitPrice>
     const customLabour = new Map<string, number>(); // Map<PartNumber, LabourHours>
 
-    const addTarget = (partNumber: string, qty: number, unitPrice?: number, labourHours?: number) => {
+    const addTarget = (partNumber: string, qty: number | Prisma.Decimal, unitPrice?: number, labourHours?: number) => {
         targetItemPartNumbers.add(partNumber);
         // If item already exists in map, take max (logic specific) or just strict set
         // Here we strictly set what we want.
-        itemQuantities.set(partNumber, qty);
+        itemQuantities.set(partNumber, Number(qty));
         if (unitPrice !== undefined) {
             customPricing.set(partNumber, unitPrice);
         }
@@ -885,10 +892,11 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // Runs if CT Mode is ACTIVE OR Spare is requested.
 
     // Helper accumulator for CT logic
-    const ctTotals = new Map<string, number>();
-    const addCtTarget = (part: string, qty: number) => {
-        const current = ctTotals.get(part) || 0;
-        ctTotals.set(part, current + qty);
+    const ctTotals = new Map<string, Prisma.Decimal>();
+    const addCtTarget = (part: string, qty: number | Prisma.Decimal) => {
+        const current = ctTotals.get(part) || new Prisma.Decimal(0);
+        const addition = new Prisma.Decimal(qty as any);
+        ctTotals.set(part, current.plus(addition));
         itemTags.set(part, 'CT'); // Mark ownership
     };
 
@@ -958,10 +966,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         });
 
         // Local Accumulator
-        const wcTotals = new Map<string, number>();
-        const addWc = (part: string, qty: number) => {
-            const current = wcTotals.get(part) || 0;
-            wcTotals.set(part, current + qty);
+        const wcTotals = new Map<string, Prisma.Decimal>();
+        const addWc = (part: string, qty: number | Prisma.Decimal) => {
+            const current = wcTotals.get(part) || new Prisma.Decimal(0);
+            wcTotals.set(part, current.plus(new Prisma.Decimal(qty as any)));
             itemTags.set(part, 'WHOLE_CURRENT'); // Mark ownership
         };
 
@@ -1569,7 +1577,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const finalTargetPartNumbers = Array.from(targetItemPartNumbers);
 
     await Promise.all(finalTargetPartNumbers.map(async (partNumber) => {
-        const targetQty = itemQuantities.get(partNumber) || 1;
+        const rawTargetQty = itemQuantities.get(partNumber) || 1;
+        const targetQty = Number(rawTargetQty); // Always sanitize to number for comparisons and DB save
         const targetPrice = customPricing.get(partNumber); // undefined if not custom
         const targetLabour = customLabour.get(partNumber);
 
