@@ -267,6 +267,18 @@ export default function ProjectDetail() {
                         </div>
                         
                         <div className="flex items-center gap-3">
+                            {project.pipedriveDealUrl && (
+                                <Button 
+                                    variant="outline"
+                                    onClick={() => window.open(project.pipedriveDealUrl, '_blank')}
+                                    className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 h-11 px-5 rounded-xl transition-all font-bold"
+                                >
+                                    <div className="w-5 h-5 rounded overflow-hidden shrink-0">
+                                        <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                    </div>
+                                    View in Pipedrive
+                                </Button>
+                            )}
                             {!project.pipedrive_deal_id && (
                                 <Button 
                                     variant="outline"
@@ -351,7 +363,12 @@ export default function ProjectDetail() {
                                     <div>
                                         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Deal Value</p>
                                         <p className="text-xl font-bold text-white">
-                                            {project.currency || '$'} {(project.dealValue || 0).toLocaleString()}
+                                            {(() => {
+                                                const val = Number(project.dealValue);
+                                                return (project.dealValue && !isNaN(val)) 
+                                                    ? `$${val.toLocaleString()}` 
+                                                    : "—";
+                                            })()}
                                         </p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">

@@ -2,20 +2,20 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { 
-    Search, 
-    ChevronRight, 
-    ChevronLeft, 
-    AlertCircle, 
-    RefreshCcw, 
-    User, 
-    Briefcase, 
-    Loader2, 
-    MoreVertical, 
-    Edit2, 
-    Trash2, 
-    Building2, 
-    Calendar, 
+import {
+    Search,
+    ChevronRight,
+    ChevronLeft,
+    AlertCircle,
+    RefreshCcw,
+    User,
+    Briefcase,
+    Loader2,
+    MoreVertical,
+    Edit2,
+    Trash2,
+    Building2,
+    Calendar,
     FileText,
     Settings2
 } from 'lucide-react';
@@ -53,10 +53,10 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { 
-    getProjectClientDisplay, 
-    getProjectCompanyDisplay, 
-    getProjectContactDisplay 
+import {
+    getProjectClientDisplay,
+    getProjectCompanyDisplay,
+    getProjectContactDisplay
 } from '@/lib/project-utils';
 
 interface Project {
@@ -85,7 +85,7 @@ interface Project {
 export default function ProjectsPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    
+
     // URL-based state
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('limit') || '25');
@@ -98,7 +98,7 @@ export default function ProjectsPage() {
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(true);
     const [searchInput, setSearchInput] = useState(search);
-    
+
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -111,7 +111,7 @@ export default function ProjectsPage() {
         projectStatus: '',
     });
     const [actionLoading, setActionLoading] = useState(false);
-    
+
     // Sync state
     const [syncingPipedrive, setSyncingPipedrive] = useState(false);
     const [syncBatchId, setSyncBatchId] = useState<string | null>(null);
@@ -129,6 +129,7 @@ export default function ProjectsPage() {
     // Refs for Synced Scrollbar
     const tableContainerRef = useRef<HTMLDivElement>(null);
     const scrollbarRef = useRef<HTMLDivElement>(null);
+    const [tableScrollWidth, setTableScrollWidth] = useState(0);
 
     // Load column visibility from localStorage
     useEffect(() => {
@@ -162,6 +163,36 @@ export default function ProjectsPage() {
             tableContainerRef.current.scrollLeft = scrollbarRef.current.scrollLeft;
         }
     };
+
+    // Keep scrollbar width in sync with table
+    useEffect(() => {
+        if (!tableContainerRef.current) return;
+
+        const updateWidth = () => {
+            if (tableContainerRef.current) {
+                // Find the table element inside the container
+                const table = tableContainerRef.current.querySelector('table');
+                if (table) {
+                    setTableScrollWidth(table.scrollWidth);
+                }
+            }
+        };
+
+        const observer = new ResizeObserver(updateWidth);
+        const table = tableContainerRef.current.querySelector('table');
+        if (table) {
+            observer.observe(table);
+            observer.observe(tableContainerRef.current);
+        }
+
+        updateWidth();
+        window.addEventListener('resize', updateWidth);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateWidth);
+        };
+    }, [projects, visibleColumns]);
 
     // Poll for sync status
     useEffect(() => {
@@ -201,7 +232,7 @@ export default function ProjectsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mode, force }),
             });
-            
+
             if (res.ok) {
                 const data = await res.json();
                 setSyncBatchId(data.batchId);
@@ -212,9 +243,9 @@ export default function ProjectsPage() {
                 toast.info(
                     <div className="flex flex-col gap-2">
                         <p>A synchronization is already in progress.</p>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            variant="outline"
+                            size="sm"
                             className="bg-white hover:bg-slate-50 border-slate-200 text-slate-700 h-8 font-bold"
                             onClick={() => handleSync(mode, true)}
                         >
@@ -284,7 +315,7 @@ export default function ProjectsPage() {
             const url = `/api/projects?page=${page}&limit=${pageSize}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
             const res = await fetch(url);
             const data = await res.json();
-            
+
             setProjects(data.projects || []);
             setTotalProjects(data.total || 0);
             setTotalPages(data.totalPages || 0);
@@ -362,7 +393,7 @@ export default function ProjectsPage() {
     };
 
     const toggleSelect = (id: string) => {
-        setSelectedIds(prev => 
+        setSelectedIds(prev =>
             prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
         );
     };
@@ -409,7 +440,7 @@ export default function ProjectsPage() {
                     <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Project Management</h1>
                     <p className="text-gray-500">Track opportunities, manage statuses, and view quote history.</p>
                 </div>
-                
+
                 <div className="flex items-center gap-3">
                     {syncingPipedrive && syncProgress && (
                         <div className="flex flex-col items-end mr-4 animate-pulse">
@@ -486,11 +517,11 @@ export default function ProjectsPage() {
                             className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm italic shadow-sm"
                         />
                     </div>
-                    
+
                     <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
                         <div className="flex items-center gap-2 border border-gray-200 bg-white rounded-xl px-3 py-1.5 shadow-sm">
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Show</span>
-                            <select 
+                            <select
                                 value={pageSize}
                                 onChange={(e) => updateUrl({ limit: parseInt(e.target.value), page: 1 })}
                                 className="text-xs font-bold text-gray-700 bg-transparent focus:outline-none cursor-pointer"
@@ -501,10 +532,10 @@ export default function ProjectsPage() {
                                 <option value="100">100</option>
                             </select>
                         </div>
-                        
-                        <Button 
-                            variant="ghost" 
-                            size="sm" 
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={fetchProjects}
                             disabled={loading}
                             className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl font-bold flex items-center gap-2 px-3 h-9"
@@ -512,7 +543,7 @@ export default function ProjectsPage() {
                             {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <RefreshCcw className="w-4 h-4" />}
                             <span className="hidden sm:inline">Refresh</span>
                         </Button>
-                        
+
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="outline" size="sm" className="rounded-xl border-gray-200 h-9 font-bold text-gray-700 flex items-center gap-2">
@@ -523,25 +554,25 @@ export default function ProjectsPage() {
                             <DropdownMenuContent align="end" className="w-56">
                                 <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuCheckboxItem 
+                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.client}
                                     onCheckedChange={() => toggleColumn('client')}
                                 >
                                     Client
                                 </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem 
+                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.company}
                                     onCheckedChange={() => toggleColumn('company')}
                                 >
                                     Company
                                 </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem 
+                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.dealValue}
                                     onCheckedChange={() => toggleColumn('dealValue')}
                                 >
                                     Deal Value
                                 </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem 
+                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.created}
                                     onCheckedChange={() => toggleColumn('created')}
                                 >
@@ -552,23 +583,24 @@ export default function ProjectsPage() {
                     </div>
                 </div>
 
-                <div 
+                <div
                     ref={tableContainerRef}
                     onScroll={handleTableScroll}
                     className="overflow-x-auto min-h-[400px] relative"
                 >
-                    <table className="w-full text-left table-fixed min-w-[1200px]">
+                    <table className="w-full text-left table-fixed min-w-[2000px]">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
                                 <th className="px-6 py-4 w-[60px]">
-                                    <input 
-                                        type="checkbox" 
+                                    <input
+                                        type="checkbox"
                                         checked={projects.length > 0 && selectedIds.length === projects.length}
                                         onChange={toggleSelectAll}
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[300px]">Project</th>
+                                {/* ADJUST PROJECT COLUMN WIDTH HERE: change w-[...] value below */}
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[800px]">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px] text-center">Status</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[100px] text-center">Quotes</th>
                                 {visibleColumns.client && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[180px]">Client</th>}
@@ -607,8 +639,8 @@ export default function ProjectsPage() {
                                         selectedIds.includes(project.id) && "bg-blue-50/50"
                                     )}>
                                         <td className="px-6 py-4">
-                                            <input 
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 checked={selectedIds.includes(project.id)}
                                                 onChange={() => toggleSelect(project.id)}
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -619,28 +651,63 @@ export default function ProjectsPage() {
                                                 <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors shadow-sm shrink-0">
                                                     <Briefcase size={18} />
                                                 </div>
-                                                <div 
-                                                    className="cursor-pointer group/link min-w-0 flex-1"
+                                                <div
+                                                    className="cursor-pointer group/link w-full overflow-hidden"
                                                     onClick={() => router.push(`/projects/${project.id}`)}
                                                 >
-                                                    <div className="font-bold text-gray-900 leading-tight group-hover/link:text-blue-600 group-hover/link:underline decoration-blue-200 transition-all truncate" title={project.projectName}>
-                                                        {project.projectName}
-                                                    </div>
+                                                    {(() => {
+                                                        const isTruncated = (project.projectName || '').length > 40;
+                                                        const projectDisplay = (
+                                                            <div className="font-bold text-gray-900 leading-tight group-hover/link:text-blue-600 transition-all whitespace-normal line-clamp-2 overflow-hidden text-ellipsis cursor-pointer break-words" title={!isTruncated ? project.projectName : undefined}>
+                                                                {project.projectName}
+                                                            </div>
+                                                        );
+
+                                                        if (isTruncated) {
+                                                            return (
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            {projectDisplay}
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="right" className="p-3 max-w-[400px] border-blue-100 bg-white shadow-xl">
+                                                                            <div className="space-y-1">
+                                                                                <div className="font-semibold text-gray-900 leading-tight">{project.projectName}</div>
+                                                                                {project.companyName && (
+                                                                                    <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                                                                                        <Building2 size={12} />
+                                                                                        {project.companyName}
+                                                                                    </div>
+                                                                                )}
+                                                                                {project.clientName && (
+                                                                                    <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                                                                                        <User size={12} />
+                                                                                        {project.clientName}
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            );
+                                                        }
+                                                        return projectDisplay;
+                                                    })()}
                                                 </div>
                                                 <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                                     {project.pipedriveDealUrl && (
                                                         <TooltipProvider>
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
-                                                                    <a 
-                                                                        href={project.pipedriveDealUrl} 
-                                                                        target="_blank" 
+                                                                    <a
+                                                                        href={project.pipedriveDealUrl}
+                                                                        target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                         className="p-1 hover:bg-blue-100 text-blue-600 rounded-md transition-colors"
                                                                     >
                                                                         <div className="w-3.5 h-3.5 rounded-sm overflow-hidden">
-                                                                           <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                                                            <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
                                                                         </div>
                                                                     </a>
                                                                 </TooltipTrigger>
@@ -652,9 +719,9 @@ export default function ProjectsPage() {
                                                         <TooltipProvider>
                                                             <Tooltip>
                                                                 <TooltipTrigger asChild>
-                                                                    <a 
-                                                                        href={project.quoteFolder} 
-                                                                        target="_blank" 
+                                                                    <a
+                                                                        href={project.quoteFolder.startsWith('http') ? project.quoteFolder : `https://${project.quoteFolder}`}
+                                                                        target="_blank"
                                                                         rel="noopener noreferrer"
                                                                         onClick={(e) => e.stopPropagation()}
                                                                         className="p-1 hover:bg-blue-100 text-slate-500 hover:text-blue-700 rounded-md transition-colors"
@@ -707,18 +774,22 @@ export default function ProjectsPage() {
                                         )}
                                         {visibleColumns.dealValue && (
                                             <td className="px-6 py-4 text-right">
-                                                {project.dealValue ? (
-                                                    <div className="flex flex-col items-end">
-                                                        <span className="text-sm font-bold text-gray-900">
-                                                            {project.currency || '$'}{project.dealValue.toLocaleString()}
-                                                        </span>
-                                                        {project.pipedrive_deal_id && (
-                                                            <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Pipedrive</span>
-                                                        )}
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-gray-300 font-medium italic">—</span>
-                                                )}
+                                                {(() => {
+                                                    const val = Number(project.dealValue);
+                                                    if (project.dealValue && !isNaN(val)) {
+                                                        return (
+                                                            <div className="flex flex-col items-end">
+                                                                <span className="text-sm font-bold text-gray-900">
+                                                                    ${val.toLocaleString()}
+                                                                </span>
+                                                                {project.pipedrive_deal_id && (
+                                                                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Pipedrive</span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return <span className="text-xs text-gray-300 font-medium italic">—</span>;
+                                                })()}
                                             </td>
                                         )}
                                         {visibleColumns.created && (
@@ -758,12 +829,12 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* Sticky Horizontal Scrollbar */}
-                <div 
+                <div
                     ref={scrollbarRef}
                     onScroll={handleScrollbarScroll}
-                    className="overflow-x-auto h-3 bg-gray-50 border-t border-gray-100 sticky bottom-0 z-20"
+                    className="overflow-x-auto h-2 bg-gray-50 border-t border-gray-100 sticky bottom-0 z-20"
                 >
-                    <div style={{ width: '1200px', height: '1px' }} />
+                    <div style={{ width: `${tableScrollWidth}px`, height: '1px' }} />
                 </div>
 
                 {/* Pagination Footer */}
@@ -777,7 +848,7 @@ export default function ProjectsPage() {
                             "No projects to display"
                         )}
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                         <Button
                             variant="outline"
@@ -826,8 +897,8 @@ export default function ProjectsPage() {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-semibold">Status</label>
-                                <Select 
-                                    value={editForm.projectStatus} 
+                                <Select
+                                    value={editForm.projectStatus}
                                     onValueChange={(val) => setEditForm({ ...editForm, projectStatus: val })}
                                 >
                                     <SelectTrigger>
@@ -878,8 +949,8 @@ export default function ProjectsPage() {
                     </div>
                     <DialogFooter>
                         <Button variant="ghost" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-                        <Button 
-                            className="bg-blue-600 hover:bg-blue-700 text-white" 
+                        <Button
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={handleUpdate}
                             disabled={actionLoading}
                         >
@@ -907,8 +978,8 @@ export default function ProjectsPage() {
                     </DialogHeader>
                     <DialogFooter className="gap-2 sm:gap-0">
                         <Button variant="ghost" onClick={() => setIsBulkDeleteDialogOpen(false)}>Cancel</Button>
-                        <Button 
-                            variant="destructive" 
+                        <Button
+                            variant="destructive"
                             onClick={handleBulkDelete}
                             disabled={actionLoading}
                         >
@@ -927,19 +998,19 @@ export default function ProjectsPage() {
                         </div>
                         <span className="text-sm font-medium">Projects Selected</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => setSelectedIds([])}
                             className="text-slate-400 hover:text-white hover:bg-slate-800"
                         >
                             Clear Selection
                         </Button>
-                        
-                        <Button 
-                            variant="destructive" 
+
+                        <Button
+                            variant="destructive"
                             size="sm"
                             onClick={() => setIsBulkDeleteDialogOpen(true)}
                             className="bg-red-600 hover:bg-red-700 gap-2"

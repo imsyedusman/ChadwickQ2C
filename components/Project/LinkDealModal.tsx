@@ -125,7 +125,7 @@ export default function LinkDealModal({ isOpen, onClose, onSelect }: LinkDealMod
                                         </div>
                                         <div className="text-right">
                                             <p className="text-sm font-bold text-slate-900">
-                                                {deal.value.toLocaleString()} {deal.currency}
+                                                ${deal.value.toLocaleString()}
                                             </p>
                                             <span className="inline-block px-2 py-0.5 bg-slate-100 text-[10px] font-bold text-slate-500 rounded uppercase mt-1">
                                                 {deal.status}

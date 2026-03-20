@@ -100,6 +100,16 @@ export async function POST(request: Request) {
             return null;
         };
 
+        // Helper to extract Custom Field value safely
+        const safeExtract = (val: any) => {
+            if (val === null || val === undefined) return null;
+            if (typeof val === 'string') return val.trim();
+            if (typeof val === 'object' && val.name) return String(val.name).trim();
+            if (typeof val === 'object' && val.value) return String(val.value).trim();
+            if (typeof val === 'object' && val.label) return String(val.label).trim();
+            return String(val).trim();
+        };
+
         while (hasMore && totalDealsProcessed < maxDeals) {
             // Heartbeat at start of chunk
             try {
@@ -197,9 +207,7 @@ export async function POST(request: Request) {
                         : (deal.value ? parseFloat(String(deal.value)) : null);
                     
                     const currency = deal.currency || null;
-                    const quoteFolder = typeof deal['47359133abef167a5b3ec1276f449c3743ce970f'] === 'string'
-                        ? deal['47359133abef167a5b3ec1276f449c3743ce970f'].trim()
-                        : null;
+                    const quoteFolder = safeExtract(deal['47359133abef167a5b3ec1276f449c3743ce970f']);
                     const pipedriveDealUrl = `https://app.pipedrive.com/deal/${deal.id}`;
                     
                     const parseDate = (dateStr: any) => {
