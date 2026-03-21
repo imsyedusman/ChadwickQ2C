@@ -83,7 +83,7 @@ export async function POST(
                     clientName: originalQuote.clientName,
                     clientCompany: originalQuote.clientCompany,
                     projectId: originalQuote.projectId, // Keep variants in the same project
-                    projectRef: `${originalQuote.projectRef} (Copy)`,
+                    projectRef: originalQuote.projectRef,
                     description: originalQuote.description,
                     status: 'DRAFT',
                     settingsSnapshot: originalQuote.settingsSnapshot,

@@ -17,10 +17,18 @@ import {
     FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 import LinkDealModal from '@/components/Project/LinkDealModal';
+import QuoteRow from '@/components/Project/QuoteRow';
 
 import { 
     getProjectClientDisplay, 
@@ -65,6 +73,7 @@ export default function ProjectDetail() {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [optimisticQuotes, setOptimisticQuotes] = useState<any[]>([]);
 
     const fetchProject = async () => {
         try {
@@ -74,6 +83,7 @@ export default function ProjectDetail() {
             const result = await res.json();
             // result is { project, quotes }
             setProject({ ...result.project, quotes: result.quotes });
+            setOptimisticQuotes(result.quotes);
         } catch (error) {
             console.error('Failed to fetch project:', error);
         } finally {
@@ -86,6 +96,118 @@ export default function ProjectDetail() {
             fetchProject();
         }
     }, [params.id]);
+
+    const handleCreateQuote = async () => {
+        try {
+            const res = await fetch('/api/quotes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId: project.id,
+                    projectRef: project.projectName,
+                    clientName: project.clientName,
+                    clientCompany: project.companyName,
+                    description: project.projectDescription,
+                })
+            });
+            if (!res.ok) throw new Error('Failed to create quote');
+            const newQuote = await res.json();
+            
+            setOptimisticQuotes([newQuote, ...optimisticQuotes]);
+            toast.success('Quote created successfully');
+            fetchProject(); // Refetch backgrounds to sync
+        } catch (err) {
+            toast.error('Error creating quote');
+        }
+    };
+
+    const handleDuplicateQuote = async (id: string) => {
+        try {
+            const res = await fetch(`/api/quotes/${id}/duplicate`, {
+                method: 'POST'
+            });
+            if (!res.ok) throw new Error('Failed to duplicate quote');
+            const newQuote = await res.json();
+            setOptimisticQuotes(prev => {
+                const idx = prev.findIndex(q => q.id === id);
+                if (idx > -1) {
+                    const newArr = [...prev];
+                    newArr.splice(idx + 1, 0, newQuote);
+                    return newArr;
+                }
+                return [newQuote, ...prev];
+            });
+            toast.success('Quote duplicated successfully');
+            fetchProject();
+        } catch (error) {
+            toast.error('Failed to duplicate quote');
+        }
+    };
+
+    const handleUpdateQuote = (id: string, diff: any) => {
+        setOptimisticQuotes(prev => prev.map(q => q.id === id ? { ...q, ...diff } : q));
+    };
+
+    const handleDeleteQuote = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this quote?")) return;
+        setOptimisticQuotes(prev => prev.filter(q => q.id !== id));
+        try {
+            const res = await fetch('/api/quotes', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids: [id] })
+            });
+            if (!res.ok) throw new Error('Failed to delete quote');
+            toast.success('Quote deleted');
+            fetchProject();
+        } catch (err) {
+            toast.error('Failed to delete quote');
+            fetchProject(); 
+        }
+    };
+
+    const handleProjectStatusChange = async (newStatus: string) => {
+        setProject({ ...project, projectStatus: newStatus });
+        try {
+            await fetch(`/api/projects/${project.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectStatus: newStatus })
+            });
+        } catch (err) {
+            toast.error('Failed to update project status');
+            fetchProject();
+        }
+    };
+
+    const sortedQuotes = (() => {
+        const groups = optimisticQuotes.reduce((acc, quote) => {
+            const match = quote.quoteNumber.match(/^(Q\d{2}-\d{4})/);
+            const base = match ? match[1] : quote.quoteNumber;
+            if (!acc[base]) acc[base] = [];
+            acc[base].push(quote);
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        const flat: any[] = [];
+        const sortedBases = Object.keys(groups).sort((a: string, b: string) => {
+            const aLatest = Math.max(...groups[a].map((q: any) => new Date(q.createdAt).getTime()));
+            const bLatest = Math.max(...groups[b].map((q: any) => new Date(q.createdAt).getTime()));
+            return bLatest - aLatest;
+        });
+
+        for (const base of sortedBases) {
+            const group = groups[base];
+            group.sort((a: any, b: any) => a.revision - b.revision);
+            if (group.length > 0) {
+                flat.push({ ...group[0], _isChild: false });
+                for (let i = 1; i < group.length; i++) {
+                    flat.push({ ...group[i], _isChild: true });
+                }
+            }
+        }
+        return flat;
+    })();
 
     const handleLinkDeal = async (deal: any) => {
         setIsLinkModalOpen(false);
@@ -214,7 +336,7 @@ export default function ProjectDetail() {
     };
 
     return (
-        <main className="max-w-[1200px] mx-auto px-6 py-8 animate-in fade-in duration-500">
+        <main className="w-full max-w-[1600px] mx-auto px-6 py-8 animate-in fade-in duration-500">
                 <LinkDealModal 
                     isOpen={isLinkModalOpen} 
                     onClose={() => setIsLinkModalOpen(false)} 
@@ -235,12 +357,19 @@ export default function ProjectDetail() {
                         <div>
                             <div className="flex items-center gap-3 mb-2">
                                 <h1 className="text-3xl font-bold text-gray-900">{project.projectName}</h1>
-                                <span className={cn(
-                                    "px-3 py-1 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm",
-                                    getProjectStatusDisplay(project.projectStatus).className
-                                )}>
-                                    {project.projectStatus}
-                                </span>
+                                <Select value={project.projectStatus} onValueChange={handleProjectStatusChange}>
+                                    <SelectTrigger className={cn(
+                                        "px-3 py-1 h-8 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm w-[120px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
+                                        getProjectStatusDisplay(project.projectStatus).className
+                                    )}>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Budget">Budget</SelectItem>
+                                        <SelectItem value="Tender">Tender</SelectItem>
+                                        <SelectItem value="Live">Live</SelectItem>
+                                    </SelectContent>
+                                </Select>
                                 {project.pipedrive_deal_id && (
                                     <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
                                         <LinkIcon size={12} />
@@ -256,12 +385,6 @@ export default function ProjectDetail() {
                                 <div className="flex items-center gap-2">
                                     <User size={16} className="text-gray-400" />
                                     <span className="font-bold text-gray-800">{getProjectClientDisplay(project)}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Clock size={16} className="text-gray-400" />
-                                    <span className="font-medium text-gray-600">
-                                        Member since {project.createdAt ? format(new Date(project.createdAt), 'MMM yyyy') : 'Recently'}
-                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -289,7 +412,7 @@ export default function ProjectDetail() {
                                     Link Pipedrive Deal
                                 </Button>
                             )}
-                            <Button className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold">
+                            <Button onClick={handleCreateQuote} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold">
                                 <Plus size={20} />
                                 New Project Quote
                             </Button>
@@ -302,7 +425,7 @@ export default function ProjectDetail() {
                         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Quotes</p>
-                                <p className="text-2xl font-bold text-gray-900">{project.quotes?.length || 0}</p>
+                                <p className="text-2xl font-bold text-gray-900">{optimisticQuotes.length || 0}</p>
                             </div>
                             <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
                                 <FileText size={14} className="text-gray-400" />
@@ -313,7 +436,7 @@ export default function ProjectDetail() {
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Combined Selling (EX GST)</p>
                                 <p className="text-2xl font-bold text-gray-900 text-blue-600">
-                                    ${(project.quotes?.reduce((acc: number, q: any) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
+                                    ${(optimisticQuotes.reduce((acc: number, q: any) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
                                 </p>
                             </div>
                             <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase tracking-tighter bg-blue-50 px-2 py-0.5 rounded-md self-start">
@@ -324,8 +447,8 @@ export default function ProjectDetail() {
                             <div>
                                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Latest Activity</p>
                                 <p className="text-lg font-bold text-gray-800 truncate">
-                                    {project.quotes.length > 0 
-                                        ? format(new Date(project.quotes[0].updatedAt), 'MMM d, h:mm a')
+                                    {optimisticQuotes.length > 0 
+                                        ? format(new Date(optimisticQuotes[0].updatedAt), 'MMM d, h:mm a')
                                         : 'No activity yet'}
                                 </p>
                             </div>
@@ -438,73 +561,32 @@ export default function ProjectDetail() {
                     </div>
                     
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        <table className="w-full text-left table-fixed">
                             <thead className="bg-gray-50/50">
                                 <tr>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Quote Number</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Status</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total (Sell)</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date Created</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest pl-10">Activity</th>
-                                    <th className="px-6 py-4"></th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[160px]">Quote Number</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Status</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest min-w-[200px]">Inline Notes</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Total (Sell)</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[120px]">Date Created</th>
+                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Activity</th>
+                                    <th className="px-6 py-4 w-[100px]"></th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {project.quotes.map((quote: any) => (
-                                    <tr 
+                                {sortedQuotes.map((quote: any) => (
+                                    <QuoteRow 
                                         key={quote.id} 
-                                        className="hover:bg-gray-50/50 transition-colors cursor-pointer group"
-                                        onClick={() => router.push(`/quote/${quote.id}`)}
-                                    >
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-gray-900 text-sm">
-                                                {formatQuoteNumber(quote.quoteNumber, quote.revision)}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={cn(
-                                                "px-2.5 py-1 text-[10px] font-bold rounded-full border uppercase tracking-tighter",
-                                                getStatusDisplay(quote.status).className
-                                            )}>
-                                                {getStatusDisplay(quote.status).label}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-semibold text-gray-900">
-                                                ${(quote.totalExGST || quote.total || 0).toLocaleString()}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                                                <Calendar size={12} className="text-gray-400" />
-                                                {quote.createdAt ? format(new Date(quote.createdAt), 'dd/MM/yy') : '--/--/--'}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 pl-10">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-600 border border-blue-100">
-                                                    {(quote.modifier?.name || '??').substring(0, 2).toUpperCase()}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-bold text-gray-900 uppercase tracking-tighter">
-                                                        {quote.modifier?.name || 'System'}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400">
-                                                        {quote.updatedAt ? format(new Date(quote.updatedAt), 'MMM d, h:mm a') : 'Unknown'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="p-2 text-gray-300 group-hover:text-blue-500 transition-colors">
-                                                <ArrowUpRight size={18} />
-                                            </div>
-                                        </td>
-                                    </tr>
+                                        quote={quote} 
+                                        isChild={quote._isChild}
+                                        onUpdate={handleUpdateQuote}
+                                        onDuplicate={handleDuplicateQuote}
+                                        onDelete={handleDeleteQuote}
+                                    />
                                 ))}
-                                {project.quotes.length === 0 && (
+                                {optimisticQuotes.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                                             No quotes found for this project.
                                         </td>
                                     </tr>
