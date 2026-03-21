@@ -111,6 +111,9 @@ export class DocxGenerator {
 
         console.log("=== DOCX EXPORT DEBUG ===");
         console.log("Quote has", quote.boards.length, "boards");
+        console.log("quote.creator:", quote.creator);
+        console.log("quote.creator?.name:", quote.creator?.name);
+        console.log("quote.creator?.email:", quote.creator?.email);
 
         // Collect drawing references to check if we should say "as shown in descriptions"
         // (Shared logic includes drawing ref, but global drawingRef in template might still use this)
@@ -127,9 +130,15 @@ export class DocxGenerator {
             : "As Shown";
 
         // Creator placeholders fallback logic
-        const creatorName = quote.creator?.name || "Unknown User";
-        const creatorEmail = quote.creator?.email || "";
-        const creatorFirstName = quote.creator?.name ? quote.creator.name.split(' ')[0] : "Unknown";
+        const rawName = quote.creator?.name || "";
+        const rawEmail = quote.creator?.email || "";
+
+        const isRoleLikeName = rawName.toLowerCase() === "admin" || rawName.toLowerCase() === "administrator";
+        const hasValidName = rawName.trim() !== "" && !isRoleLikeName;
+
+        const creatorName = hasValidName ? rawName : (rawEmail || "Unknown User");
+        const creatorEmail = rawEmail || "Unknown User";
+        const creatorFirstName = hasValidName ? rawName.split(' ')[0] : "Unknown User";
 
         return {
             clientName: quote.clientName || "",

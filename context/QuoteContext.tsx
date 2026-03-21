@@ -99,6 +99,7 @@ interface QuoteContextType {
     description: string;
     status: string;
     projectStatus: string | null;
+    creator?: { name?: string; email?: string } | null;
     boards: Board[];
     settings: QuoteSettings; // Global settings
     overrides: QuoteOverrides; // Quote-specific overrides
@@ -176,6 +177,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         description: '',
         status: 'DRAFT',
         projectStatus: null as string | null,
+        creator: null as { name?: string; email?: string } | null,
     });
     const [saving, setSaving] = useState(false);
     const [settings, setSettings] = useState<QuoteSettings>({
@@ -209,6 +211,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     description: data.description || '',
                     status: data.status || 'DRAFT',
                     projectStatus: data.project?.projectStatus || null,
+                    creator: data.creator || null,
                 });
 
                 // Load overrides
@@ -632,6 +635,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 description: metadata.description,
                 status: metadata.status,
                 projectStatus: metadata.projectStatus,
+                creator: metadata.creator,
                 boards,
                 settings,
                 overrides,
