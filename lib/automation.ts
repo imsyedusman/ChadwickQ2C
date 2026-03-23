@@ -256,6 +256,7 @@ export class AutomationService {
             } catch (e) { }
         }
         const disabledHandleFrames: string[] = overrides.disableRotaryHandleFrames || [];
+        const deletedAccessories: Record<string, string[]> = overrides.deletedAccessories || {};
 
         // 2. Identify Breakers (Parent Items)
         const ACCESSORY_SKUS = new Set<string>(
@@ -285,6 +286,13 @@ export class AutomationService {
 
             for (const req of requiredAccessories) {
                 if (req.disabled) continue;
+
+                // Check if manually deleted for THIS breaker
+                const deletedForBreaker = deletedAccessories[breaker.id] || [];
+                if (deletedForBreaker.includes(req.sku)) {
+                    console.log(`[Automation] Skipping manually deleted accessory ${req.sku} for breaker ${breaker.id}`);
+                    continue;
+                }
 
                 // Find existing accessory for THIS breaker
                 const existing = allItems.find(i =>
@@ -774,12 +782,24 @@ export class AutomationService {
         // 1. Fetch Board Items
         const board = await prisma.board.findUnique({
             where: { id: boardId },
-            include: { items: true }
+            include: { items: true, quote: true }
         });
 
         if (!board) return;
 
         const items = board.items;
+
+        // Load Overrides from Quote Settings
+        let overrides: any = {};
+        if (board.quote?.settingsSnapshot) {
+            try {
+                const settings = JSON.parse(board.quote.settingsSnapshot);
+                if (settings.mccbOverrides && settings.mccbOverrides[boardId]) {
+                    overrides = settings.mccbOverrides[boardId];
+                }
+            } catch (e) { }
+        }
+        const deletedSkus: string[] = overrides.deletedSkus || [];
 
         // 2. Aggregate Requirements
         const requirements = new Map<string, number>();
@@ -840,7 +860,7 @@ export class AutomationService {
                         }
                     });
                 }
-            } else {
+            } else if (!deletedSkus.includes(partNumber)) {
                 // Create New
                 const catalogItem = await prisma.catalogItem.findFirst({
                     where: { partNumber: partNumber }
@@ -885,7 +905,7 @@ export class AutomationService {
         // 1. Fetch Board Items
         const board = await prisma.board.findUnique({
             where: { id: boardId },
-            include: { items: true }
+            include: { items: true, quote: true }
         });
 
         if (!board) return;
@@ -930,6 +950,15 @@ export class AutomationService {
             i.isSystemManaged && (i as any).systemTag === SYSTEM_TAG
         );
 
+        // Load Global Deletions
+        let deletedSkus: string[] = [];
+        if (board.quote?.settingsSnapshot) {
+            try {
+                const settings = JSON.parse(board.quote.settingsSnapshot);
+                deletedSkus = settings.mccbOverrides?.[boardId]?.deletedSkus || [];
+            } catch (e) { }
+        }
+
         await prisma.$transaction(async (tx) => {
             // A. Update or Create
             for (const [partNumber, qty] of requirements.entries()) {
@@ -947,7 +976,7 @@ export class AutomationService {
                         });
                         console.log(`[GC Automation] Updated ${partNumber} to Qty ${qty}`);
                     }
-                } else {
+                } else if (!deletedSkus.includes(partNumber)) {
                     // Create New from Catalog
                     const catalogItem = await tx.catalogItem.findFirst({
                         where: { partNumber: partNumber }
@@ -1008,12 +1037,24 @@ export class AutomationService {
         // 1. Fetch Board Items
         const board = await prisma.board.findUnique({
             where: { id: boardId },
-            include: { items: true }
+            include: { items: true, quote: true }
         });
 
         if (!board) return;
 
         const items = board.items;
+
+        // Load Overrides from Quote Settings
+        let overrides: any = {};
+        if (board.quote?.settingsSnapshot) {
+            try {
+                const settings = JSON.parse(board.quote.settingsSnapshot);
+                if (settings.mccbOverrides && settings.mccbOverrides[boardId]) {
+                    overrides = settings.mccbOverrides[boardId];
+                }
+            } catch (e) { }
+        }
+        const deletedSkus: string[] = overrides.deletedSkus || [];
 
         // 2. Identify 3P Contactors
         const contactors = items.filter(i =>
@@ -1056,6 +1097,12 @@ export class AutomationService {
                         console.log(`[Control Wiring] Updated ${WIRING_SKU} to Qty ${totalWires}`);
                     }
                 } else {
+                    // Skip if manually deleted by user
+                    if (deletedSkus.includes(WIRING_SKU)) {
+                        console.log(`[Control Wiring] Skipping manually deleted item ${WIRING_SKU}`);
+                        return; // Transaction callback
+                    }
+
                     // Create New from Catalog
                     const catalogItem = await tx.catalogItem.findFirst({
                         where: { partNumber: WIRING_SKU }

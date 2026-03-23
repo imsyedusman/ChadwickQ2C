@@ -108,6 +108,37 @@ export async function POST(
             const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
             const { syncBoardItems } = await import('@/lib/board-item-service');
             await syncBoardItems(boardId, config);
+
+            // Clear Deletion Record if this item was previously "User Deleted"
+            // (Relevant for Switchgear accessories)
+            const parentItemId = (body as any).parentItemId || newItem.parentItemId;
+            if (parentItemId) {
+                const quoteReq = await prisma.board.findUnique({
+                    where: { id: boardId },
+                    select: { quote: { select: { id: true, settingsSnapshot: true } } }
+                });
+
+                if (quoteReq?.quote?.settingsSnapshot) {
+                    let settings: any = {};
+                    try {
+                        settings = JSON.parse(quoteReq.quote.settingsSnapshot);
+                    } catch (e) { }
+
+                    if (settings.mccbOverrides?.[boardId]?.deletedAccessories?.[parentItemId]) {
+                        const deletedList: string[] = settings.mccbOverrides[boardId].deletedAccessories[parentItemId];
+                        const newList = deletedList.filter(sku => sku !== newItem.name && sku !== newItem.partNumber);
+                        
+                        if (newList.length !== deletedList.length) {
+                            settings.mccbOverrides[boardId].deletedAccessories[parentItemId] = newList;
+                            await prisma.quote.update({
+                                where: { id: quoteReq.quote.id },
+                                data: { settingsSnapshot: JSON.stringify(settings) }
+                            });
+                            console.log(`[API] Cleared deletion record for ${newItem.name} on parent ${parentItemId}`);
+                        }
+                    }
+                }
+            }
         }
 
         // Hook: MCCB Accessory Automation

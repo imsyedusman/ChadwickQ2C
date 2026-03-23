@@ -303,11 +303,14 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const isNSX100Handle = item.name === 'LV429338T';
         const isOtherHandle = ['LV432598T', '33873'].includes(item.name);
 
+        const isSwitchgear = item.category === 'Switchboard';
+
         // Relax locks for newly introduced autoAdded items (MCCB Accessories)
         const isAutoAccessory = (item as any).autoAdded === true || item.systemTag === 'MCCB_ACCESSORIES';
         
-        const isQtyLocked = !!autoManaged && !isAutoAccessory;
-        const isDeleteLocked = !!autoManaged && !isAutoAccessory;
+        // Switchgear auto-items should be UNLOCKED as per user request
+        const isQtyLocked = !!autoManaged && !isAutoAccessory && !isSwitchgear;
+        const isDeleteLocked = !!autoManaged && !isAutoAccessory && !isSwitchgear;
 
         // Determine Tooltip Text
         let lockTooltip = "";

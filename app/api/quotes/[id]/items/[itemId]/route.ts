@@ -128,7 +128,16 @@ export async function DELETE(
         // Get the item before deletion to check if it's a tier item OR a breaker
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, category: true, productFrame: true, partNumber: true }
+            select: { 
+                name: true, 
+                boardId: true, 
+                category: true, 
+                productFrame: true, 
+                partNumber: true,
+                isSystemManaged: true,
+                parentItemId: true,
+                autoAdded: true
+            }
         });
 
         // Check if it's a handle that needs an override persisted
@@ -137,36 +146,62 @@ export async function DELETE(
             return NextResponse.json({ error: 'Item not found' }, { status: 404 });
         }
 
-        const accessoryType = getAccessoryType(item.name);
+        const isSwitchboardAuto = (item.category === 'Switchboard' && (item.isSystemManaged || (item as any).autoAdded));
+        
+        if (isSwitchboardAuto) {
+            const boardId = item.boardId;
+            const parentItemId = (item as any).parentItemId;
+            const accessoryType = getAccessoryType(item.name);
 
-        if (accessoryType === 'HANDLE') {
-            const frame = getAccessoryFrame(item?.name || '');
-            if (frame === 'NSX100-250') {
-                const boardId = item.boardId;
-                const quoteReq = await prisma.board.findUnique({
-                    where: { id: boardId },
-                    select: { quote: { select: { id: true, settingsSnapshot: true } } }
-                });
+            const quoteReq = await prisma.board.findUnique({
+                where: { id: boardId },
+                select: { quote: { select: { id: true, settingsSnapshot: true } } }
+            });
 
-                if (quoteReq?.quote) {
-                    let settings: any = {};
-                    try {
-                        settings = quoteReq.quote.settingsSnapshot ? JSON.parse(quoteReq.quote.settingsSnapshot) : {};
-                    } catch (e) { }
+            if (quoteReq?.quote) {
+                let settings: any = {};
+                try {
+                    settings = quoteReq.quote.settingsSnapshot ? JSON.parse(quoteReq.quote.settingsSnapshot) : {};
+                } catch (e) { }
 
-                    if (!settings.mccbOverrides) settings.mccbOverrides = {};
-                    if (!settings.mccbOverrides[boardId]) settings.mccbOverrides[boardId] = {};
+                if (!settings.mccbOverrides) settings.mccbOverrides = {};
+                if (!settings.mccbOverrides[boardId]) settings.mccbOverrides[boardId] = {};
 
-                    const currentDisabled = settings.mccbOverrides[boardId].disableRotaryHandleFrames || [];
-
-                    if (!currentDisabled.includes('NSX100-250')) {
-                        settings.mccbOverrides[boardId].disableRotaryHandleFrames = [...currentDisabled, 'NSX100-250'];
-                        await prisma.quote.update({
-                            where: { id: quoteReq.quote.id },
-                            data: { settingsSnapshot: JSON.stringify(settings) }
-                        });
+                // 1. Existing Handle Logic (Frame-based)
+                if (accessoryType === 'HANDLE') {
+                    const frame = getAccessoryFrame(item.name);
+                    if (frame === 'NSX100-250') {
+                        const currentDisabled = settings.mccbOverrides[boardId].disableRotaryHandleFrames || [];
+                        if (!currentDisabled.includes('NSX100-250')) {
+                            settings.mccbOverrides[boardId].disableRotaryHandleFrames = [...currentDisabled, 'NSX100-250'];
+                        }
                     }
                 }
+
+                // 2. New Generalized Deletion Tracking (Parent-Item + SKU based)
+                // This satisfies the requirement to NOT re-add items if deleted by user.
+                if (parentItemId) {
+                    if (!settings.mccbOverrides[boardId].deletedAccessories) {
+                        settings.mccbOverrides[boardId].deletedAccessories = {};
+                    }
+                    const deletedItems = settings.mccbOverrides[boardId].deletedAccessories[parentItemId] || [];
+                    if (!deletedItems.includes(item.name)) {
+                        settings.mccbOverrides[boardId].deletedAccessories[parentItemId] = [...deletedItems, item.name];
+                    }
+                } else {
+                    // Global deletion (for items without specific parents like Fuses, Wiring, or Board-level additions)
+                    if (!settings.mccbOverrides[boardId].deletedSkus) {
+                        settings.mccbOverrides[boardId].deletedSkus = [];
+                    }
+                    if (!settings.mccbOverrides[boardId].deletedSkus.includes(item.name)) {
+                        settings.mccbOverrides[boardId].deletedSkus.push(item.name);
+                    }
+                }
+
+                await prisma.quote.update({
+                    where: { id: quoteReq.quote.id },
+                    data: { settingsSnapshot: JSON.stringify(settings) }
+                });
             }
         }
 

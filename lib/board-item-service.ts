@@ -288,26 +288,39 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // Fetch existing items to respect manual edits
     // Also fetch Quote settings for overrides
-    const boardData = await prisma.board.findUnique({
+    const board = await prisma.board.findUnique({
         where: { id: boardId },
         include: { items: true, quote: true }
     });
 
-    if (!boardData) return;
+    if (!board) return;
+    const boardItems = board.items;
+
+    // Load Overrides from Quote Settings
+    let overrides: any = {};
+    if (board.quote?.settingsSnapshot) {
+        try {
+            const settings = JSON.parse(board.quote.settingsSnapshot);
+            if (settings.mccbOverrides && settings.mccbOverrides[boardId]) {
+                overrides = settings.mccbOverrides[boardId];
+            }
+        } catch (e) { }
+    }
+    const deletedSkus: string[] = overrides.deletedSkus || [];
 
     // Calculate global pricing context
     let effectiveCopperPrice = 15.0;
     const globalSettings = await prisma.settings.findUnique({ where: { id: 'global' } });
 
-    if (boardData.quote?.overrideCopperPricePerKg != null) {
-        effectiveCopperPrice = Number(boardData.quote.overrideCopperPricePerKg);
+    if (board.quote?.overrideCopperPricePerKg != null) {
+        effectiveCopperPrice = Number(board.quote.overrideCopperPricePerKg);
     } else if (globalSettings?.copperPricePerKg != null) {
         effectiveCopperPrice = Number(globalSettings.copperPricePerKg);
     }
 
     const pricingContext = { copperPrice: effectiveCopperPrice };
 
-    let existingItems = boardData.items;
+    let existingItems = board.items;
 
     // --- COMPOSITE SYNC BLOCK ---
     // Execute before other automation blocks.
@@ -498,28 +511,38 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const currentQty = Number(existingChild.quantity) || 0;
             const needsQtyUpdate = currentQty !== requiredQty;
             const needsTagUpdate = existingChild.systemTag !== 'DIGITAL_METER';
-
             if (needsQtyUpdate || needsTagUpdate) {
-                console.log(`[DM Auto Debug] Updating ${part}: Qty(${currentQty}->${requiredQty}), Tag(${existingChild.systemTag}->DIGITAL_METER)`);
-                try {
-                    await prisma.item.update({
-                        where: { id: existingChild.id },
-                        data: { 
-                            quantity: requiredQty, 
-                            cost: Number(existingChild.unitPrice || 0) * requiredQty,
-                            systemTag: 'DIGITAL_METER',
-                            systemRuleType: 'DIGITAL_METER_AUTOMATION'
-                        } as any
-                    });
-                    console.log(`[DM Auto Debug] Update SUCCESS for ${part}`);
-                    digitalMetersChanged = true;
-                } catch (err: any) {
-                    console.error(`[DM Auto Debug] Update FAILED for ${part}:`, err.message);
+                // Only update if still system managed
+                if (existingChild.isSystemManaged || needsTagUpdate) {
+                    console.log(`[DM Auto Debug] Updating ${part}: Qty(${currentQty}->${requiredQty}), Tag(${existingChild.systemTag}->DIGITAL_METER)`);
+                    try {
+                        await prisma.item.update({
+                            where: { id: existingChild.id },
+                            data: {
+                                quantity: requiredQty,
+                                cost: Number(existingChild.unitPrice || 0) * requiredQty,
+                                systemTag: 'DIGITAL_METER',
+                                systemRuleType: 'DIGITAL_METER_AUTOMATION'
+                            } as any
+                        });
+                        console.log(`[DM Auto Debug] Update SUCCESS for ${part}`);
+                        digitalMetersChanged = true;
+                    } catch (err: any) {
+                        console.error(`[DM Auto Debug] Update FAILED for ${part}:`, err.message);
+                    }
+                } else {
+                    console.log(`[DM Auto Debug] Item ${part} quantity differs but it is NO LONGER system managed. Respecting user override.`);
                 }
             } else {
                 console.log(`[DM Auto Debug] Item ${part} already correctly managed. Skipping update.`);
             }
         } else {
+            // Check if manually deleted
+            if (deletedSkus.includes(part)) {
+                console.log(`[DM Auto] Skipping manually deleted item ${part}`);
+                continue;
+            }
+
             console.log(`[DM Auto Debug] No existing ${part} found with systemTag="DIGITAL_METER". Attempting to create...`);
             const catItem = await prisma.catalogItem.findFirst({
                 where: { partNumber: part }
@@ -610,9 +633,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             const existingChild = existingItems.find(
                 i => i.name === target.part && (i as any).systemRuleType === 'SURGE_AUTOMATION'
             );
-
             if (existingChild) {
-                if (Number(existingChild.quantity) !== target.qty) {
+                if (Number(existingChild.quantity) !== target.qty && (existingChild as any).isSystemManaged) {
                     console.log(`[Surge Auto] Updating ${target.part} qty to ${target.qty}`);
                     await prisma.item.update({
                         where: { id: existingChild.id },
@@ -621,7 +643,14 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     surgeChanged = true;
                 }
             } else {
-                console.log(`[Surge Auto] Creating new item for ${target.part} with qty ${target.qty}`);
+                // Check if manually deleted
+                if (deletedSkus.includes(target.part)) {
+                    console.log(`[Surge Auto] Skipping manually deleted item ${target.part}`);
+                    continue;
+                }
+
+                // Create
+                console.log(`[Surge Auto] Creating ${target.part} (qty=${target.qty})`);
                 const catItem = await prisma.catalogItem.findFirst({
                     where: { partNumber: target.part }
                 });
@@ -676,9 +705,9 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // Parse Settings/Overrides
     let cleatOverrides: Record<string, number> = {};
-    if (boardData.quote?.settingsSnapshot) {
+    if (board.quote?.settingsSnapshot) {
         try {
-            const settings = JSON.parse(boardData.quote.settingsSnapshot);
+            const settings = JSON.parse(board.quote.settingsSnapshot);
             if (settings.cleatOverrides && settings.cleatOverrides[boardId]) {
                 cleatOverrides = settings.cleatOverrides[boardId];
             }
