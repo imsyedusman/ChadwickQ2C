@@ -7,7 +7,7 @@ import FinancialsHeroCard from './FinancialsHeroCard';
 import SidebarCard from './SidebarCard';
 
 export default function GrandTotalView() {
-    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, settings, effectiveSettings, allBoardTotals, creator } = useQuote();
+    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, effectiveSettings, allBoardTotals, creator } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
     const [isDetailed, setIsDetailed] = useState(true);
 

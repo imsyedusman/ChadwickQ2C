@@ -101,9 +101,10 @@ interface QuoteContextType {
     projectStatus: string | null;
     creator?: { name?: string; email?: string } | null;
     boards: Board[];
-    settings: QuoteSettings; // Global settings
+    globalSettings: QuoteSettings;
+    quoteSnapshot: Partial<QuoteSettings> | null;
     overrides: QuoteOverrides; // Quote-specific overrides
-    effectiveSettings: QuoteSettings; // Merged settings (Global + Overrides)
+    effectiveSettings: QuoteSettings; // Merged settings (Global + Snapshot + Overrides)
     loading: boolean;
     saving: boolean;
     totals: BoardTotals;
@@ -133,8 +134,8 @@ interface QuoteContextType {
     updateItem: (itemId: string, updates: Partial<Item>) => Promise<void>;
     removeItem: (itemId: string) => Promise<void>;
     refreshQuote: () => Promise<void>;
-    updateSettings: (settings: Partial<QuoteSettings>) => void;
     updateOverrides: (overrides: Partial<QuoteOverrides>) => Promise<void>;
+    resetToGlobalDefaults: () => Promise<void>;
     updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
     updateProjectStatus: (status: string) => Promise<void>;
@@ -180,7 +181,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         creator: null as { name?: string; email?: string } | null,
     });
     const [saving, setSaving] = useState(false);
-    const [settings, setSettings] = useState<QuoteSettings>({
+    const [globalSettings, setGlobalSettings] = useState<QuoteSettings>({
         labourRate: 100,
         consumablesPct: 0.03,
         overheadPct: 0.20,
@@ -191,11 +192,23 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         minMarginAlertPct: 0.05,
         copperPricePerKg: 15.0,
     });
+    const [quoteSnapshot, setQuoteSnapshot] = useState<Partial<QuoteSettings> | null>(null);
     const [overrides, setOverrides] = useState<QuoteOverrides>({});
     const [loading, setLoading] = useState(true);
 
     const fetchQuoteData = async () => {
         try {
+            // 1. Always fetch global settings first to ensure they are fresh
+            try {
+                const settingsRes = await fetch('/api/settings');
+                if (settingsRes.ok) {
+                    const freshGlobalSettings = await settingsRes.json();
+                    setGlobalSettings(freshGlobalSettings);
+                }
+            } catch (e) {
+                console.error("Failed to fetch fresh global settings", e);
+            }
+
             const res = await fetch(`/api/quotes/${quoteId}`);
             if (!res.ok) throw new Error('Failed to fetch quote');
             const data = await res.json();
@@ -225,6 +238,21 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     overrideRoundingIncrement: data.overrideRoundingIncrement,
                     overrideCopperPricePerKg: data.overrideCopperPricePerKg,
                 });
+
+                // Load snapshot if it exists
+                if (data.settingsSnapshot) {
+                    try {
+                        const parsed = typeof data.settingsSnapshot === 'string'
+                            ? JSON.parse(data.settingsSnapshot)
+                            : data.settingsSnapshot;
+                        setQuoteSnapshot(parsed);
+                    } catch (e) {
+                        console.error("Failed to parse settings snapshot", e);
+                        setQuoteSnapshot(null);
+                    }
+                } else {
+                    setQuoteSnapshot(null);
+                }
             }
 
             if (data.boards) {
@@ -274,28 +302,6 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     setSelectedBoardId(boardToSelect);
                 }
             }
-
-            if (data.settingsSnapshot) {
-                try {
-                    const parsed = JSON.parse(data.settingsSnapshot);
-                    setSettings(prev => ({ ...prev, ...parsed }));
-                } catch (e) {
-                    console.error("Failed to parse settings", e);
-                }
-            }
-
-            // Fetch global settings if no snapshot exists
-            if (!data.settingsSnapshot) {
-                try {
-                    const settingsRes = await fetch('/api/settings');
-                    if (settingsRes.ok) {
-                        const globalSettings = await settingsRes.json();
-                        setSettings(prev => ({ ...prev, ...globalSettings }));
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch global settings", e);
-                }
-            }
         } catch (error) {
             console.error('Failed to fetch quote data', error);
         } finally {
@@ -307,17 +313,17 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         fetchQuoteData();
     }, [quoteId]);
 
-    // Calculate effective settings (Global + Overrides)
+    // Calculate effective settings (Overrides > Snapshot > Global)
     const effectiveSettings: QuoteSettings = {
-        labourRate: overrides.overrideLabourRate ?? settings.labourRate,
-        consumablesPct: overrides.overrideConsumablesPct ?? settings.consumablesPct,
-        overheadPct: overrides.overrideOverheadPct ?? settings.overheadPct,
-        engineeringPct: overrides.overrideEngineeringPct ?? settings.engineeringPct,
-        targetMarginPct: overrides.overrideTargetMarginPct ?? settings.targetMarginPct,
-        gstPct: overrides.overrideGstPct ?? settings.gstPct,
-        roundingIncrement: overrides.overrideRoundingIncrement ?? settings.roundingIncrement,
-        minMarginAlertPct: settings.minMarginAlertPct,
-        copperPricePerKg: overrides.overrideCopperPricePerKg ?? settings.copperPricePerKg
+        labourRate: overrides.overrideLabourRate ?? quoteSnapshot?.labourRate ?? globalSettings.labourRate,
+        consumablesPct: overrides.overrideConsumablesPct ?? quoteSnapshot?.consumablesPct ?? globalSettings.consumablesPct,
+        overheadPct: overrides.overrideOverheadPct ?? quoteSnapshot?.overheadPct ?? globalSettings.overheadPct,
+        engineeringPct: overrides.overrideEngineeringPct ?? quoteSnapshot?.engineeringPct ?? globalSettings.engineeringPct,
+        targetMarginPct: overrides.overrideTargetMarginPct ?? quoteSnapshot?.targetMarginPct ?? globalSettings.targetMarginPct,
+        gstPct: overrides.overrideGstPct ?? quoteSnapshot?.gstPct ?? globalSettings.gstPct,
+        roundingIncrement: overrides.overrideRoundingIncrement ?? quoteSnapshot?.roundingIncrement ?? globalSettings.roundingIncrement,
+        minMarginAlertPct: globalSettings.minMarginAlertPct,
+        copperPricePerKg: overrides.overrideCopperPricePerKg ?? quoteSnapshot?.copperPricePerKg ?? globalSettings.copperPricePerKg
     };
 
     const calculateTotals = () => {
@@ -327,7 +333,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
         };
 
-        if (!settings) return {
+        if (!globalSettings) return {
             boardTotals: emptyTotals,
             allBoardTotals: {},
             grandTotals: {
@@ -495,21 +501,6 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
-    const updateSettings = async (newSettings: Partial<QuoteSettings>) => {
-        const updated = { ...settings, ...newSettings };
-        setSettings(updated);
-
-        // Persist to DB
-        try {
-            await fetch(`/api/quotes/${quoteId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ settingsSnapshot: JSON.stringify(updated) }),
-            });
-        } catch (error) {
-            console.error("Failed to save settings", error);
-        }
-    };
 
     const updateOverrides = async (newOverrides: Partial<QuoteOverrides>) => {
         const updated = { ...overrides, ...newOverrides };
@@ -524,6 +515,45 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
         } catch (error) {
             console.error("Failed to save overrides", error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const resetToGlobalDefaults = async () => {
+        setSaving(true);
+        try {
+            // Prepare reset payload (nullify all overrides and the snapshot)
+            const resetPayload = {
+                settingsSnapshot: null,
+                overrideLabourRate: null,
+                overrideOverheadPct: null,
+                overrideEngineeringPct: null,
+                overrideTargetMarginPct: null,
+                overrideConsumablesPct: null,
+                overrideGstPct: null,
+                overrideRoundingIncrement: null,
+                overrideCopperPricePerKg: null
+            };
+
+            const res = await fetch(`/api/quotes/${quoteId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(resetPayload),
+            });
+
+            if (res.ok) {
+                // Clear local state
+                setQuoteSnapshot(null);
+                setOverrides({});
+                // Refetch everything to be absolutely sync'd
+                await fetchQuoteData();
+            } else {
+                throw new Error('Failed to reset settings');
+            }
+        } catch (error) {
+            console.error("Failed to reset settings", error);
+            alert("Failed to reset settings to global defaults.");
         } finally {
             setSaving(false);
         }
@@ -549,7 +579,6 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const updateStatus = async (status: string) => {
         setMetadata(prev => ({ ...prev, status }));
         setSaving(true);
-
         try {
             await fetch(`/api/quotes/${quoteId}`, {
                 method: 'PUT',
@@ -637,7 +666,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 projectStatus: metadata.projectStatus,
                 creator: metadata.creator,
                 boards,
-                settings,
+                globalSettings,
+                quoteSnapshot,
                 overrides,
                 effectiveSettings,
                 loading,
@@ -652,8 +682,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateItem,
                 removeItem,
                 refreshQuote: fetchQuoteData,
-                updateSettings,
                 updateOverrides,
+                resetToGlobalDefaults,
                 updateMetadata,
                 updateStatus,
                 updateProjectStatus,
