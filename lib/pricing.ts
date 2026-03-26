@@ -156,8 +156,12 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
         return sum;
     }, 0);
 
-    const applySheetmetalUplift = isCustomBoard;
-    const sheetmetalUplift = (applySheetmetalUplift ? sheetmetalSubtotal * 0.04 : 0) + (cubicSubtotal * 0.04);
+    // Uplift Logic (Revised 2026-03-25):
+    // 1. Custom boards apply 4% uplift to all items marked as sheetmetal (isSheetmetal = true).
+    // 2. CUBIC enclosures (Cubic subcategory) now have 0% uplift to align exactly with Excel base pricing.
+    const customSheetmetalUplift = isCustomBoard ? sheetmetalSubtotal * 0.04 : 0;
+    const cubicEnclosureUplift = 0; // Explicitly 0% as per Excel logic
+    const sheetmetalUplift = customSheetmetalUplift + cubicEnclosureUplift;
 
     // Only include non-price-adjustments in material cost
     const baseMaterialCost = items.reduce((sum, item) => {
@@ -166,6 +170,12 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
     }, 0);
 
     const materialCost = baseMaterialCost + sheetmetalUplift;
+
+    // DEBUG LOGGING (2026-03-26)
+    console.log(`[Pricing Debug] CUBIC Subtotal: ${cubicSubtotal.toFixed(2)}`);
+    console.log(`[Pricing Debug] Sheetmetal Subtotal: ${sheetmetalSubtotal.toFixed(2)}`);
+    console.log(`[Pricing Debug] Sheetmetal Uplift: ${sheetmetalUplift.toFixed(2)}`);
+    console.log(`[Pricing Debug] Material Cost (inc uplift): ${materialCost.toFixed(2)}`);
 
     // Only include non-price-adjustments in labour
     const labourHours = items.reduce((sum, item) => {
