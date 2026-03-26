@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
+import { prepareBoardCloneData } from '@/lib/board-service';
 
 export async function POST(
     request: Request,
@@ -104,36 +105,34 @@ export async function POST(
                     lastModifiedBy: userId as string,
 
                     boards: {
-                        create: originalQuote.boards.map((board: Board & { items: Item[] }) => ({
-                            name: board.name,
-                            type: board.type,
-                            order: board.order,
-                            isOptional: board.isOptional,
-                            mccbVariant: board.mccbVariant,
-                            config: board.config,
-                            items: {
-                                create: board.items.map((item: Item) => ({
-                                    category: item.category,
-                                    subcategory: item.subcategory,
-                                    name: item.name,
-                                    description: item.description,
-                                    quantity: item.quantity,
-                                    unitPrice: item.unitPrice,
-                                    labourHours: item.labourHours,
-                                    cost: item.cost,
-                                    notes: item.notes,
-                                    isDefault: item.isDefault,
-                                    order: item.order,
-                                    isSheetmetal: item.isSheetmetal,
-                                    isSystemManaged: item.isSystemManaged,
-                                    systemTag: item.systemTag,
-                                    partNumber: item.partNumber,
-                                    productFrame: item.productFrame,
-                                    mccbVariant: item.mccbVariant,
-                                    systemRuleType: item.systemRuleType
-                                }))
-                            }
-                        }))
+                        create: originalQuote.boards.map((board: Board & { items: Item[] }) => {
+                            const clonedBoardData = prepareBoardCloneData(board);
+                            return {
+                                ...clonedBoardData,
+                                items: {
+                                    create: board.items.map((item: Item) => ({
+                                        category: item.category,
+                                        subcategory: item.subcategory,
+                                        name: item.name,
+                                        description: item.description,
+                                        quantity: item.quantity,
+                                        unitPrice: item.unitPrice,
+                                        labourHours: item.labourHours,
+                                        cost: item.cost,
+                                        notes: item.notes,
+                                        isDefault: item.isDefault,
+                                        order: item.order,
+                                        isSheetmetal: item.isSheetmetal,
+                                        isSystemManaged: item.isSystemManaged,
+                                        systemTag: item.systemTag,
+                                        partNumber: item.partNumber,
+                                        productFrame: item.productFrame,
+                                        mccbVariant: item.mccbVariant,
+                                        systemRuleType: item.systemRuleType
+                                    }))
+                                }
+                            };
+                        })
                     }
                 },
                 include: {

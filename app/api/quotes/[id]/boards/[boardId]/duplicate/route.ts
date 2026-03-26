@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { AutomationService } from '@/lib/automation';
+import { prepareBoardCloneData } from '@/lib/board-service';
 
 export async function POST(
     request: Request,
@@ -42,20 +42,16 @@ export async function POST(
             });
             const nextOrder = (maxOrder._max.order ?? 0) + 1;
 
+            // Prepare Cloned Data using shared utility
+            const cloneData = prepareBoardCloneData(sourceBoard, {
+                name: newName,
+                order: nextOrder,
+                quoteId
+            });
+
             // Clone Board
             const createdBoard = await tx.board.create({
-                data: {
-                    quoteId,
-                    name: newName,
-                    type: sourceBoard.type,
-                    order: nextOrder,
-                    config: sourceBoard.config,
-                    mccbVariant: sourceBoard.mccbVariant,
-                    isOptional: sourceBoard.isOptional,
-                    // id: auto-generated
-                    // createdAt: now
-                    // updatedAt: now
-                }
+                data: cloneData
             });
 
             // Clone Items
