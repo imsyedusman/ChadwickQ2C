@@ -21,7 +21,6 @@ const COPPER_WEIGHTS: Record<string, number> = {
     "BB-400A": 7,
 
     // Cubic Busbars (BBC-)
-    "BBC-4000A": 112,
     "BBC-3600A": 105,
     "BBC-2800A": 70,
     "BBC-2250A": 56,

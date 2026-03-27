@@ -64,7 +64,7 @@ const WC_TYPES = ['100A wiring 3-phase', '100A wiring 1-phase'];
 
 const CURRENT_RATINGS = [
     '63A', '100A', '160A', '250A', '400A', '630A', '800A',
-    '1000A', '1250A', '1600A', '2000A', '2500A', '3200A', '4000A'
+    '1000A', '1250A', '1600A', '2000A', '2500A', '3200A'
 ];
 
 const TYPE_DEFAULTS: Record<string, Partial<BoardConfig>> = {
@@ -87,11 +87,11 @@ const ALLOWED_CURRENTS: Record<string, string[]> = {
     'Supply Authority CT Metering Enclosure 200-400A': ['250A', '400A'],
     'Tee-Off-Box Riser': ['400A', '630A'],
     'Tee-Off-Box End of Run': ['630A', '800A'],
-    'Remote Meter Panel with Test Block': ['1000A', '1250A', '1600A', '2500A', '3200A', '4000A'],
+    'Remote Meter Panel with Test Block': ['1000A', '1250A', '1600A', '2500A', '3200A'],
 };
 
 const FORMS = ['1', '2b', '2bi', '3b', '3bih', '4a', '4b', '4aih'];
-const FAULT_RATINGS = ['25kA', '36kA', '50kA', '63kA', '70kA'];
+const FAULT_RATINGS = ['10kA', '25kA', '36kA', '50kA', '70kA'];
 
 const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     type: '',

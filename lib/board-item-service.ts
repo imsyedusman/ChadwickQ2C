@@ -137,7 +137,8 @@ const MISC_TIER_ITEMS = ['MISC-LABELS', 'MISC-HARDWARE', 'MISC-TEST-TIERS'];
 const MISC_DELIVERY_ITEMS = ['MISC-DELIVERY-UTE', 'MISC-DELIVERY-HIAB'];
 
 // Helper function to determine current band based on current rating
-function getCurrentBand(currentRating: string): string {
+export function getCurrentBand(currentRating: string): string | null {
+    if (currentRating === '4000A') return null;
     const amps = parseInt(currentRating.replace('A', ''));
 
     if (amps <= 400) return '400A';
@@ -149,11 +150,11 @@ function getCurrentBand(currentRating: string): string {
     if (amps <= 2000) return '2000A';
     if (amps <= 2500) return '2500A';
     if (amps <= 3200) return '3200A';
-    return '4000A';
+    return null;
 }
 
 // Helper function to get busbar part number based on current band and enclosure type
-function getBusbarPartNumber(currentRating: string, enclosureType: string): string | null {
+export function getBusbarPartNumber(currentRating: string, enclosureType: string): string | null {
     const band = getCurrentBand(currentRating);
 
     if (enclosureType === 'Custom') {
@@ -167,9 +168,9 @@ function getBusbarPartNumber(currentRating: string, enclosureType: string): stri
             '1600A': 'BB-1600A',
             '2000A': 'BB-2000A',
             '2500A': 'BB-2500A',
-            '3200A': 'BB-3000A',
-            '4000A': 'BB-3000A'
+            '3200A': 'BB-3000A'
         };
+        if (!band) return null;
         return customMapping[band] || null;
     } else if (enclosureType === 'Cubic') {
         // Cubic busbars: BBC-400A-2, BBC-800A-2, BBC-1100A, BBC-1350A, BBC-1600A, BBC-1800A, BBC-2250A, BBC-2800A, BBC-3600A, BBC-4000A
@@ -182,9 +183,9 @@ function getBusbarPartNumber(currentRating: string, enclosureType: string): stri
             '1600A': 'BBC-1600A',
             '2000A': 'BBC-1800A',
             '2500A': 'BBC-2250A',
-            '3200A': 'BBC-2800A',
-            '4000A': 'BBC-4000A'
+            '3200A': 'BBC-2800A'
         };
+        if (!band) return null;
         return cubicMapping[band] || null;
     }
 
@@ -205,10 +206,10 @@ function getLabourPartNumber(currentRating: string): string | null {
         '1600A': 'CT-1600A',
         '2000A': 'CT-2000A',
         '2500A': 'CT-2500A',
-        '3200A': 'CT-3200A',
-        '4000A': 'CT-3200A'
+        '3200A': 'CT-3200A'
     };
 
+    if (!band) return null;
     return labourMapping[band] || null;
 }
 
@@ -285,6 +286,12 @@ function getCleatType(currentRating: number): string | null {
 
 export async function syncBoardItems(boardId: string, config: BoardConfig, options?: { forceTiers?: boolean }) {
     console.log(`Syncing items for board ${boardId} with config:`, JSON.stringify(config, null, 2));
+
+    // Atomic Safety Check: Legacy ratings (4000A, 63kA) trigger escape to prevent inconsistent automation.
+    if (config.currentRating === '4000A' || config.faultRating === '63kA') {
+        console.warn(`Legacy rating detected (${config.currentRating || config.faultRating}) - automation skipped for boardId: ${boardId}`);
+        return;
+    }
 
     // Fetch existing items to respect manual edits
     // Also fetch Quote settings for overrides

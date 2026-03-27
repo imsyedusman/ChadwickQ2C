@@ -15,6 +15,14 @@ export async function POST(
         console.log('Board type:', type);
         console.log('Config received:', JSON.stringify(config, null, 2));
 
+        // Strict Contract: Reject legacy ratings for new boards
+        if (config?.currentRating === '4000A' || config?.faultRating === '63kA') {
+            return NextResponse.json(
+                { error: `Legacy ratings (${config.currentRating || config.faultRating}) are no longer supported for new boards.` }, 
+                { status: 400 }
+            );
+        }
+
         const count = await prisma.board.count({ where: { quoteId } });
 
         const newBoard = await prisma.board.create({
@@ -26,10 +34,11 @@ export async function POST(
                 order: count,
                 config: config ? JSON.stringify(config) : null,
                 mccbVariant: config?.faultRating ?
-                    (config.faultRating.includes('25kA') ? 'B3' :
-                        config.faultRating.includes('36kA') ? 'F3' :
-                            config.faultRating.includes('50kA') ? 'N3' :
-                                config.faultRating.includes('70kA') ? 'H3' : null)
+                    (config.faultRating.includes('10kA') ? 'B3' :
+                        config.faultRating.includes('25kA') ? 'B3' :
+                            config.faultRating.includes('36kA') ? 'F3' :
+                                config.faultRating.includes('50kA') ? 'N3' :
+                                    config.faultRating.includes('70kA') ? 'H3' : 'B3')
                     : 'B3', // Default to B3 if missing or empty
             } as any,
         });

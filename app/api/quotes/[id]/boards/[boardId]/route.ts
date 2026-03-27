@@ -22,10 +22,16 @@ export async function PUT(
         // Resolve new MCCB Variant if fault rating changed
         let newMccbVariant = undefined;
         if (config && config.faultRating) {
-            newMccbVariant = config.faultRating.includes('25kA') ? 'B3' :
-                config.faultRating.includes('36kA') ? 'F3' :
-                    config.faultRating.includes('50kA') ? 'N3' :
-                        config.faultRating.includes('70kA') ? 'H3' : 'B3';
+            newMccbVariant = config.faultRating.includes('10kA') ? 'B3' :
+                config.faultRating.includes('25kA') ? 'B3' :
+                    config.faultRating.includes('36kA') ? 'F3' :
+                        config.faultRating.includes('50kA') ? 'N3' :
+                            config.faultRating.includes('70kA') ? 'H3' : 'B3';
+
+            // Trace legacy ratings on update
+            if (config.currentRating === '4000A' || config.faultRating === '63kA') {
+                console.warn(`Legacy rating preserved on update (${config.currentRating || config.faultRating}) for boardId: ${boardId}`);
+            }
         }
 
         // Build data object dynamically to avoid sending undefined fields
