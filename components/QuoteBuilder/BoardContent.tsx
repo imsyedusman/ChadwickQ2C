@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuote, Item } from '@/context/QuoteContext';
-import { generateDescriptionBullets } from '@/lib/description-logic';
+import { generateDescriptionBullets, syncDescriptionWithDraft } from '@/lib/description-logic';
 import { 
     Plus, Minus, Trash2, Edit2, Info, ChevronDown, ChevronRight, Settings2, Zap, Clock, FileText, User, Lock as LockIcon 
 } from 'lucide-react';
@@ -122,14 +122,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const editedIds = new Set(options.editedIds || []);
 
         if (savedDraft && savedDraft.length > 0) {
-            // Update system-linked bullets in the saved draft if they haven't been edited
-            const updatedDraft = savedDraft.map(bullet => {
-                if (bullet.id && !editedIds.has(bullet.id)) {
-                    const latest = systemBullets.find(b => b.id === bullet.id);
-                    if (latest) return { ...bullet, text: latest.text };
-                }
-                return bullet;
-            });
+            // Use shared sync helper to update existing bullets and append new ones automatically
+            const updatedDraft = syncDescriptionWithDraft(systemBullets, savedDraft, editedIds as Set<string>);
             setDescriptionDraft(updatedDraft);
         } else {
             // Initial draft from system logic

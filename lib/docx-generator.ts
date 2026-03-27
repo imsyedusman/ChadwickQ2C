@@ -1,7 +1,8 @@
 import PizZip from "pizzip";
 import Docxtemplater from "docxtemplater";
 import { saveAs } from "file-saver";
-import { generateDescriptionBullets, BoardLike } from "./description-logic";
+import { generateDescriptionBullets, syncDescriptionWithDraft, BoardLike } from "./description-logic";
+const DEFAULT_TEMPLATE = "/templates/Estimating Standard Tender Template (2026).docx";
 
 // Interfaces matching the QuoteContext structure (simplified for what we need)
 interface Item {
@@ -41,28 +42,34 @@ interface QuoteData {
 }
 
 export class DocxGenerator {
-    static async generate(quote: QuoteData, settings: any, templatePath: string) {
-        console.log("DocxGenerator.generate started with path:", templatePath);
+    static async generate(quote: QuoteData, settings: any, templatePath?: string) {
+        const actualPath = (templatePath && templatePath.trim().length > 0) ? templatePath : DEFAULT_TEMPLATE;
+        const isUsingFallback = actualPath === DEFAULT_TEMPLATE;
+        
+        console.log(`[DOCX] Starting generation. Template: '${actualPath}' ${isUsingFallback ? '(FALLBACK TRIGGERED)' : '(USER SPECIFIED)'}`);
+        
         try {
             // 1. Load the template
-            console.log("Fetching template file...");
+            console.log(`[DOCX] Fetching template from internal API...`);
+            const templateToFetch = actualPath;
 
             // Extract filename from path if it's a local path
-            let fetchUrl = templatePath;
-            if (templatePath.startsWith('/templates/')) {
-                const filename = templatePath.split('/').pop();
+            let fetchUrl = templateToFetch;
+            if (templateToFetch.startsWith('/templates/')) {
+                const filename = templateToFetch.split('/').pop();
                 if (filename) {
                     fetchUrl = `/api/templates/download?filename=${encodeURIComponent(filename)}`;
-                    console.log(`Converted path to API call: ${fetchUrl}`);
+                    console.log(`[DOCX] Resolved API URL: ${fetchUrl}`);
                 }
             }
 
             const response = await fetch(fetchUrl);
             if (!response.ok) {
-                throw new Error(`Could not find template file at ${templatePath} (Status: ${response.status})`);
+                console.error(`[DOCX] Template fetch failed. Status: ${response.status}, URL: ${fetchUrl}`);
+                throw new Error(`Could not find template file at ${templateToFetch} (Status: ${response.status})`);
             }
             const arrayBuffer = await response.arrayBuffer();
-            console.log("Template loaded, size:", arrayBuffer.byteLength);
+            console.log(`[DOCX] Template loaded successfully. Size: ${arrayBuffer.byteLength} bytes`);
 
             // 2. Unzip the content
             const zip = new PizZip(arrayBuffer);
@@ -168,18 +175,10 @@ export class DocxGenerator {
         let bullets: { text: string }[] = [];
 
         if (draft && draft.length > 0) {
-            // SYNC LOGIC: Live-update system bullets if they haven't been edited
-            // This ensures "No stale values" even if the drawer wasn't opened recently.
+            // SYNC LOGIC: Live-update system bullets and append new ones
+            // This uses the EXACT SAME shared helper as the UI for consistency.
             const latestSystem = generateDescriptionBullets(board);
-            bullets = draft.map(bullet => {
-                if (bullet.id && !editedIds.has(bullet.id)) {
-                    // This is a system bullet that hasn't been edited -> sync it
-                    const latest = latestSystem.find(b => b.id === bullet.id);
-                    return { text: latest ? latest.text : bullet.text };
-                }
-                // Manual bullet or Edited system bullet -> keep as is (preserves user edits)
-                return { text: bullet.text };
-            });
+            bullets = syncDescriptionWithDraft(latestSystem, draft, editedIds as Set<string>);
         } else {
             // Fallback for older boards or boards without a draft
             bullets = generateDescriptionBullets(board).map(b => ({ text: b.text }));

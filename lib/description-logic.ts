@@ -1,3 +1,4 @@
+import { QUOTE_DESCRIPTION_MAPPINGS, MappingRule } from "./quote-mapping-config";
 
 export interface BoardLike {
     name: string;
@@ -7,8 +8,93 @@ export interface BoardLike {
     items: {
         name: string;
         category: string;
+        subcategory?: string | null;
         quantity: number;
     }[];
+}
+
+const RELEVANT_CATEGORIES = ['Basics', 'Switchboard', 'Busbar', 'Other'];
+
+/**
+ * SHARED SYNC HELPER
+ * Reconciles the latest system-generated bullets with a stored draft.
+ * Ensures new mapping-based bullets appear automatically without duplicates.
+ */
+export function syncDescriptionWithDraft(
+    latestSystem: { id: string, text: string }[],
+    currentDraft: { id?: string; text: string; isManual?: boolean }[],
+    editedIds: Set<string>
+): { id?: string; text: string; isManual?: boolean }[] {
+    // 1. Map existing draft and sync system bullets that haven't been edited
+    const updatedDraft = currentDraft.map(bullet => {
+        if (bullet.id && !editedIds.has(bullet.id)) {
+            const latest = latestSystem.find(b => b.id === bullet.id);
+            if (latest) return { ...bullet, text: latest.text };
+        }
+        return bullet;
+    });
+
+    // 2. Append NEW system bullets that aren't in the draft yet
+    // We deduplicate by ID first, then by normalized text to be safe
+    const existingIds = new Set(updatedDraft.filter(b => b.id).map(b => b.id));
+    const existingTexts = new Set(updatedDraft.map(b => b.text.trim().toLowerCase()));
+
+    const newSystemBullets = latestSystem.filter(sys => 
+        !existingIds.has(sys.id) && !existingTexts.has(sys.text.trim().toLowerCase())
+    );
+
+    return [...updatedDraft, ...newSystemBullets];
+}
+
+/**
+ * Applies a set of mapping rules to board items to generate standardized bullets.
+ * - Prioritizes matchers in order.
+ * - Within a rule, searches for ANY item that matches (subcategory > category > name).
+ * - Deduplicates: one bullet per rule.
+ * - Follows the order of the rules array.
+ */
+function applyMappingRules(items: any[], rules: MappingRule[]): { id: string, text: string }[] {
+    const results: { id: string, text: string }[] = [];
+    console.log(`[Mapping] Evaluating ${rules.length} rules against ${items.length} items`);
+
+    for (const rule of rules) {
+        let matchTriggeredBy: any = null;
+        
+        for (const matcher of rule.matchers) {
+            for (const item of items) {
+                // Category Constraint (Safeguard)
+                const category = item.category || '';
+                const isRelevant = RELEVANT_CATEGORIES.some(rc => category.toLowerCase().includes(rc.toLowerCase()));
+                if (category && !isRelevant) continue;
+
+                const itemSubcat = (item.subcategory || '').toLowerCase();
+                const itemCat = (item.category || '').toLowerCase();
+                const itemName = (item.name || '').toLowerCase();
+
+                let matchFound = false;
+                if (matcher.subcategory && itemSubcat.includes(matcher.subcategory.toLowerCase())) {
+                    matchFound = true;
+                } else if (matcher.category && itemCat.includes(matcher.category.toLowerCase())) {
+                    matchFound = true;
+                } else if (matcher.name && itemName.includes(matcher.name.toLowerCase())) {
+                    matchFound = true;
+                }
+
+                if (matchFound) {
+                    matchTriggeredBy = item;
+                    break;
+                }
+            }
+            if (matchTriggeredBy) break;
+        }
+
+        if (matchTriggeredBy) {
+            console.log(`[Mapping] MATCH: Rule '${rule.id}' triggered by item '${matchTriggeredBy.name}' (Category: ${matchTriggeredBy.category}, Sub: ${matchTriggeredBy.subcategory})`);
+            results.push({ id: `auto-${rule.id}`, text: rule.displayText });
+        }
+    }
+
+    return results;
 }
 
 // Helper to validate current rating (avoid showing "---", "Yes", "No")
@@ -141,27 +227,9 @@ export function generateDescriptionBullets(board: BoardLike): { id: string, text
             bullets.push({ id: "msb-cb", text: "Circuit Breakers per Single Line Diagram" });
         }
 
-        // 7. Surge Diverters
-        if (hasItem("Surge Diverter") || hasItem("Surge")) {
-            bullets.push({ id: "msb-surge", text: "Surge Diverter(s)" });
-        }
-
-        // 8. Power Meters
-        if (hasCategory("Power Meters") || hasCategory("Metering") || hasItem("Power Meter") || hasItem("kWh") || hasItem("Digital Meter")) {
-            bullets.push({ id: "msb-meters", text: "Power Meters" });
-        }
-
-        // 9. Transfer Switch
-        if (hasItem("Automatic Transfer") || hasItem("ATS")) {
-            bullets.push({ id: "msb-transfer", text: "Automatic Transfer Switch" });
-        } else if (hasItem("Manual Transfer") || hasItem("MTS")) {
-            bullets.push({ id: "msb-transfer", text: "Manual Transfer Switch" });
-        }
-
-        // 10. Heater
-        if (hasItem("Heater") || hasItem("Anti-condensation") || hasItem("Anti-Condensation") || hasItem("Temperature")) {
-            bullets.push({ id: "msb-heater", text: "Anti-condensation Heater" });
-        }
+        // 7-10. Rule-based mappings (Surge, Meters, ATS/MTS, Heater)
+        const mappedBullets = applyMappingRules(items, QUOTE_DESCRIPTION_MAPPINGS);
+        bullets.push(...mappedBullets);
     }
 
     // --- 2. DISTRIBUTION BOARD (MDB/DB) ---
@@ -188,18 +256,13 @@ export function generateDescriptionBullets(board: BoardLike): { id: string, text
             bullets.push({ id: "db-mainswitch", text: "Main Switch" });
         }
 
-        // 3. Optional Extras
-        if (hasItem("Surge Diverter") || hasItem("Surge")) {
-            bullets.push({ id: "db-surge", text: "Surge Diverter" });
-        }
-        if (hasItem("Power Meter") || hasItem("Dual Power") || hasItem("kWh") || hasCategory("Power Meters")) {
-            bullets.push({ id: "db-meters", text: "Dual Power Meter" });
-        }
+        // 3. Rule-based mappings (Surge, Meters, ATS/MTS, Heater)
+        const mappedBullets = applyMappingRules(items, QUOTE_DESCRIPTION_MAPPINGS);
+        bullets.push(...mappedBullets);
+
+        // 3a. Emergency Lighting (Keep separate as it's DB specific and not in core mapping yet)
         if (hasItem("Lighting Test") || hasItem("Emergency Lighting") || hasItem("Test Kit")) {
             bullets.push({ id: "db-light-test", text: "Emergency Lighting Test Kit" });
-        }
-        if (hasItem("Heater") || hasItem("Anti-condensation") || hasItem("Temperature")) {
-            bullets.push({ id: "db-heater", text: "Anti-condensation Heater" });
         }
 
         // 4. Always include
