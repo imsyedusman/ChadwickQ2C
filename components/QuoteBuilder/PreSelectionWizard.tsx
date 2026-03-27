@@ -82,7 +82,7 @@ const TYPE_DEFAULTS: Record<string, Partial<BoardConfig>> = {
 const ALLOWED_CURRENTS: Record<string, string[]> = {
     'Main Switchboard (MSB)': CURRENT_RATINGS, // All
     'Main Distribution Board (MDB)': ['100A', '160A', '250A', '400A', '630A', '800A'],
-    'Distribution Board (DB)': ['63A', '100A', '160A', '250A'],
+    'Distribution Board (DB)': ['63A', '100A', '160A', '250A', '400A'],
     'Prewired Whole Current Meter Panel': ['63A', '100A', '160A', '250A'],
     'Supply Authority CT Metering Enclosure 200-400A': ['250A', '400A'],
     'Tee-Off-Box Riser': ['400A', '630A'],
