@@ -19,16 +19,30 @@ export function formatCurrency(value: number, decimals: number = 2): string {
 }
 
 /**
- * Format a quote number with an alphabetical suffix based on its revision
+ * Format a quote number with an alphabetical suffix based on its revision.
  * @param quoteNumber - Base quote number e.g. "Q26-0240"
- * @param revision - Integer revision, 0 means no suffix, 1 means "-A"
+ * @param revision - Integer revision, used for DB uniqueness in duplicates.
+ * @param id - The unique ID of the quote.
+ * @param revisionGroupId - The ID of the revision group root.
  */
-export function formatQuoteNumber(quoteNumber: string, revision: number = 0): string {
-  if (!revision || revision === 0) return quoteNumber;
-
-  // If the quoteNumber already has a suffix (e.g. -A, -B), don't add another one
+export function formatQuoteNumber(
+  quoteNumber: string, 
+  revision: number = 0, 
+  id?: string, 
+  revisionGroupId?: string | null
+): string {
+  // If the quoteNumber already has a suffix in the string (e.g. -A, -B), use it as is.
   if (quoteNumber.match(/-[A-Z]+$/)) return quoteNumber;
 
+  // Independent quotes (where revisionGroupId is null or same as its own id)
+  // should NEVER show an alphabetical suffix even if revision > 0.
+  // The revision integer is strictly for DB uniqueness in these cases.
+  if (!revisionGroupId || revisionGroupId === id || revision === 0) {
+    return quoteNumber;
+  }
+
+  // Otherwise, it's a revision member that needs a suffix generated from its revision number.
+  // Note: Most new revisions will store the suffix in the quoteNumber string directly.
   let suffix = "";
   let r = revision;
   while (r > 0) {
@@ -37,4 +51,17 @@ export function formatQuoteNumber(quoteNumber: string, revision: number = 0): st
     r = Math.floor((r - 1) / 26);
   }
   return `${quoteNumber}-${suffix}`;
+}
+
+export function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => {
+      func(...args);
+    }, wait);
+  };
 }

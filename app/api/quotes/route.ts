@@ -6,6 +6,11 @@ import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { calculateQuoteTotals } from '@/lib/pricing';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
+import { 
+    upsertPipedriveDealAsProject, 
+    upsertPipedriveOrganization, 
+    upsertPipedrivePerson 
+} from '@/lib/pipedrive-sync-utils';
 
 export async function GET(request: Request) {
     try {
@@ -215,23 +220,51 @@ export async function POST(request: Request) {
         let finalDescription = description;
 
         if (newProject && !projectId) {
-            const createdProject = await (prisma as any).project.create({
-                data: {
-                    projectName: newProject.projectName,
-                    clientName: newProject.clientName || clientName,
-                    companyName: newProject.companyName || body.clientCompany,
-                    projectReference: newProject.projectReference || projectRef,
-                    projectDescription: newProject.projectDescription || description,
-                    projectStatus: newProject.projectStatus || 'Budget',
-                },
-            });
-            finalProjectId = createdProject.id;
-            // Auto-populate from new project
-            if (!finalClientName) finalClientName = createdProject.clientName;
-            if (!finalClientCompany) finalClientCompany = createdProject.companyName;
-            if (!finalProjectRef) finalProjectRef = createdProject.projectName;
-            if (!finalDescription) finalDescription = createdProject.projectDescription;
-        } else if (projectId) {
+            // Check for Pipedrive IDs
+            if (newProject.pipedrive_deal_id) {
+                const project = await upsertPipedriveDealAsProject(newProject.pipedrive_deal_id);
+                if (project) {
+                    finalProjectId = project.id;
+                    finalClientName = project.clientName || clientName;
+                    finalClientCompany = project.companyName || body.clientCompany;
+                    finalProjectRef = project.projectName || projectRef;
+                }
+            } else {
+                // Determine linked entities if IDs provided but no Deal ID
+                let linkedClientId = undefined;
+                let linkedContactId = undefined;
+
+                if (newProject.pipedrive_org_id) {
+                    const client = await upsertPipedriveOrganization(newProject.pipedrive_org_id);
+                    if (client) linkedClientId = client.id;
+                }
+
+                if (newProject.pipedrive_person_id) {
+                    const contact = await upsertPipedrivePerson(newProject.pipedrive_person_id, linkedClientId);
+                    if (contact) linkedContactId = contact.id;
+                }
+
+                const createdProject = await (prisma as any).project.create({
+                    data: {
+                        projectName: newProject.projectName,
+                        clientName: newProject.clientName || clientName,
+                        companyName: newProject.companyName || body.clientCompany,
+                        projectReference: newProject.projectReference || projectRef,
+                        projectDescription: newProject.projectDescription || description,
+                        projectStatus: newProject.projectStatus || 'Budget',
+                        clientId: linkedClientId,
+                        contactId: linkedContactId
+                    },
+                });
+                finalProjectId = createdProject.id;
+                // Auto-populate from new project
+                if (!finalClientName) finalClientName = createdProject.clientName;
+                if (!finalClientCompany) finalClientCompany = createdProject.companyName;
+                if (!finalProjectRef) finalProjectRef = createdProject.projectName;
+                if (!finalDescription) finalDescription = createdProject.projectDescription;
+            }
+        }
+ else if (projectId) {
             const project = await (prisma as any).project.findUnique({
                 where: { id: projectId }
             });

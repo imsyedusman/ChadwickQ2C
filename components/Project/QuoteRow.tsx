@@ -18,7 +18,8 @@ interface QuoteRowProps {
     quote: any;
     isChild?: boolean;
     onUpdate: (id: string, diff: any) => void;
-    onDuplicate: (id: string) => void;
+    onDuplicate: (quote: any) => void;
+    onCreateRevision: (id: string) => void;
     onDelete: (id: string) => void;
 }
 
@@ -29,7 +30,7 @@ const STATUS_OPTIONS = [
     { value: 'LOST', label: 'Lost', colorClass: 'bg-red-100 text-red-700' },
 ];
 
-export default function QuoteRow({ quote, isChild, onUpdate, onDuplicate, onDelete }: QuoteRowProps) {
+export default function QuoteRow({ quote, isChild, onUpdate, onDuplicate, onCreateRevision, onDelete }: QuoteRowProps) {
     const router = useRouter();
     const [isEditingStatus, setIsEditingStatus] = useState(false);
     const [isEditingNotes, setIsEditingNotes] = useState(false);
@@ -239,9 +240,13 @@ export default function QuoteRow({ quote, isChild, onUpdate, onDuplicate, onDele
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-40 font-medium">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(quote.id); }} className="cursor-pointer">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCreateRevision(quote.id); }} className="cursor-pointer">
+                                <Copy size={14} className="mr-2 text-blue-500" />
+                                Create Revision
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate(quote); }} className="cursor-pointer">
                                 <Copy size={14} className="mr-2 text-gray-400" />
-                                Duplicate
+                                Duplicate Quote
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(quote.id); }} className="cursor-pointer text-red-600 focus:text-red-700 focus:bg-red-50">

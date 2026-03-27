@@ -34,6 +34,7 @@ import {
     getProjectCompanyDisplay, 
     getProjectContactDisplay 
 } from '@/lib/project-utils';
+import { PipedriveSearchableDropdown, PipedriveItem } from '@/components/ui/PipedriveSearchableDropdown';
 
 interface Project {
     id: string;
@@ -73,6 +74,11 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
     const [description, setDescription] = useState('Initial Quote');
     const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
     const [foundDuplicateProject, setFoundDuplicateProject] = useState<Project | null>(null);
+
+    // Pipedrive Selections
+    const [selectedDealId, setSelectedDealId] = useState<number | null>(null);
+    const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
+    const [selectedOrgId, setSelectedOrgId] = useState<number | null>(null);
 
     const router = useRouter();
 
@@ -242,6 +248,10 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                     projectReference,
                     projectDescription,
                     projectStatus,
+                    // Pipedrive IDs for backend upsert
+                    pipedrive_deal_id: selectedDealId,
+                    pipedrive_person_id: selectedPersonId,
+                    pipedrive_org_id: selectedOrgId,
                 };
             } else if (selectedProject) {
                 body.projectId = selectedProject.id;
@@ -419,12 +429,16 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-semibold text-gray-700">Project Name</label>
-                                    <input
-                                        type="text"
-                                        required={isNewProject}
+                                    <PipedriveSearchableDropdown
+                                        type="deal"
                                         value={projectName}
-                                        onChange={(e) => setProjectName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        onSelect={(item) => {
+                                            setProjectName(item.name);
+                                            setSelectedDealId(item.pipedriveId || null);
+                                            // Handle auto-population if it's a Pipedrive deal?
+                                            // Actually, Pipedrive deal search doesn't return Org/Person details in the search result item,
+                                            // but we can fetch them on the backend during creation.
+                                        }}
                                         placeholder="e.g. Westfield Expansion"
                                     />
                                 </div>
@@ -443,22 +457,25 @@ export default function NewQuoteDialog({ isOpen, onClose }: NewQuoteDialogProps)
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-semibold text-gray-700">Client Name</label>
-                                    <input
-                                        type="text"
-                                        required={isNewProject}
+                                    <PipedriveSearchableDropdown
+                                        type="person"
                                         value={clientName}
-                                        onChange={(e) => setClientName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        onSelect={(item) => {
+                                            setClientName(item.name);
+                                            setSelectedPersonId(item.pipedriveId || null);
+                                        }}
                                         placeholder="Full Name"
                                     />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-semibold text-gray-700">Company Name</label>
-                                    <input
-                                        type="text"
+                                    <PipedriveSearchableDropdown
+                                        type="organization"
                                         value={companyName}
-                                        onChange={(e) => setCompanyName(e.target.value)}
-                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                        onSelect={(item) => {
+                                            setCompanyName(item.name);
+                                            setSelectedOrgId(item.pipedriveId || null);
+                                        }}
                                         placeholder="ABC Electrical"
                                     />
                                 </div>

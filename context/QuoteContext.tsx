@@ -136,7 +136,15 @@ interface QuoteContextType {
     refreshQuote: () => Promise<void>;
     updateOverrides: (overrides: Partial<QuoteOverrides>) => Promise<void>;
     resetToGlobalDefaults: () => Promise<void>;
-    updateMetadata: (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => Promise<void>;
+    updateMetadata: (data: { 
+        quoteNumber?: string; 
+        clientName?: string; 
+        clientCompany?: string; 
+        projectRef?: string; 
+        description?: string;
+        pipedrive_org_id?: number | null;
+        pipedrive_person_id?: number | null;
+    }) => Promise<void>;
     updateStatus: (status: string) => Promise<void>;
     updateProjectStatus: (status: string) => Promise<void>;
     updateUiState: (key: string, value: any) => void;
@@ -559,7 +567,15 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
-    const updateMetadata = async (data: { quoteNumber?: string; clientName?: string; clientCompany?: string; projectRef?: string; description?: string }) => {
+    const updateMetadata = async (data: { 
+        quoteNumber?: string; 
+        clientName?: string; 
+        clientCompany?: string; 
+        projectRef?: string; 
+        description?: string;
+        pipedrive_org_id?: number | null;
+        pipedrive_person_id?: number | null;
+    }) => {
         setMetadata(prev => ({ ...prev, ...data }));
         setSaving(true);
 
@@ -657,7 +673,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 quoteNumber: metadata.quoteNumber,
                 revision: metadata.revision,
                 revisionGroupId: metadata.revisionGroupId,
-                formattedQuoteNumber: formatQuoteNumber(metadata.quoteNumber, metadata.revision),
+                formattedQuoteNumber: formatQuoteNumber(metadata.quoteNumber, metadata.revision, quoteId, metadata.revisionGroupId),
                 clientName: metadata.clientName,
                 clientCompany: metadata.clientCompany,
                 projectRef: metadata.projectRef,

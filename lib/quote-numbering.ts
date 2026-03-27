@@ -74,85 +74,97 @@ export async function generateNextQuoteNumber(): Promise<string> {
 }
 
 /**
- * Generates a revision number suffix for a duplicated quote.
- * e.g., "Q26-0240" -> "Q26-0240-A" -> "Q26-0240-B"
+ * Generates a revision number suffix for a quote.
+ * e.g., "Q26-0243" -> "Q26-0243-A" -> "Q26-0243-B"
  * 
- * @param {string} originalQuoteNumber The base quote number to duplicate.
+ * @param {string} originalQuoteNumber The quote number string to derive from.
+ * @param {string} revisionGroupId The group ID to search within for existing suffixes.
  * @returns {Promise<string>} The new quote number with the next alphabetical suffix.
  */
-export async function generateRevisionNumber(originalQuoteNumber: string): Promise<string> {
+export async function generateRevisionNumber(originalQuoteNumber: string, revisionGroupId?: string): Promise<string> {
     // Extract base number (e.g., "Q26-0243" from "Q26-0243-A")
     // We look for the standard QYY-NNNN pattern at the start
     const match = originalQuoteNumber.match(/^(Q\d{2}-\d{4})/);
     const baseNumber = match ? match[1] : originalQuoteNumber;
 
-    // Find all existing quotes that start with this base number
-    const existingQuotes = await prisma.quote.findMany({
-        where: {
-            quoteNumber: {
-                startsWith: baseNumber
-            }
-        },
-        select: { quoteNumber: true }
-    });
+    // Determine existing suffixes in the group
+    let existingSuffixes: string[] = [];
 
-    if (existingQuotes.length === 0) {
-        // Fallback: If for some reason the original doesn't exist, just start with -A
-        return `${baseNumber}-A`;
-    }
+    if (revisionGroupId) {
+        // Preferred: Search by group ID to ensure isolation
+        const groupQuotes = await prisma.quote.findMany({
+            where: { revisionGroupId },
+            select: { quoteNumber: true }
+        });
 
-    // Determine the highest existing suffix
-    const existingSuffixes: string[] = [];
+        for (const q of groupQuotes) {
+            const suffix = extractSuffix(q.quoteNumber, baseNumber);
+            if (suffix) existingSuffixes.push(suffix);
+        }
+    } else {
+        // Fallback: Search by prefix (Legacy or if group ID isn't provided)
+        const existingQuotes = await prisma.quote.findMany({
+            where: {
+                quoteNumber: { startsWith: baseNumber }
+            },
+            select: { quoteNumber: true }
+        });
 
-    for (const q of existingQuotes) {
-        // Match suffixes like -A, -B, -Z, -AA at the end of the base number
-        // We escape the baseNumber just in case it contains special characters
-        const escapedBase = baseNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const suffixRegex = new RegExp(`^${escapedBase}-([A-Z]+)$`);
-        const suffixMatch = q.quoteNumber.match(suffixRegex);
-
-        if (suffixMatch && suffixMatch[1]) {
-            existingSuffixes.push(suffixMatch[1]);
+        for (const q of existingQuotes) {
+            const suffix = extractSuffix(q.quoteNumber, baseNumber);
+            if (suffix) existingSuffixes.push(suffix);
         }
     }
 
     if (existingSuffixes.length === 0) {
-        // No suffixes yet, just the base
         return `${baseNumber}-A`;
     }
 
-    // Sort suffixes to find the highest logically
-    // To sort alphabetical suffixes correctly (A, B, C... Z, AA, AB), we can convert back to numbers
-    const getSuffixNumber = (suffix: string): number => {
-        let num = 0;
-        for (let i = 0; i < suffix.length; i++) {
-            num = num * 26 + (suffix.charCodeAt(i) - 64);
-        }
-        return num;
-    };
-
-    const getNumberSuffix = (num: number): string => {
-        let suffix = "";
-        while (num > 0) {
-            let rem = (num - 1) % 26;
-            suffix = String.fromCharCode(65 + rem) + suffix;
-            num = Math.floor((num - rem) / 26);
-        }
-        return suffix;
-    };
-
-    let maxSuffixNum = 0;
-    for (const suffix of existingSuffixes) {
+    // Sort and get next (using Math.max for numbers converted from strings)
+    const maxSuffixNum = existingSuffixes.reduce((max, suffix) => {
         const num = getSuffixNumber(suffix);
-        if (num > maxSuffixNum) {
-            maxSuffixNum = num;
-        }
-    }
+        return num > max ? num : max;
+    }, 0);
 
-    // Next suffix
     const nextSuffix = getNumberSuffix(maxSuffixNum + 1);
 
     return `${baseNumber}-${nextSuffix}`;
+}
+
+/**
+ * Extracts the alphabetical suffix from a full quote number string.
+ * e.g., ("Q26-0001-A", "Q26-0001") -> "A"
+ */
+function extractSuffix(fullNumber: string, baseNumber: string): string | null {
+    const escapedBase = baseNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const suffixRegex = new RegExp(`^${escapedBase}-([A-Z]+)$`);
+    const match = fullNumber.match(suffixRegex);
+    return match ? match[1] : null;
+}
+
+/**
+ * Converts alphabetical suffix (A, B... Z, AA) to a 1-based number.
+ */
+function getSuffixNumber(suffix: string): number {
+    let num = 0;
+    for (let i = 0; i < suffix.length; i++) {
+        num = num * 26 + (suffix.charCodeAt(i) - 64);
+    }
+    return num;
+}
+
+/**
+ * Converts a 1-based number to alphabetical suffix.
+ */
+function getNumberSuffix(num: number): string {
+    let suffix = "";
+    let n = num;
+    while (n > 0) {
+        let rem = (n - 1) % 26;
+        suffix = String.fromCharCode(65 + rem) + suffix;
+        n = Math.floor((n - rem) / 26);
+    }
+    return suffix;
 }
 
 /**

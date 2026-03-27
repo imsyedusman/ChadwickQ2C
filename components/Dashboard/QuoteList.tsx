@@ -2,12 +2,37 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Copy, Search, ChevronDown, ChevronRight, Hash, RotateCcw, Filter, Settings2, MoreHorizontal, User as UserIcon, Clock, Check, X, Shield, Briefcase, ChevronLeft, Pencil, Loader2, AlertCircle } from 'lucide-react';
+import {
+    Search,
+    Plus,
+    MoreHorizontal,
+    Trash2,
+    Copy,
+    FileText,
+    ChevronRight,
+    ChevronDown,
+    Settings2,
+    Check,
+    Filter,
+    ChevronLeft,
+    AlertCircle,
+    Loader2,
+    Layers,
+    Clock,
+    RotateCcw,
+    Pencil,
+    X,
+    Shield,
+    Briefcase,
+    Hash,
+    User as UserIcon
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
 import NewQuoteDialog from './NewQuoteDialog';
+import DuplicateQuoteDialog from './DuplicateQuoteDialog';
 import { toast } from 'sonner';
 import {
     DropdownMenu,
@@ -118,6 +143,12 @@ export default function QuoteList() {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [duplicateDialog, setDuplicateDialog] = useState<{
+        isOpen: boolean;
+        quoteId: string;
+        clientName: string;
+        clientCompany: string;
+    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
 
 
     const toggleSelectAll = () => {
@@ -376,12 +407,59 @@ export default function QuoteList() {
         }
     };
 
-    const handleDuplicate = async (e: React.MouseEvent, id: string) => {
+    const handleCreateRevision = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
+        setActionLoading(true);
 
         try {
-            const res = await fetch(`/api/quotes/${id}/duplicate`, {
+            const res = await fetch(`/api/quotes/${id}/revision`, {
                 method: 'POST',
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to create revision');
+            }
+
+            const newQuote = await res.json();
+            await fetchQuotes();
+            router.push(`/quote/${newQuote.id}`);
+        } catch (error: any) {
+            console.error('Failed to create revision', error);
+            alert(`Failed: ${error.message}`);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleDuplicateClick = (e: React.MouseEvent, quote: Quote) => {
+        e.stopPropagation();
+        setDuplicateDialog({
+            isOpen: true,
+            quoteId: quote.id,
+            clientName: quote.clientName || '',
+            clientCompany: quote.clientCompany || '',
+        });
+    };
+
+    const handleDuplicateConfirm = async (
+        clientName: string, 
+        clientCompany: string, 
+        pipedrivePersonId?: number | null, 
+        pipedriveOrgId?: number | null
+    ) => {
+        try {
+            const res = await fetch(`/api/quotes/${duplicateDialog.quoteId}/duplicate`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    clientName, 
+                    clientCompany,
+                    pipedrivePersonId,
+                    pipedriveOrgId
+                }),
             });
 
             if (!res.ok) {
@@ -389,11 +467,7 @@ export default function QuoteList() {
             }
 
             const newQuote = await res.json();
-
-            // Refresh the quotes list
             await fetchQuotes();
-
-            // Navigate to the new quote
             router.push(`/quote/${newQuote.id}`);
         } catch (error) {
             console.error('Failed to duplicate quote', error);
@@ -420,10 +494,9 @@ export default function QuoteList() {
         const groups: Record<string, Quote[]> = {};
         
         filteredQuotes.forEach((q: Quote) => {
-            // AUTHORITATIVE GROUPING: Use revisionGroupId if available
-            // FALLBACK (for data consistency): Strip suffix if missing (Q26-0263-A -> Q26-0263)
-            const fallbackKey = q.quoteNumber.split('-').slice(0, 2).join('-');
-            const groupId = q.revisionGroupId || fallbackKey;
+            // AUTHORITATIVE GROUPING: Use revisionGroupId primarily.
+            // If missing, it is its own group (e.g. legacy data or fresh standalone).
+            const groupId = q.revisionGroupId || q.id;
             
             if (!groups[groupId]) {
                 groups[groupId] = [];
@@ -994,12 +1067,16 @@ export default function QuoteList() {
                                             <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
                                                 {view === 'ACTIVE' ? (
                                                     <>
-                                                        <DropdownMenuItem onClick={(e) => handleDuplicate(e, parent.id)} className="rounded-md gap-3 py-2">
+                                                        <DropdownMenuItem onClick={(e) => handleCreateRevision(e, parent.id)} className="rounded-md gap-3 py-2 cursor-pointer font-medium">
+                                                            <Layers size={16} className="text-purple-500" />
+                                                            Create Revision
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={(e) => handleDuplicateClick(e, parent as any)} className="rounded-md gap-3 py-2 cursor-pointer font-medium">
                                                             <Copy size={16} className="text-blue-500" />
                                                             Duplicate Quote
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuSeparator className="my-1" />
-                                                        <DropdownMenuItem onClick={(e) => handleDelete(e, parent.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50">
+                                                        <DropdownMenuSeparator className="my-1 border-gray-100" />
+                                                        <DropdownMenuItem onClick={(e) => handleDelete(e, parent.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer font-medium">
                                                             <Trash2 size={16} />
                                                             Move to Trash
                                                         </DropdownMenuItem>
@@ -1285,13 +1362,20 @@ export default function QuoteList() {
                                                                         <MoreHorizontal size={14} />
                                                                     </Button>
                                                                 </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end" className="w-48 rounded-xl p-2">
-                                                                    <DropdownMenuItem onClick={(e) => handleDuplicate(e, child.id)} className="rounded-md gap-3 py-2">
-                                                                        <Copy size={16} className="text-blue-500" />
-                                                                        Duplicate Version
+                                                                <DropdownMenuContent align="end" className="w-56 rounded-xl p-2 shadow-xl border-gray-200">
+                                                                    <DropdownMenuItem onClick={(e) => handleCreateRevision(e, child.id)} className="rounded-md gap-3 py-2 cursor-pointer font-medium">
+                                                                        <Layers size={16} className="text-purple-500" />
+                                                                        Create Revision
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator className="my-1" />
-                                                                    <DropdownMenuItem onClick={(e) => handleDelete(e, child.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50">
+                                                                        <DropdownMenuItem
+                                                                            onClick={(e) => handleDuplicateClick(e, child)}
+                                                                            className="rounded-md"
+                                                                        >
+                                                                            <Copy className="mr-2 h-4 w-4" />
+                                                                            Duplicate Quote
+                                                                        </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator className="my-1 border-gray-100" />
+                                                                    <DropdownMenuItem onClick={(e) => handleDelete(e, child.id)} className="rounded-md gap-3 py-2 text-red-600 focus:text-red-700 focus:bg-red-50 cursor-pointer font-medium">
                                                                         <Trash2 size={16} />
                                                                         Move to Trash
                                                                     </DropdownMenuItem>
@@ -1415,6 +1499,14 @@ export default function QuoteList() {
             <NewQuoteDialog
                 isOpen={isNewQuoteDialogOpen}
                 onClose={() => setIsNewQuoteDialogOpen(false)}
+            />
+
+            <DuplicateQuoteDialog
+                isOpen={duplicateDialog.isOpen}
+                onClose={() => setDuplicateDialog({ ...duplicateDialog, isOpen: false })}
+                onDuplicate={handleDuplicateConfirm}
+                initialClientName={duplicateDialog.clientName}
+                initialClientCompany={duplicateDialog.clientCompany}
             />
             {/* Bulk Delete Dialog */}
             <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>

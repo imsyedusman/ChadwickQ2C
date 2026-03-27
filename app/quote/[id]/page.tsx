@@ -16,6 +16,7 @@ import SlimCostingRail from '@/components/QuoteBuilder/SlimCostingRail';
 import RevisionSelector from '@/components/QuoteBuilder/RevisionSelector';
 import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
 import { Share2 } from 'lucide-react';
+import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchableDropdown';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, projectStatus, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
@@ -189,45 +190,45 @@ function QuoteBuilderContent() {
                             <div className="h-8 w-px bg-gray-200" />
 
                             <div className="group relative flex-1 max-w-xs">
-                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Client
                                 </label>
-                                <input
-                                    type="text"
+                                <PipedriveSearchableDropdown
+                                    type="person"
                                     value={clientName ?? ""}
-                                    onChange={(e) => updateMetadata({ clientName: e.target.value })}
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    onSelect={(item) => { updateMetadata({ clientName: item.name, pipedrive_person_id: item.pipedriveId }); }}
                                     placeholder="Client Name"
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
                                 />
                             </div>
 
                             <div className="h-8 w-px bg-gray-200" />
 
                             <div className="group relative flex-1 max-w-xs">
-                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Company
                                 </label>
-                                <input
-                                    type="text"
+                                <PipedriveSearchableDropdown
+                                    type="organization"
                                     value={clientCompany ?? ""}
-                                    onChange={(e) => updateMetadata({ clientCompany: e.target.value })}
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    onSelect={(item) => { updateMetadata({ clientCompany: item.name, pipedrive_org_id: item.pipedriveId }); }}
                                     placeholder="Client Company"
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
                                 />
                             </div>
 
                             <div className="h-8 w-px bg-gray-200" />
 
                             <div className="group relative flex-1 max-w-md">
-                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Project
                                 </label>
-                                <input
-                                    type="text"
+                                <PipedriveSearchableDropdown
+                                    type="deal"
                                     value={projectRef ?? ""}
-                                    onChange={(e) => updateMetadata({ projectRef: e.target.value })}
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full transition-colors"
+                                    onSelect={(item) => { updateMetadata({ projectRef: item.name }); }}
                                     placeholder="Project Reference"
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
                                 />
                             </div>
                         </div>

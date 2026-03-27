@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { 
+    upsertPipedriveDealAsProject, 
+    upsertPipedriveOrganization, 
+    upsertPipedrivePerson 
+} from '@/lib/pipedrive-sync-utils';
 
 export async function GET(request: Request) {
     try {
@@ -102,15 +107,44 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { projectName, clientName, companyName, projectReference, projectDescription, projectStatus } = body;
+        const { 
+            projectName, 
+            clientName, 
+            companyName, 
+            projectReference, 
+            projectDescription, 
+            projectStatus,
+            pipedrive_deal_id,
+            pipedrive_person_id,
+            pipedrive_org_id
+        } = body;
 
         const session = await getServerSession(authOptions);
         if (!session) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        if (!projectName) {
-            return NextResponse.json({ error: 'Project Name is required' }, { status: 400 });
+        if (!projectName && !pipedrive_deal_id) {
+            return NextResponse.json({ error: 'Project Name or Pipedrive Deal ID is required' }, { status: 400 });
+        }
+
+        if (pipedrive_deal_id) {
+            const project = await upsertPipedriveDealAsProject(pipedrive_deal_id);
+            return NextResponse.json(project);
+        }
+
+        // Determine linked entities if IDs provided but no Deal ID
+        let linkedClientId = undefined;
+        let linkedContactId = undefined;
+
+        if (pipedrive_org_id) {
+            const client = await upsertPipedriveOrganization(pipedrive_org_id);
+            if (client) linkedClientId = client.id;
+        }
+
+        if (pipedrive_person_id) {
+            const contact = await upsertPipedrivePerson(pipedrive_person_id, linkedClientId);
+            if (contact) linkedContactId = contact.id;
         }
 
         const newProject = await (prisma as any).project.create({
@@ -121,6 +155,8 @@ export async function POST(request: Request) {
                 projectReference,
                 projectDescription,
                 projectStatus: projectStatus || 'Budget',
+                clientId: linkedClientId,
+                contactId: linkedContactId
             },
         });
 

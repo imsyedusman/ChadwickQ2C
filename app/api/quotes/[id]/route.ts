@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { canEditQuote } from '@/lib/permissions';
 import { logAction } from '@/lib/audit';
 import { enrichItems } from '@/lib/enrichment';
+import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedrive-sync-utils';
 
 export async function GET(
     request: Request,
@@ -126,14 +127,27 @@ export async function PUT(
         const session = await getServerSession(authOptions);
         const userId = session?.user?.id;
 
+        // Handle Pipedrive Upserts if IDs provided
+        const updateData: any = {
+            ...Object.fromEntries(
+                Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier', 'pipedrive_org_id', 'pipedrive_person_id' ].includes(key))
+            ),
+            lastModifiedBy: userId as string,
+        };
+
+        if (body.pipedrive_org_id) {
+            const client = await upsertPipedriveOrganization(body.pipedrive_org_id);
+            if (client) updateData.clientId = client.id;
+        }
+
+        if (body.pipedrive_person_id) {
+            const contact = await upsertPipedrivePerson(body.pipedrive_person_id, updateData.clientId || existingQuote.clientId);
+            if (contact) updateData.contactId = contact.id;
+        }
+
         const updatedQuote = await prisma.quote.update({
             where: { id },
-            data: {
-                ...Object.fromEntries(
-                    Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier' ].includes(key))
-                ),
-                lastModifiedBy: userId as string,
-            },
+            data: updateData,
         } as any);
 
         await logAction(userId, 'UPDATE_QUOTE', 'QUOTE', id, { quoteNumber: updatedQuote.quoteNumber });

@@ -7,7 +7,6 @@ import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 import { prepareBoardCloneData } from '@/lib/board-service';
-import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedrive-sync-utils';
 
 export async function POST(
     request: Request,
@@ -15,13 +14,6 @@ export async function POST(
 ) {
     try {
         const { id } = await params;
-        const body = await request.json().catch(() => ({}));
-        const { 
-            clientName: overrideClientName, 
-            clientCompany: overrideClientCompany,
-            pipedrivePersonId,
-            pipedriveOrgId
-        } = body;
 
         // Fetch the original quote with all boards and items
         const originalQuote = await prisma.quote.findUnique({
@@ -39,38 +31,26 @@ export async function POST(
             return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
         }
 
-        // Handle Pipedrive Upserts before transaction if IDs provided
-        let linkedClientId = originalQuote.clientId;
-        let linkedContactId = originalQuote.contactId;
-
-        if (pipedriveOrgId) {
-            const client = await upsertPipedriveOrganization(pipedriveOrgId);
-            if (client) linkedClientId = client.id;
-        }
-
-        if (pipedrivePersonId) {
-            const contact = await upsertPipedrivePerson(pipedrivePersonId, linkedClientId);
-            if (contact) linkedContactId = contact.id;
-        }
-
         const newQuote = await prisma.$transaction(async (tx) => {
-            // DUPLICATE RULE: Keep quote number EXACTLY the same
-            const newFullQuoteNumber = originalQuote.quoteNumber;
+            const groupId = originalQuote.revisionGroupId || originalQuote.id;
+            
+            // Ensure the original quote is marked as part of its own group if it wasn't already
+            if (!originalQuote.revisionGroupId) {
+                await tx.quote.update({
+                    where: { id: originalQuote.id },
+                    data: { revisionGroupId: originalQuote.id }
+                });
+            }
 
-            // To satisfy unique constraint @@unique([quoteNumber, revision]), 
-            // find the next integer revision for this EXACT string.
-            const maxRevisionResult = await tx.quote.aggregate({
-                where: {
-                    quoteNumber: newFullQuoteNumber
-                },
-                _max: { revision: true }
-            });
-            const newRevision = (maxRevisionResult._max.revision ?? 0) + 1;
+            // REVISION RULE: Alphabetical suffix (e.g., -A, -B)
+            // generateRevisionNumber extracts base and finds next suffix within the group
+            const newFullQuoteNumber = await generateRevisionNumber(originalQuote.quoteNumber, groupId);
 
             const session = await getServerSession(authOptions);
             let userId = (session?.user as any)?.id;
             const userEmail = (session?.user as any)?.email;
 
+            // Robust User Resolution
             let dbUser = null;
             if (userId) {
                 dbUser = await (tx as any).user.findUnique({ where: { id: userId } });
@@ -85,24 +65,17 @@ export async function POST(
             }
 
             if (!dbUser || !userId) {
-                throw new Error('Quote duplication failed: No valid users found in database.');
+                throw new Error('Quote revision failed: No valid users found in database.');
             }
 
-            // Generate a fresh ID to use as the revisionGroupId (standalone root)
-            const crypto = require('crypto');
-            const newId = crypto.randomUUID();
-
-            // Create the new quote as a fully independent record
+            // Create the new quote with all boards and items
             return await (tx.quote as any).create({
                 data: {
-                    id: newId,
                     quoteNumber: newFullQuoteNumber,
-                    revision: newRevision,
-                    revisionGroupId: newId, // It is its own group root
-                    clientName: overrideClientName || originalQuote.clientName,
-                    clientCompany: overrideClientCompany || originalQuote.clientCompany,
-                    clientId: linkedClientId,
-                    contactId: linkedContactId,
+                    revision: 0, // Suffix is handled in the quoteNumber string itself
+                    revisionGroupId: groupId,
+                    clientName: originalQuote.clientName,
+                    clientCompany: originalQuote.clientCompany,
                     projectId: originalQuote.projectId, 
                     projectRef: originalQuote.projectRef,
                     description: originalQuote.description,
@@ -112,7 +85,7 @@ export async function POST(
                     globalContingency: originalQuote.globalContingency,
                     gridInternalNotes: originalQuote.gridInternalNotes,
                     
-                    // Copy Financial Overrides
+                    // Copy exact Financial Overrides
                     overrideLabourRate: originalQuote.overrideLabourRate,
                     overrideOverheadPct: originalQuote.overrideOverheadPct,
                     overrideEngineeringPct: originalQuote.overrideEngineeringPct,
@@ -122,6 +95,7 @@ export async function POST(
                     overrideRoundingIncrement: originalQuote.overrideRoundingIncrement,
                     overrideCopperPricePerKg: originalQuote.overrideCopperPricePerKg,
                     
+                    // Ownership
                     createdBy: userId as string,
                     lastModifiedBy: userId as string,
 
@@ -164,14 +138,14 @@ export async function POST(
             });
         });
 
-        await logAction((newQuote as any).createdBy || (newQuote as any).userId, 'DUPLICATE_QUOTE', 'QUOTE', newQuote.id, { 
+        await logAction((newQuote as any).createdBy || (newQuote as any).userId, 'REVISE_QUOTE', 'QUOTE', newQuote.id, { 
             originalId: id, 
             newQuoteNumber: newQuote.quoteNumber 
         });
 
         return NextResponse.json(newQuote);
-    } catch (error) {
-        console.error('Failed to duplicate quote:', error);
-        return NextResponse.json({ error: 'Failed to duplicate quote' }, { status: 500 });
+    } catch (error: any) {
+        console.error('Failed to create revision:', error);
+        return NextResponse.json({ error: 'Failed to create revision', details: error.message }, { status: 500 });
     }
 }

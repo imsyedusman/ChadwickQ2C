@@ -29,12 +29,17 @@ export default function RevisionSelector({ currentId, revisionGroupId }: Revisio
             }
 
             try {
-                const res = await fetch(`/api/quotes?revisionGroupId=${revisionGroupId}`);
+                // Fetch up to 100 revisions in the group to ensure all are shown
+                const res = await fetch(`/api/quotes?revisionGroupId=${revisionGroupId}&limit=100`);
                 if (res.ok) {
                     const result = await res.json();
-                    const data = result.data || [];
-                    // Sort by revision descending (newest first)
-                    const sorted = (data as Revision[]).sort((a, b) => (b.revision || 0) - (a.revision || 0));
+                    const data = (result.data || []) as Revision[];
+                    
+                    // Sort by quoteNumber ascending (Q26-0001, Q26-0001-A, Q26-0001-B, etc.)
+                    // Use numeric collation to handle suffix overflows correctly
+                    const sorted = data.sort((a, b) => 
+                        a.quoteNumber.localeCompare(b.quoteNumber, undefined, { numeric: true, sensitivity: 'base' })
+                    );
                     setRevisions(sorted);
                 }
             } catch (error) {
@@ -75,7 +80,7 @@ export default function RevisionSelector({ currentId, revisionGroupId }: Revisio
             <div className="flex items-center gap-1">
                 {displayRevisions.map((rev, index) => {
                     const isActive = rev.id === currentId;
-                    const formattedDisplay = formatQuoteNumber(rev.quoteNumber, rev.revision);
+                    const formattedDisplay = formatQuoteNumber(rev.quoteNumber, rev.revision, rev.id, revisionGroupId);
 
                     return (
                         <div key={rev.id} className="flex items-center">

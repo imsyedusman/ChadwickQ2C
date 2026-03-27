@@ -29,6 +29,7 @@ import { cn, formatQuoteNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 import LinkDealModal from '@/components/Project/LinkDealModal';
 import QuoteRow from '@/components/Project/QuoteRow';
+import DuplicateQuoteDialog from '@/components/Dashboard/DuplicateQuoteDialog';
 
 import { 
     getProjectClientDisplay, 
@@ -74,6 +75,13 @@ export default function ProjectDetail() {
     const [refreshing, setRefreshing] = useState(false);
     const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
     const [optimisticQuotes, setOptimisticQuotes] = useState<any[]>([]);
+    const [duplicateDialog, setDuplicateDialog] = useState<{
+        isOpen: boolean;
+        quoteId: string;
+        clientName: string;
+        clientCompany: string;
+    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
+    const [actionLoading, setActionLoading] = useState(false);
 
     const fetchProject = async () => {
         try {
@@ -121,15 +129,38 @@ export default function ProjectDetail() {
         }
     };
 
-    const handleDuplicateQuote = async (id: string) => {
+    const handleDuplicateQuoteClick = (quote: any) => {
+        setDuplicateDialog({
+            isOpen: true,
+            quoteId: quote.id,
+            clientName: quote.clientName || '',
+            clientCompany: quote.clientCompany || '',
+        });
+    };
+
+    const handleDuplicateConfirm = async (
+        clientName: string, 
+        clientCompany: string,
+        pipedrivePersonId?: number | null,
+        pipedriveOrgId?: number | null
+    ) => {
         try {
-            const res = await fetch(`/api/quotes/${id}/duplicate`, {
-                method: 'POST'
+            const res = await fetch(`/api/quotes/${duplicateDialog.quoteId}/duplicate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    clientName, 
+                    clientCompany,
+                    pipedrivePersonId,
+                    pipedriveOrgId
+                }),
             });
+
             if (!res.ok) throw new Error('Failed to duplicate quote');
             const newQuote = await res.json();
+            
             setOptimisticQuotes(prev => {
-                const idx = prev.findIndex(q => q.id === id);
+                const idx = prev.findIndex(q => q.id === duplicateDialog.quoteId);
                 if (idx > -1) {
                     const newArr = [...prev];
                     newArr.splice(idx + 1, 0, newQuote);
@@ -141,6 +172,30 @@ export default function ProjectDetail() {
             fetchProject();
         } catch (error) {
             toast.error('Failed to duplicate quote');
+        }
+    };
+
+    const handleCreateRevision = async (id: string) => {
+        setActionLoading(true);
+        try {
+            const res = await fetch(`/api/quotes/${id}/revision`, {
+                method: 'POST',
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to create revision');
+            }
+
+            const newQuote = await res.json();
+            toast.success('Revision created successfully');
+            fetchProject();
+            router.push(`/quote/${newQuote.id}`);
+        } catch (error: any) {
+            console.error('Failed to create revision', error);
+            toast.error(`Failed: ${error.message}`);
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -580,7 +635,8 @@ export default function ProjectDetail() {
                                         quote={quote} 
                                         isChild={quote._isChild}
                                         onUpdate={handleUpdateQuote}
-                                        onDuplicate={handleDuplicateQuote}
+                                        onDuplicate={handleDuplicateQuoteClick}
+                                        onCreateRevision={handleCreateRevision}
                                         onDelete={handleDeleteQuote}
                                     />
                                 ))}
@@ -595,6 +651,14 @@ export default function ProjectDetail() {
                         </table>
                     </div>
                 </div>
+
+                <DuplicateQuoteDialog
+                    isOpen={duplicateDialog.isOpen}
+                    onClose={() => setDuplicateDialog({ ...duplicateDialog, isOpen: false })}
+                    onDuplicate={handleDuplicateConfirm}
+                    initialClientName={duplicateDialog.clientName}
+                    initialClientCompany={duplicateDialog.clientCompany}
+                />
             </main>
     );
 }

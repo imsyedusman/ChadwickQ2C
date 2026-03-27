@@ -56,6 +56,28 @@ export async function searchDeals(query: string) {
     }
 }
 
+export async function searchOrganizations(query: string) {
+    if (!query) return [];
+    try {
+        const data = await pipedriveFetch(`organizations/search?term=${encodeURIComponent(query)}`);
+        return data.data?.items?.map((item: any) => item.item) || [];
+    } catch (error) {
+        console.error('Failed to search Pipedrive organizations:', error);
+        return [];
+    }
+}
+
+export async function searchPersons(query: string) {
+    if (!query) return [];
+    try {
+        const data = await pipedriveFetch(`persons/search?term=${encodeURIComponent(query)}`);
+        return data.data?.items?.map((item: any) => item.item) || [];
+    } catch (error) {
+        console.error('Failed to search Pipedrive persons:', error);
+        return [];
+    }
+}
+
 export async function listDeals(options: { limit?: number, start?: number, sort?: string } = {}) {
     try {
         const { limit = 50, start = 0, sort = 'add_time DESC' } = options;
