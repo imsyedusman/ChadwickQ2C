@@ -52,8 +52,8 @@ export async function GET(
         }
 
         if (!templatePath) {
-            // Fallback to system default
-            templatePath = '/templates/tender-default.docx';
+            // Fallback to absolute standard system default
+            templatePath = '/templates/Estimating Standard Tender Template (2026).docx';
         }
 
         // Calculate effective settings

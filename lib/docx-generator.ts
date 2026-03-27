@@ -166,7 +166,7 @@ export class DocxGenerator {
         };
     }
 
-    private static generateBoardData(board: Board, itemNo: number) {
+    public static generateBoardData(board: Board, itemNo: number) {
         const boardPrice = (board as any).totalSellPrice || 0;
         const options = (board as any).descriptionOptions || {};
         const draft = options.draft as { id?: string; text: string; isManual?: boolean }[] | undefined;

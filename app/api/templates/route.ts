@@ -12,12 +12,12 @@ export async function GET(request: NextRequest) {
 
         const systemDefault = {
             id: 'system-default',
-            name: 'Default (System)',
-            filename: 'tender-default.docx',
-            originalName: 'Estimating Standard Tender To Print - v3.docx',
+            name: 'Estimating Standard Tender Template (2026)',
+            filename: 'Estimating Standard Tender Template (2026).docx',
+            originalName: 'Estimating Standard Tender Template (2026).docx',
             size: 0,
             isDefault: false,
-            createdAt: new Date(0).toISOString(), // Oldest
+            createdAt: new Date(0).toISOString(),
         };
 
         if (isDefault) {

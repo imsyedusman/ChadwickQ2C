@@ -6,7 +6,7 @@ async function main() {
   const items = await prisma.catalogItem.findMany({
     take: 100,
     select: {
-      name: true,
+      description: true,
       category: true,
       subcategory: true,
     }
