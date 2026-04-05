@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { isAutoManaged } from '@/lib/system-definitions';
+import { isAutoManaged, isPermanentManualCategory } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import { compareItems } from '@/lib/sorting';
@@ -53,7 +53,8 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
     const [qty, setQty] = useState(initialQty);
 
-    const autoManaged = isAutoManaged(item.partNumber) || isSystemManaged;
+    const isPermanentlyManual = isPermanentManualCategory(item.category, item.subcategory);
+    const autoManaged = !isPermanentlyManual && (isAutoManaged(item.partNumber) || isSystemManaged);
 
     // Pricing Calculation
     let displayUnitPrice = item.unitPrice;
@@ -131,6 +132,14 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                     {existingQty > 0 && (
                         <span className="ml-2 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
                             {existingQty} on board
+                        </span>
+                    )}
+
+                    {/* Manual Category Badge (Cleats) */}
+                    {isPermanentlyManual && (
+                        <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="This item is permanently manual and will never be system-locked.">
+                            <Layers size={8} />
+                            Manual
                         </span>
                     )}
                 </div>

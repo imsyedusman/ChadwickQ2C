@@ -62,3 +62,14 @@ export function isFormulaPriced(partNumber: string): boolean {
     if (!partNumber) return false;
     return FORMULA_PRICED_ITEMS.includes(partNumber);
 }
+
+/**
+ * Identifies categories that must ALWAYS be manual.
+ * Cleats (Busbar Supports) are permanently manual to prevent ghost-locks and sync regressions.
+ */
+export function isPermanentManualCategory(category?: string | null, subcategory?: string | null): boolean {
+    const catStr = category || '';
+    const subStr = subcategory || '';
+    return catStr.includes('Busbar Supports') || subStr.includes('Busbar Supports');
+}
+

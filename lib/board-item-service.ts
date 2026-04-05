@@ -2,6 +2,7 @@ import prisma from './prisma';
 import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
 import { calculateBusbarUnitPrice } from './pricing';
 import { Prisma } from '@prisma/client'; // For Decimal
+import { isPermanentManualCategory } from './system-definitions';
 
 export interface BoardConfig {
     ctMetering: string;
@@ -277,12 +278,7 @@ const CUBIC_OPTIONS_ITEMS = [
     '1A-COLOUR'
 ];
 
-function getCleatType(currentRating: number): string | null {
-    if (currentRating <= 400) return '1B1-CLEAT-SMALL-1';
-    if (currentRating <= 1000) return '1B1-CLEAT-SMALL-2';
-    if (currentRating <= 1600) return '1B1-CLEAT-LARGE-2';
-    return '1B1-CLEAT-LARGE-3';
-}
+
 
 export async function syncBoardItems(boardId: string, config: BoardConfig, options?: { forceTiers?: boolean }) {
     console.log(`Syncing items for board ${boardId} with config:`, JSON.stringify(config, null, 2));
@@ -1196,112 +1192,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         }
     });
 
-    // --- CLEAT LOGIC (Universal Sync Participation) ---
-    // Architecture Change: Cleats ALWAYS participate in sync (targets + removal).
-    // Scope determines AUTHORITY (System vs User).
 
-    // 1. Determine Scope
-    const isCustom = config.enclosureType === 'Custom';
-    const isForm3B = (config.form || '').toLowerCase() === '3b';
-    const faultRatingStr = config.faultRating || '999';
-    const faultkA = parseInt(faultRatingStr.replace(/[^0-9]/g, '') || '999');
-    const isFaultSafe = faultkA <= 50;
-
-    const managingCleats = isCustom && isForm3B && isFaultSafe;
-
-    const CLEAT_ITEMS = [
-        '1B1-CLEAT-SMALL-1',
-        '1B1-CLEAT-SMALL-2',
-        '1B1-CLEAT-LARGE-2',
-        '1B1-CLEAT-LARGE-3'
-    ];
-
-    if (!managingCleats) {
-        console.log(`[Cleats] Out of Scope (User Managed). Custom=${isCustom}, Form3B=${isForm3B}, Fault=${faultkA}kA`);
-    }
-
-    const cleatTargets = new Map<string, number>();
-
-    // 2. Iterate Busbars to determine VALID cleats (Parent existence check)
-    effectiveBusbarItems.forEach((val, key) => {
-        // Extract rating from Part Number
-        const ratingMatch = key.match(/-(\d+)A/);
-        if (ratingMatch && ratingMatch[1]) {
-            const rating = parseInt(ratingMatch[1]);
-            const cleatType = getCleatType(rating);
-
-            if (cleatType) {
-                // We have a specialized cleat type needed for this busbar
-
-                if (managingCleats) {
-                    // SCOPE: IN (System Authority)
-                    // Calculate Quantity
-                    const lengthMm = val.qty * 1000;
-                    let cleatQty = Math.ceil(lengthMm / 400) + 1;
-                    if (lengthMm > 0 && cleatQty < 2) cleatQty = 2;
-
-                    const currentTotal = cleatTargets.get(cleatType) || 0;
-                    cleatTargets.set(cleatType, currentTotal + cleatQty);
-
-                } else {
-                    // SCOPE: OUT (User Authority)
-                    // Preserve EXISTING Quantity if item exists.
-                    // Do NOT auto-add if missing.
-                    // Do NOT recalculate.
-
-                    const existing = existingItems.find((i: Item) => i.name === cleatType);
-                    if (existing) {
-                        // User "Keep this" authority
-                        // We sum up? No, existing item is unique per part number in this list context.
-                        // But wait, we are iterating BUSBARS. Multiple busbars might map to same cleat type.
-                        // Existing item quantity is the TOTAL for that part number.
-                        // We simply need to ensure we mark this Part Number as "Targeted" once.
-
-                        // If we haven't processed this cleatType yet, grab existing qty.
-                        if (!cleatTargets.has(cleatType)) {
-                            cleatTargets.set(cleatType, Number(existing.quantity));
-                        }
-                    }
-                    // If not existing, we do NOTHING (don't auto-add).
-                }
-            }
-        }
-    });
-
-    // 3. Apply Targets
-    cleatTargets.forEach((qty, partNumber) => {
-        if (managingCleats) {
-            // Apply Overrides if System Managed
-            if (cleatOverrides[partNumber] !== undefined) {
-                addTarget(partNumber, cleatOverrides[partNumber]);
-            } else {
-                // Safeguard: Respect manual edit if item already exists on board
-                const existing = existingItems.find((i: Item) => i.name === partNumber);
-                if (existing) {
-                    addTarget(partNumber, existing.quantity.toNumber());
-                } else {
-                    addTarget(partNumber, qty);
-                }
-            }
-        } else {
-            // User Managed: Trust the derived quantity (Existing).
-            addTarget(partNumber, qty);
-        }
-    });
-
-    // 4. Manual Cleat Preservation (User Authority Catch-All)
-    // CRITICAL FIX: If !managingCleats, we must preserve ALL existing cleats,
-    // even if they are orphaned (no parent busbar) and thus not found in step 2.
-    if (!managingCleats) {
-        existingItems.forEach((item: Item) => {
-            if (CLEAT_ITEMS.includes(item.name)) {
-                // Ensure we don't overwrite if already processed (though quantity should be same)
-                if (!targetItemPartNumbers.has(item.name)) {
-                    addTarget(item.name, Number(item.quantity));
-                }
-            }
-        });
-    }
 
     // --- 3. FETCH CATALOG DATA ---
     // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
@@ -1578,27 +1469,18 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         BUSBAR_INSULATION_ITEM,
         'MISC-SITE-RECONNECTION',
         'MISC-CABLE-TRAY',
-        '1A-50KA',
-        '1B1-CLEAT-SMALL-1',
-        '1B1-CLEAT-SMALL-2',
-        '1B1-CLEAT-LARGE-2',
-        '1B1-CLEAT-LARGE-3',
     ];
 
     // NOTE: Removed 'finalManagedItems' filtering logic as Cleats now always participate in sync.
     // This allows them to be removed if orphaned (parent busbar removed) even when out of scope.
 
     const itemsToRemove = existingItems.filter((item: Item) =>
-        (item.isDefault || CLEAT_ITEMS.includes(item.name)) && // Cleats must be removed if orphaned, even if released (isDefault=false)
-        allManagedItems.includes(item.name) && // Cleats are always in here
+        item.isDefault &&
+        allManagedItems.includes(item.name) &&
         !targetItemPartNumbers.has(item.name) &&
         // PROTECT METERING ITEMS (systemTag-based exclusion)
         item.systemTag !== 'CT' &&
         item.systemTag !== 'WHOLE_CURRENT'
-        // If Out-of-Scope and user removed busbar, 'targetItemPartNumbers' will NOT have the cleat (logic above).
-        // So this will correctly remove it.
-        // If Out-of-Scope and busbar exists, 'targetItemPartNumbers' WILL have the cleat (logic above).
-        // So this will PRESERVE it.
     );
 
     if (itemsToRemove.length > 0) {
@@ -1618,47 +1500,32 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const targetPrice = customPricing.get(partNumber); // undefined if not custom
         const targetLabour = customLabour.get(partNumber);
 
-        const isCleat = CLEAT_ITEMS.includes(partNumber);
-
-        // Lookup: Loose lookup for Cleats (to allow re-acquisition), Strict for others (default)
-        let existingItem: Item | undefined;
-
-        if (isCleat) {
-            // For cleats, we want to find ANY match to update it, regardless of lock state
-            existingItem = existingItems.find((i: Item) => i.name === partNumber);
-        } else {
-            existingItem = existingItems.find((i: Item) => i.name === partNumber && i.isDefault);
-        }
-
         const catalogItem = catalogMap.get(partNumber);
-
-        if (!existingItem && !catalogItem && !customPricing.has(partNumber)) {
-            // It's possible for valid items (e.g. Busbar Insulation) to be purely dynamic with no catalog entry
-            // but we must have pushed them via addTarget.
-            console.warn(`Skipping ${partNumber}: No catalog item found and not existing/custom.`);
-            return;
-        }
-
+        
         // Visibility Logic: Force Bascis category for these critical items
         const isCoreItem = ['1A-TIERS', '1B-TIERS-400', '1B-BASE', '1B-SS-2B', '1B-SS-NO4', ...CUBIC_OPTIONS_ITEMS, 'MISC-SITE-RECONNECTION'].includes(partNumber);
         const isBusbarInsulation = partNumber === BUSBAR_INSULATION_ITEM;
         const forcedCategory = isBusbarInsulation ? 'Busbar' : (isCoreItem ? 'Basics' : undefined);
 
-        if (isBusbarInsulation) {
-            console.log(`[BusbarInsulation] Processing item: ${partNumber}. Force Cat: ${forcedCategory}. Target Qty: ${targetQty}. Target Price: ${targetPrice}`);
+        const isCleat = isPermanentManualCategory(forcedCategory || catalogItem?.category, catalogItem?.subcategory);
+
+        // Lookup: Strict for everyone (only update if system-managed)
+        const existingItem = existingItems.find((i: Item) => i.name === partNumber && i.isDefault);
+
+        if (!existingItem && !catalogItem && !customPricing.has(partNumber)) {
+            console.warn(`Skipping ${partNumber}: No catalog item found and not existing/custom.`);
+            return;
         }
+
 
         if (existingItem) {
             // Update logic
-
-            // AUTO-MANAGED PRICING LOGIC (Update)
             const FORMULA_ITEMS = [
                 '1B-BASE',
                 '1B-SS-2B', '1B-SS-NO4',
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-
                 '1B-TIERS-400'
             ];
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
@@ -1667,12 +1534,9 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             let newLabour = existingItem.labourHours;
 
             if (isFormulaItem) {
-                // Formula items: Explicitly use our calculated target price
                 newUnitPrice = targetPrice !== undefined ? targetPrice : existingItem.unitPrice;
                 newLabour = targetLabour !== undefined ? targetLabour : existingItem.labourHours;
             } else {
-                // Catalog-managed defaults (e.g. 1A-TIERS, MISC-HARDWARE)
-                // Prefer catalog price if available
                 if (catalogItem) {
                     newUnitPrice = catalogItem.unitPrice;
                     newLabour = catalogItem.labourHours;
@@ -1682,10 +1546,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 }
             }
 
-            const newQty = targetQty; // We enforce quantity for auto-items
-
-            // Only update if changes needed
-            // Also force subcategory for 1A-50KA and 1A-COLOUR if updating
+            const newQty = targetQty;
             const isCubicExtra = ['1A-50KA', '1A-COLOUR'].includes(partNumber);
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
             const forcedSubcategory = isCubicExtra ? CUBIC_SUBCATEGORY : undefined;
@@ -1695,23 +1556,16 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 (Math.abs(existingItem.labourHours - newLabour) > 0.01) ||
                 (forcedCategory && existingItem.category !== forcedCategory) ||
                 (forcedSubcategory && existingItem.subcategory !== forcedSubcategory) ||
-                (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false)) ||
-                // Trigger update if lock state mismatch for Cleats
-                (isCleat && existingItem.isDefault !== managingCleats)) {
-
-                // Clean Info Note if acquiring
-                let newNotes = existingItem.notes;
-                if (isCleat && managingCleats) {
-                    newNotes = newNotes?.replace(/\n\[INFO\] Cleat automation applies up to 50kA\..*/g, '') || null;
-                } else if (isCleat && !managingCleats && !newNotes?.includes('[INFO]')) {
-                    // Add Note if releasing (should have been handled? No, we might be transitioning)
-                    newNotes = (newNotes || '') + '\n[INFO] Cleat automation applies up to 50kA. Above this rating, cleats are fully manual and must be reviewed by engineering.';
-                }
+                (existingItem.isSheetmetal !== (catalogItem?.isSheetmetal || false))) {
 
                 if (catalogItem && catalogItem.isCopperPriced) {
                     const dynamicCalc = calculateBusbarUnitPrice(catalogItem as any, pricingContext);
                     newUnitPrice = Number(dynamicCalc);
                 }
+
+                // FORCE MANUAL for Cleats
+                const finalIsDefault = isCleat ? false : true;
+                const finalIsSystemManaged = isCleat ? false : existingItem.isSystemManaged;
 
                 await prisma.item.update({
                     where: { id: existingItem.id },
@@ -1720,21 +1574,17 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                         unitPrice: newUnitPrice,
                         labourHours: newLabour,
                         cost: newUnitPrice * newQty,
-                        category: forcedCategory || existingItem.category, // Enforce basics/busbar if needed
+                        category: forcedCategory || existingItem.category,
                         subcategory: forcedSubcategory || existingItem.subcategory,
                         isSheetmetal: catalogItem?.isSheetmetal || false,
-
-                        // Dynamic Locking
-                        isDefault: isCleat ? false : true,
-                        isSystemManaged: isCleat ? false : existingItem.isSystemManaged, // Don't touch others
-                        systemTag: itemTags.get(partNumber) || existingItem.systemTag || null, // Persist CT/WC tag
-                        notes: newNotes
+                        isDefault: finalIsDefault,
+                        isSystemManaged: finalIsSystemManaged,
+                        systemTag: itemTags.get(partNumber) || existingItem.systemTag || null
                     }
                 });
             }
         } else {
             // Create new
-            // Catalog item might be undefined for dynamic items!
             const catItem = catalogItem || {
                 category: 'Switchboard',
                 subcategory: '',
@@ -1743,38 +1593,27 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 labourHours: 0
             };
 
-            // AUTO-MANAGED PRICING LOGIC
-            // 1. Formula items: computed targetPrice always wins
-            // 2. Catalog-managed defaults: catalog price wins (if available)
-            // 3. Fallback: use targetPrice (if provided, e.g. calculated) or 0
-
-            // Define Formula Items (Price is computed, don't use catalog price)
             const FORMULA_ITEMS = [
                 '1B-BASE',
                 '1B-SS-2B', '1B-SS-NO4',
                 '1B-600MM', '1B-800MM',
                 '1A-50KA', '1A-COLOUR',
                 BUSBAR_INSULATION_ITEM,
-
                 '1B-TIERS-400'
             ];
 
             const isFormulaItem = FORMULA_ITEMS.includes(partNumber);
             const isCubicExtra = ['1A-50KA', '1A-COLOUR'].includes(partNumber);
             const CUBIC_SUBCATEGORY = 'Cubic Switchboard Enclosures (includes busbar supports)';
-
             const forcedSubcategory = isCubicExtra ? CUBIC_SUBCATEGORY : undefined;
 
             let finalUnitPrice = 0;
             let finalLabourHours = 0;
 
             if (isFormulaItem) {
-                // Formula items: Explicitly use our calculated target price
                 finalUnitPrice = targetPrice !== undefined ? targetPrice : 0;
                 finalLabourHours = targetLabour !== undefined ? targetLabour : 0;
             } else {
-                // Catalog-managed defaults (e.g. 1A-TIERS, MISC-HARDWARE)
-                // Prefer catalog price if available, otherwise targetPrice
                 if (catalogItem) {
                     finalUnitPrice = catalogItem.unitPrice;
                     finalLabourHours = catalogItem.labourHours;
@@ -1789,6 +1628,9 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                 finalUnitPrice = Number(dynamicCalc);
             }
 
+            // FORCE MANUAL for Cleats
+            const finalIsDefault = isCleat ? false : true;
+
             await prisma.item.create({
                 data: {
                     boardId,
@@ -1800,9 +1642,10 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
                     labourHours: finalLabourHours,
                     quantity: targetQty,
                     cost: finalUnitPrice * targetQty,
-                    isDefault: isCleat ? false : true,
+                    isDefault: finalIsDefault,
+                    isSystemManaged: false, // Never auto-manage new items here, let the gate handle it
                     isSheetmetal: catalogItem?.isSheetmetal || false,
-                    systemTag: itemTags.get(partNumber) || null // Persist CT/WC tag
+                    systemTag: itemTags.get(partNumber) || null
                 }
             });
         }

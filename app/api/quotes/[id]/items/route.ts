@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { logItemMutation } from '@/lib/telemetry';
+import { isPermanentManualCategory } from '@/lib/system-definitions';
 
 export async function POST(
     request: Request,
@@ -64,7 +66,11 @@ export async function POST(
             // (assuming 'name' is the field for part number)
         }
 
-        // Item doesn't exist - create new item
+        // Force Manual for specific categories (Cleats)
+        const isPermanentlyManual = isPermanentManualCategory(category, subcategory) || 
+                                   (catalogItem && isPermanentManualCategory(catalogItem.category, catalogItem.subcategory));
+        
+        const finalIsSystemManaged = isPermanentlyManual ? false : (isDefault || false);
         const cost = (unitPrice || 0) * (quantity || 1);
 
         const newItem = await prisma.item.create({
@@ -72,21 +78,33 @@ export async function POST(
                 boardId,
                 category: category || 'Switchboard',
                 subcategory,
-                name: catalogItem?.partNumber || name, // Prefer Catalog PartNumber
+                name: catalogItem?.partNumber || name,
                 description,
                 quantity: quantity || 1,
                 unitPrice: unitPrice || 0,
                 labourHours: labourHours || 0,
                 cost,
                 notes,
-                isSystemManaged: isDefault || false,
-                partNumber: (body.partNumber || (catalogItem as any)?.partNumber || (name && !name.includes(' ') ? name : null)), // Robust Part Number resolution
+                isSystemManaged: finalIsSystemManaged,
+                partNumber: (body.partNumber || (catalogItem as any)?.partNumber || (name && !name.includes(' ') ? name : null)),
                 isSheetmetal: isSheetmetal,
                 productFrame: (catalogItem as any)?.productFrame,
-                // Strict Logic: Only copy variant if it exists in Catalog.
-                // Do NOT stamp board fallback here. Let sync logic handle dynamic resolution for generic items.
                 mccbVariant: (catalogItem as any)?.mccbVariant || null
             } as any,
+        });
+
+        logItemMutation({
+            itemId: newItem.id,
+            boardId,
+            category: newItem.category,
+            subcategory: newItem.subcategory,
+            name: newItem.name,
+            action: 'CREATE',
+            result: isPermanentlyManual && isDefault ? 'INTERCEPTED' : 'SUCCESS',
+            reason: isPermanentlyManual ? 'FORCED_MANUAL_CATEGORY' : undefined,
+            requestedState: { isSystemManaged: isDefault },
+            finalState: { isSystemManaged: newItem.isSystemManaged },
+            timestamp: new Date().toISOString()
         });
 
         // Debug / Validation Logging for Trip Units

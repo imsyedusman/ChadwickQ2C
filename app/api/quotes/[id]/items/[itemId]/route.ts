@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { logItemMutation } from '@/lib/telemetry';
+import { isPermanentManualCategory } from '@/lib/system-definitions';
 
 export async function PUT(
     request: Request,
@@ -21,18 +23,34 @@ export async function PUT(
         const finalUnitPrice = unitPrice !== undefined ? parseFloat(unitPrice) : (item?.unitPrice || 0);
         const newCost = finalQuantity * finalUnitPrice;
 
+        const isPermanentlyManual = isPermanentManualCategory(item?.category);
+        const finalIsSystemManaged = isPermanentlyManual ? false : ((quantity !== undefined || unitPrice !== undefined) ? false : undefined);
+
         const updatedItem = await prisma.item.update({
             where: { id: itemId },
             data: {
                 quantity: quantity !== undefined ? parseFloat(quantity) : undefined,
                 notes: notes !== undefined ? notes : undefined,
                 unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : undefined,
-                labourHours: labourHours !== undefined ? parseFloat(labourHours) : undefined,
+                labourHours: labourHours || undefined,
                 name: name !== undefined ? name : undefined,
                 description: description !== undefined ? description : undefined,
                 cost: newCost,
-                isSystemManaged: (quantity !== undefined || unitPrice !== undefined) ? false : undefined,
+                isSystemManaged: finalIsSystemManaged,
             },
+        });
+
+        logItemMutation({
+            itemId,
+            boardId: item?.boardId,
+            category: item?.category || 'Unknown',
+            name: item?.name || 'Unknown',
+            action: 'UPDATE',
+            result: isPermanentlyManual && (quantity !== undefined || unitPrice !== undefined) ? 'SUCCESS' : (isPermanentlyManual ? 'INTERCEPTED' : 'SUCCESS'),
+            reason: isPermanentlyManual ? 'FORCED_MANUAL_CATEGORY' : undefined,
+            requestedState: { quantity, unitPrice },
+            finalState: { quantity: updatedItem.quantity, unitPrice: updatedItem.unitPrice, isSystemManaged: updatedItem.isSystemManaged },
+            timestamp: new Date().toISOString()
         });
 
         // Trigger board sync if quantity was updated (required for automations like composite, digital meters, etc.)
@@ -207,6 +225,16 @@ export async function DELETE(
 
         await prisma.item.delete({
             where: { id: itemId },
+        });
+
+        logItemMutation({
+            itemId,
+            boardId: item.boardId,
+            category: item.category,
+            name: item.name,
+            action: 'DELETE',
+            result: 'SUCCESS',
+            timestamp: new Date().toISOString()
         });
 
         // Trigger general Board Sync Lifecycle (Automations like Composites and Digital Meters)
