@@ -14,7 +14,9 @@ import {
     Loader2,
     Link as LinkIcon,
     RefreshCw,
-    FileText
+    FileText,
+    ChevronUp,
+    ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,9 +69,17 @@ interface Project {
     }[];
 }
 
+import { useSearchParams } from 'next/navigation';
+
 export default function ProjectDetail() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    
+    // Sort parameters
+    const currentSort = searchParams.get('sort') || 'updatedAt';
+    const currentDir = (searchParams.get('dir') || 'desc') as 'asc' | 'desc';
+
     const [project, setProject] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -129,6 +139,28 @@ export default function ProjectDetail() {
         }
     };
 
+    const handleCreateRevision = async (id: string) => {
+        try {
+            const res = await fetch(`/api/quotes/${id}/revision`, { method: 'POST' });
+            if (!res.ok) throw new Error('Failed to create revision');
+            const newQuote = await res.json();
+            
+            // ID-based replacement for state sync
+            setOptimisticQuotes(prev => {
+                const exists = prev.some(q => q.id === newQuote.id);
+                if (exists) {
+                    return prev.map(q => q.id === newQuote.id ? newQuote : q);
+                }
+                return [newQuote, ...prev];
+            });
+            
+            toast.success('Revision created successfully');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to create revision');
+        }
+    };
+
     const handleDuplicateQuoteClick = (quote: any) => {
         setDuplicateDialog({
             isOpen: true,
@@ -160,6 +192,10 @@ export default function ProjectDetail() {
             const newQuote = await res.json();
             
             setOptimisticQuotes(prev => {
+                const exists = prev.some(q => q.id === newQuote.id);
+                if (exists) {
+                    return prev.map(q => q.id === newQuote.id ? newQuote : q);
+                }
                 const idx = prev.findIndex(q => q.id === duplicateDialog.quoteId);
                 if (idx > -1) {
                     const newArr = [...prev];
@@ -172,30 +208,6 @@ export default function ProjectDetail() {
             fetchProject();
         } catch (error) {
             toast.error('Failed to duplicate quote');
-        }
-    };
-
-    const handleCreateRevision = async (id: string) => {
-        setActionLoading(true);
-        try {
-            const res = await fetch(`/api/quotes/${id}/revision`, {
-                method: 'POST',
-            });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || 'Failed to create revision');
-            }
-
-            const newQuote = await res.json();
-            toast.success('Revision created successfully');
-            fetchProject();
-            router.push(`/quote/${newQuote.id}`);
-        } catch (error: any) {
-            console.error('Failed to create revision', error);
-            toast.error(`Failed: ${error.message}`);
-        } finally {
-            setActionLoading(false);
         }
     };
 
@@ -235,8 +247,61 @@ export default function ProjectDetail() {
         }
     };
 
+    const parseQuoteNumberForSort = (quoteNumber: string) => {
+        const match = quoteNumber.match(/Q(\d+)-(\d+)/);
+        if (match) {
+            return parseInt(match[1]) * 1000000 + parseInt(match[2]);
+        }
+        return 0;
+    };
+
+    const toggleSort = (column: string) => {
+        const newDir = currentSort === column && currentDir === 'desc' ? 'asc' : 'desc';
+        const params = new URLSearchParams(searchParams.toString());
+        params.set('sort', column);
+        params.set('dir', newDir);
+        router.push(`?${params.toString()}`);
+    };
+
+    const renderSortIcon = (column: string) => {
+        if (currentSort !== column) return null;
+        return currentDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
+    };
+
     const sortedQuotes = (() => {
-        const groups = optimisticQuotes.reduce((acc, quote) => {
+        let sorted = [...optimisticQuotes].sort((a: any, b: any) => {
+            let aVal, bVal;
+            
+            switch (currentSort) {
+                case 'total':
+                    aVal = a.totalExGST || 0;
+                    bVal = b.totalExGST || 0;
+                    break;
+                case 'status':
+                    aVal = a.status || '';
+                    bVal = b.status || '';
+                    break;
+                case 'estimator':
+                    aVal = a.modifier?.name || '';
+                    bVal = b.modifier?.name || '';
+                    break;
+                case 'quoteNumber':
+                    aVal = parseQuoteNumberForSort(a.quoteNumber);
+                    bVal = parseQuoteNumberForSort(b.quoteNumber);
+                    break;
+                case 'updatedAt':
+                default:
+                    aVal = new Date(a.updatedAt).getTime();
+                    bVal = new Date(b.updatedAt).getTime();
+            }
+
+            if (aVal < bVal) return currentDir === 'asc' ? -1 : 1;
+            if (aVal > bVal) return currentDir === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        // Revision grouping logic
+        const groups = sorted.reduce((acc, quote) => {
             const match = quote.quoteNumber.match(/^(Q\d{2}-\d{4})/);
             const base = match ? match[1] : quote.quoteNumber;
             if (!acc[base]) acc[base] = [];
@@ -245,13 +310,16 @@ export default function ProjectDetail() {
         }, {} as Record<string, any[]>);
 
         const flat: any[] = [];
-        const sortedBases = Object.keys(groups).sort((a: string, b: string) => {
-            const aLatest = Math.max(...groups[a].map((q: any) => new Date(q.createdAt).getTime()));
-            const bLatest = Math.max(...groups[b].map((q: any) => new Date(q.createdAt).getTime()));
-            return bLatest - aLatest;
-        });
+        const processedBases = new Set();
+        
+        // Use the initial sorted order to determine which group base comes first
+        for (const quote of sorted) {
+            const match = quote.quoteNumber.match(/^(Q\d{2}-\d{4})/);
+            const base = match ? match[1] : quote.quoteNumber;
+            
+            if (processedBases.has(base)) continue;
+            processedBases.add(base);
 
-        for (const base of sortedBases) {
             const group = groups[base];
             group.sort((a: any, b: any) => a.revision - b.revision);
             if (group.length > 0) {
@@ -380,16 +448,6 @@ export default function ProjectDetail() {
         return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' };
     };
 
-    const getStatusDisplay = (status: string) => {
-        const statusMap: Record<string, { label: string; className: string }> = {
-            'DRAFT': { label: 'Draft', className: 'bg-yellow-100 text-yellow-700' },
-            'SENT': { label: 'Sent', className: 'bg-blue-100 text-blue-700' },
-            'WON': { label: 'Won', className: 'bg-green-100 text-green-700' },
-            'LOST': { label: 'Lost', className: 'bg-red-100 text-red-700' },
-        };
-        return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700' };
-    };
-
     return (
         <main className="w-full max-w-[1600px] mx-auto px-6 py-8 animate-in fade-in duration-500">
                 <LinkDealModal 
@@ -398,8 +456,20 @@ export default function ProjectDetail() {
                     onSelect={handleLinkDeal} 
                 />
                 
+                {/* Pricing Discrepancy Indicator (Dev Only) */}
+                {process.env.NODE_ENV === 'development' && optimisticQuotes.length > 0 && (
+                    <div className="mb-4">
+                        {optimisticQuotes.some(q => q.totalExGST === undefined || q.totalExGST === null) && (
+                            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 animate-pulse">
+                                <span className="w-2 h-2 bg-red-500 rounded-full" />
+                                PRICING DATA INCOMPLETE: Some quotes are missing totalExGST values.
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Header & Back Button */}
-                <div className="mb-8">
+                <div className="mb-6">
                     <button 
                         onClick={() => router.push('/projects')}
                         className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-4 group"
@@ -408,9 +478,9 @@ export default function ProjectDetail() {
                         Back to Projects
                     </button>
                     
-                    <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div>
-                            <div className="flex items-center gap-3 mb-2">
+                            <div className="flex items-center gap-3">
                                 <h1 className="text-3xl font-bold text-gray-900">{project.projectName}</h1>
                                 <Select value={project.projectStatus} onValueChange={handleProjectStatusChange}>
                                     <SelectTrigger className={cn(
@@ -431,16 +501,6 @@ export default function ProjectDetail() {
                                         Linked Deal #{project.pipedrive_deal_id}
                                     </div>
                                 )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-sm text-gray-500">
-                                <div className="flex items-center gap-2">
-                                    <Building2 size={16} className="text-gray-400" />
-                                    <span className="font-bold text-gray-800">{getProjectCompanyDisplay(project)}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <User size={16} className="text-gray-400" />
-                                    <span className="font-bold text-gray-800">{getProjectClientDisplay(project)}</span>
-                                </div>
                             </div>
                         </div>
                         
@@ -475,182 +535,193 @@ export default function ProjectDetail() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Quotes</p>
-                                <p className="text-2xl font-bold text-gray-900">{optimisticQuotes.length || 0}</p>
+                <div className="space-y-6">
+                    {/* Metadata Cards Row */}
+                    <div className="flex flex-wrap items-stretch gap-4">
+                        {/* Total Quotes Card */}
+                        <div className="bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                            <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
+                                <FileText size={14} className="text-blue-500" />
                             </div>
-                            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-                                <FileText size={14} className="text-gray-400" />
-                                <span>Quotes across all revisions</span>
+                            <div>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Quotes</p>
+                                <p className="text-base font-bold text-gray-900 leading-none">{optimisticQuotes.length || 0}</p>
                             </div>
                         </div>
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Combined Selling (EX GST)</p>
-                                <p className="text-2xl font-bold text-gray-900 text-blue-600">
-                                    ${(optimisticQuotes.reduce((acc: number, q: any) => acc + (q.totalExGST || q.total || 0), 0) || 0).toLocaleString()}
-                                </p>
+                        
+                        {/* Latest Activity Card */}
+                        <div className="bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                            <div className="p-1.5 bg-slate-50 rounded-lg shrink-0">
+                                <Clock size={14} className="text-slate-500" />
                             </div>
-                            <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-blue-500 uppercase tracking-tighter bg-blue-50 px-2 py-0.5 rounded-md self-start">
-                                Exclusive of GST
-                            </div>
-                        </div>
-                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
-                            <div>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Latest Activity</p>
-                                <p className="text-lg font-bold text-gray-800 truncate">
+                            <div className="min-w-0">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Latest Activity</p>
+                                <p className="text-xs font-bold text-gray-800 leading-none truncate">
                                     {optimisticQuotes.length > 0 
                                         ? format(new Date(optimisticQuotes[0].updatedAt), 'MMM d, h:mm a')
                                         : 'No activity yet'}
                                 </p>
                             </div>
-                            <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
-                                <Clock size={14} className="text-gray-400" />
-                                <span>Last modified date</span>
-                            </div>
                         </div>
-                    </div>
 
-                    {/* Pipedrive Sidebar Stats */}
-                    <div className="bg-slate-900 rounded-2xl p-6 shadow-xl border border-slate-800 relative overflow-hidden flex flex-col justify-between group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl -mr-16 -mt-16" />
-                        
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="flex items-center gap-2">
-                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-5 h-5 rounded" />
-                                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Pipedrive Deal</span>
+                        {/* Consolidated Pipedrive Metadata Card */}
+                        <div className={cn(
+                            "bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-6",
+                            !project.pipedrive_deal_id && "opacity-60"
+                        )}>
+                            <div className="flex items-center gap-3 pr-6 border-r border-gray-100">
+                                <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
+                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-3.5 h-3.5 rounded" />
                                 </div>
-                                {project.pipedriveDealUrl && (
-                                    <a 
-                                        href={project.pipedriveDealUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-gray-400 hover:text-white transition-colors"
-                                    >
-                                        <ArrowUpRight size={14} />
-                                    </a>
-                                )}
+                                <div className="min-w-[100px]">
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Deal Value</p>
+                                    <p className="text-base font-bold text-gray-900 leading-none">
+                                        {(() => {
+                                            const val = Number(project.dealValue);
+                                            return (project.dealValue && !isNaN(val)) 
+                                                ? `$${val.toLocaleString()}` 
+                                                : "—";
+                                        })()}
+                                    </p>
+                                </div>
                             </div>
-                            
-                            {project.pipedrive_deal_id ? (
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Deal Value</p>
-                                        <p className="text-xl font-bold text-white">
-                                            {(() => {
-                                                const val = Number(project.dealValue);
-                                                return (project.dealValue && !isNaN(val)) 
-                                                    ? `$${val.toLocaleString()}` 
-                                                    : "—";
-                                            })()}
-                                        </p>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Expected Close</p>
-                                            <p className="text-xs font-bold text-slate-300">
-                                                {project.expectedCloseDate ? format(new Date(project.expectedCloseDate), 'MMM d, yyyy') : 'TBA'}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-0.5">Created</p>
-                                            <p className="text-xs font-bold text-slate-300">
-                                                {project.dealCreatedAt ? format(new Date(project.dealCreatedAt), 'MMM d, yyyy') : 'Unknown'}
-                                            </p>
-                                        </div>
-                                    </div>
+
+                            <div className="flex items-center gap-6">
+                                <div>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Exp. Close</p>
+                                    <p className="text-[11px] font-bold text-gray-700 leading-none">
+                                        {project.expectedCloseDate ? format(new Date(project.expectedCloseDate), 'MMM d, yyyy') : '—'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Created</p>
+                                    <p className="text-[11px] font-bold text-gray-700 leading-none">
+                                        {project.dealCreatedAt ? format(new Date(project.dealCreatedAt), 'MMM d, yyyy') : '—'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {project.pipedrive_deal_id && (
+                                <div className="flex items-center gap-2 pl-4 border-l border-gray-100 ml-auto">
                                     {project.quoteFolder && (
-                                        <div>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">Quote Folder</p>
-                                            <a 
-                                                href={project.quoteFolder}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center gap-2 p-2 bg-slate-800 rounded-lg text-xs font-bold text-blue-400 hover:bg-slate-700 hover:text-blue-300 transition-all border border-slate-700"
-                                            >
-                                                <FileText size={14} />
-                                                Open Sharepoint Folder
-                                            </a>
-                                        </div>
+                                        <a 
+                                            href={project.quoteFolder}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                            title="Open Sharepoint Folder"
+                                        >
+                                            <FileText size={16} />
+                                        </a>
+                                    )}
+                                    <button 
+                                        onClick={handleRefresh}
+                                        disabled={refreshing}
+                                        className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all disabled:opacity-50"
+                                        title="Sync from Pipedrive"
+                                    >
+                                        <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
+                                    </button>
+                                    {project.pipedriveDealUrl && (
+                                        <a 
+                                            href={project.pipedriveDealUrl} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                            title="View in Pipedrive"
+                                        >
+                                            <ArrowUpRight size={16} />
+                                        </a>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="py-4 text-center">
-                                    <p className="text-xs text-slate-500 font-medium italic">Project not linked to a Pipedrive deal.</p>
-                                    <Button 
-                                        variant="link" 
-                                        size="sm" 
-                                        onClick={() => setIsLinkModalOpen(true)}
-                                        className="text-blue-400 text-[10px] font-bold uppercase tracking-widest h-auto p-0 mt-2"
-                                    >
-                                        Link Now
-                                    </Button>
-                                </div>
+                            )}
+
+                            {!project.pipedrive_deal_id && (
+                                <Button 
+                                    variant="link" 
+                                    size="sm" 
+                                    onClick={() => setIsLinkModalOpen(true)}
+                                    className="text-blue-500 text-[10px] font-bold uppercase tracking-widest h-auto p-0 ml-4 hover:no-underline"
+                                >
+                                    Link Deal
+                                </Button>
                             )}
                         </div>
-
-                        {project.pipedrive_deal_id && (
-                            <button 
-                                onClick={handleRefresh}
-                                disabled={refreshing}
-                                className="mt-6 flex items-center justify-center gap-2 w-full h-10 rounded-xl bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-300 uppercase tracking-widest hover:bg-slate-700 hover:text-white transition-all disabled:opacity-50"
-                            >
-                                <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />
-                                {refreshing ? 'Refreshing...' : 'Sync from Pipedrive'}
-                            </button>
-                        )}
                     </div>
-                </div>
 
-                {/* Quotes Table */}
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                            <Briefcase size={18} className="text-blue-500" />
-                            Associated Quotes
-                        </h2>
-                    </div>
-                    
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left table-fixed">
-                            <thead className="bg-gray-50/50">
-                                <tr>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[160px]">Quote Number</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Status</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest min-w-[200px]">Inline Notes</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Total (Sell)</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[120px]">Date Created</th>
-                                    <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[140px]">Activity</th>
-                                    <th className="px-6 py-4 w-[100px]"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {sortedQuotes.map((quote: any) => (
-                                    <QuoteRow 
-                                        key={quote.id} 
-                                        quote={quote} 
-                                        isChild={quote._isChild}
-                                        onUpdate={handleUpdateQuote}
-                                        onDuplicate={handleDuplicateQuoteClick}
-                                        onCreateRevision={handleCreateRevision}
-                                        onDelete={handleDeleteQuote}
-                                    />
-                                ))}
-                                {optimisticQuotes.length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                                            No quotes found for this project.
-                                        </td>
+                    {/* Associated Quotes Table */}
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden w-full">
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                                <Briefcase size={18} className="text-blue-500" />
+                                Associated Quotes
+                            </h2>
+                        </div>
+                        
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[80px]">Est.</th>
+                                        <th 
+                                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[160px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                            onClick={() => toggleSort('quoteNumber')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Quote Number
+                                                {renderSortIcon('quoteNumber')}
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[200px]">Project Name</th>
+                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Company</th>
+                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Client</th>
+                                        <th 
+                                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[110px] cursor-pointer hover:bg-gray-100 transition-colors"
+                                            onClick={() => toggleSort('status')}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                Status
+                                                {renderSortIcon('status')}
+                                            </div>
+                                        </th>
+                                        <th 
+                                            className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[140px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                            onClick={() => toggleSort('total')}
+                                        >
+                                            <div className="flex items-center justify-end gap-2">
+                                                Total (ex GST)
+                                                {renderSortIcon('total')}
+                                            </div>
+                                        </th>
+                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notes</th>
+                                        <th className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[80px]"></th>
                                     </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {sortedQuotes.map((quote: any) => (
+                                        <QuoteRow 
+                                            key={quote.id} 
+                                            quote={quote} 
+                                            isChild={quote._isChild}
+                                            onUpdate={handleUpdateQuote}
+                                            onDuplicate={handleDuplicateQuoteClick}
+                                            onCreateRevision={handleCreateRevision}
+                                            onDelete={handleDeleteQuote}
+                                        />
+                                    ))}
+                                    {optimisticQuotes.length === 0 && (
+                                        <tr>
+                                            <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium italic">
+                                                No quotes found for this project.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
+
 
                 <DuplicateQuoteDialog
                     isOpen={duplicateDialog.isOpen}

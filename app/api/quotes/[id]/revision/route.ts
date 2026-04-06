@@ -7,6 +7,7 @@ import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 import { prepareBoardCloneData } from '@/lib/board-service';
+import { calculateQuoteTotals } from '@/lib/pricing';
 
 export async function POST(
     request: Request,
@@ -138,12 +139,48 @@ export async function POST(
             });
         });
 
-        await logAction((newQuote as any).createdBy || (newQuote as any).userId, 'REVISE_QUOTE', 'QUOTE', newQuote.id, { 
-            originalId: id, 
-            newQuoteNumber: newQuote.quoteNumber 
-        });
+        // 2. FETCH SETTINGS FOR CALCULATION
+        const settings = await prisma.settings.findUnique({ where: { id: 'global' } });
+        
+        // 3. ATOMIC RECALCULATION & UPDATE
+        if (settings) {
+            const effectiveSettings = {
+                labourRate: newQuote.overrideLabourRate ?? settings.labourRate,
+                consumablesPct: newQuote.overrideConsumablesPct ?? settings.consumablesPct,
+                overheadPct: newQuote.overrideOverheadPct ?? settings.overheadPct,
+                engineeringPct: newQuote.overrideEngineeringPct ?? settings.engineeringPct,
+                targetMarginPct: newQuote.overrideTargetMarginPct ?? settings.targetMarginPct,
+                gstPct: newQuote.overrideGstPct ?? settings.gstPct,
+                roundingIncrement: newQuote.overrideRoundingIncrement ?? settings.roundingIncrement,
+                copperPricePerKg: newQuote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
+            };
 
-        return NextResponse.json(newQuote);
+            const { grandTotals } = calculateQuoteTotals(newQuote.boards as any, effectiveSettings);
+
+            // Update with calculated totals
+            const finalizedQuote = await (prisma.quote as any).update({
+                where: { id: newQuote.id },
+                data: {
+                    totalExGST: grandTotals.sellPriceRounded,
+                    totalIncGST: grandTotals.finalSellPrice,
+                    gstAmount: grandTotals.gst,
+                    // Legacy support
+                    total: grandTotals.sellPriceRounded,
+                    totalIncGst: grandTotals.finalSellPrice
+                },
+                include: {
+                    modifier: { select: { name: true } },
+                    creator: { select: { name: true } }
+                }
+            });
+
+            await logAction(finalizedQuote.createdBy || (finalizedQuote as any).userId, 'REVISE_QUOTE', 'QUOTE', finalizedQuote.id, { 
+                originalId: id, 
+                newQuoteNumber: finalizedQuote.quoteNumber 
+            });
+
+            return NextResponse.json(finalizedQuote);
+        }
     } catch (error: any) {
         console.error('Failed to create revision:', error);
         return NextResponse.json({ error: 'Failed to create revision', details: error.message }, { status: 500 });
