@@ -4,6 +4,7 @@ const PdfPrinter = PdfPrinterModule.default || PdfPrinterModule;
 import { TDocumentDefinitions, Content, ContextPageSize } from 'pdfmake/interfaces';
 import { QuoteBOM, CanonicalBOM } from '../bom-engine';
 import { formatCurrency, formatQuantity } from '../utils';
+import { resolveCostCategory } from '../items/categorization';
 import path from 'path';
 
 // Define fonts with absolute paths for Node runtime consistency
@@ -40,18 +41,26 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
                 margin: [0, boardIdx === 0 ? 0 : 25, 0, 10]
             });
 
-            // 2. Group Items by Category
+            // 2. Group Items by Resolved Cost Category
             const grouped: Record<string, typeof board.items> = {};
             const categories: string[] = [];
             for (const item of board.items) {
-                const rawCat = item.category || 'Uncategorized';
-                const cat = rawCat === 'Switchboard' ? 'Switchgear' : rawCat;
+                // Use centralized logic as Single Source of Truth
+                const cat = resolveCostCategory(item as any);
+                
                 if (!grouped[cat]) {
                     grouped[cat] = [];
                     categories.push(cat);
                 }
                 grouped[cat].push(item);
             }
+            
+            // Sort categories for consistency (Basics first if present)
+            categories.sort((a, b) => {
+                if (a.startsWith('Basics')) return -1;
+                if (b.startsWith('Basics')) return 1;
+                return a.localeCompare(b);
+            });
 
             // 3. Build Table Body
             const tableBody: any[] = [];

@@ -1,4 +1,5 @@
 import { Item } from '@prisma/client';
+import { resolveCostCategory } from './items/categorization';
 
 export interface AggregateItem {
     key: string;
@@ -79,8 +80,9 @@ export const aggregateBoardItems = (items: Item[]): Map<string, AggregateItem> =
         const qty = toNum(item.quantity);
         const cost = item.cost || 0; // Use stored extended cost
         const labour = item.labourHours || 0;
-        // Capture category (prefer existing, but will settle for first found)
-        const cat = item.category || 'Uncategorized';
+        
+        // Resolve cost category using single source of truth
+        const cat = resolveCostCategory(item as any);
 
         if (current) {
             current.quantity += qty;

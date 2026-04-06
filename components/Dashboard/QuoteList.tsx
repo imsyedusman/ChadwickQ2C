@@ -483,6 +483,7 @@ export default function QuoteList() {
     ) : [];
 
     interface QuoteGroup {
+        groupId: string;
         quoteNumber: string;
         parent: Quote;
         children: Quote[];
@@ -518,6 +519,7 @@ export default function QuoteList() {
                 , quotesInGroup[0]?.updatedAt || new Date().toISOString());
 
             return {
+                groupId,
                 quoteNumber: parent.quoteNumber.replace(/-[A-Z]+$/, ''),
                 parent,
                 children,
@@ -530,11 +532,11 @@ export default function QuoteList() {
         return result.sort((a, b) => new Date(b.latestUpdate).getTime() - new Date(a.latestUpdate).getTime());
     }, [filteredQuotes]);
 
-    const toggleGroup = (e: React.MouseEvent, quoteNumber: string) => {
+    const toggleGroup = (e: React.MouseEvent, groupId: string) => {
         e.stopPropagation();
         setCollapsedGroups(prev => ({
             ...prev,
-            [quoteNumber]: !prev[quoteNumber]
+            [groupId]: !prev[groupId]
         }));
     };
 
@@ -734,13 +736,13 @@ export default function QuoteList() {
                         </div>
                     )}
                     {groupedQuotes.map((group) => {
-                        const isCollapsed = collapsedGroups[group.quoteNumber] || false;
+                        const isCollapsed = collapsedGroups[group.groupId] || false;
                         const parent = group.parent;
                         const totalPrice = parent.total || 0;
                         const updatedDate = new Date(parent.updatedAt);
 
                         return (
-                            <div key={group.quoteNumber} className="flex flex-col">
+                            <div key={group.groupId} className="flex flex-col">
                                 {/* Parent Row */}
                                  <div
                                     className={cn(
@@ -778,11 +780,11 @@ export default function QuoteList() {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        toggleGroup(e, group.parent.id);
+                                                        toggleGroup(e, group.groupId);
                                                     }}
                                                     className="p-1 hover:bg-gray-200 rounded text-gray-400 transition-all hover:scale-110 active:scale-95"
                                                 >
-                                                    {collapsedGroups[group.parent.id] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                                    {collapsedGroups[group.groupId] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
                                                 </button>
                                             )}
                                         </div>

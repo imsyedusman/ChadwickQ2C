@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Item, useQuote } from '../../context/QuoteContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { resolveCostCategory } from '@/lib/items/categorization';
 
 interface BoardCompositionProps {
     items: Item[];
@@ -36,88 +37,8 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
         other: { items: [], labour: 0, cost: 0 }
     };
 
-    items.forEach(item => {
-        const qty = Number(item.quantity) || 0;
-        const labour = qty * (item.labourHours || 0);
-        const cost = qty * (item.unitPrice || 0);
-
-        const cat = (item.category || '').toLowerCase();
-        const subcat = (item.subcategory || '').toLowerCase();
-        const name = (item.name || '').toLowerCase();
-
-        // Helper to check if any part of the subcategory hierarchy contains a term
-        const subcatContains = (term: string) => subcat.includes(term.toLowerCase());
-
-        // ---------------------------------------------------------------------
-        // HIERARCHY-AWARE MAPPING
-        // ---------------------------------------------------------------------
-
-        // 1. Busbar Insulation (Must check name/subcat under Busbar category)
-        if (cat === 'busbar' && (subcatContains('insulation') || name.includes('insulation'))) {
-            buckets.busbarInsulation.items.push(item);
-            buckets.busbarInsulation.labour += labour;
-            buckets.busbarInsulation.cost += cost;
-        }
-        // 2. Main Busbars
-        else if (cat === 'busbar') {
-            buckets.busbars.items.push(item);
-            buckets.busbars.labour += labour;
-            buckets.busbars.cost += cost;
-        }
-        // 3. Circuit Breakers (Includes MCCB, MCB, Accessories, Trip Units)
-        else if (cat === 'switchboard' && (
-            subcatContains('circuit breaker') ||
-            subcatContains('mccb') ||
-            subcatContains('mcb') ||
-            subcatContains('acb') ||
-            subcatContains('trip unit')
-        )) {
-            buckets.circuitBreakers.items.push(item);
-            buckets.circuitBreakers.labour += labour;
-            buckets.circuitBreakers.cost += cost;
-        }
-        // 4. Isolators & Switches
-        else if (cat === 'switchboard' && (subcatContains('switch') || subcatContains('isolator'))) {
-            buckets.isolators.items.push(item);
-            buckets.isolators.labour += labour;
-            buckets.isolators.cost += cost;
-        }
-        // 5. Miscellaneous (Meters, Fuses, CTs, Wiring, Surge, etc.)
-        else if (cat === 'switchboard' && (
-            subcatContains('meter') ||
-            subcatContains('fuse') ||
-            subcatContains('current transformer') ||
-            subcatContains('wiring') ||
-            subcatContains('surge') ||
-            subcatContains('miscellaneous') ||
-            item.systemTag === 'CT_METERING'
-        )) {
-            buckets.miscellaneous.items.push(item);
-            buckets.miscellaneous.labour += labour;
-            buckets.miscellaneous.cost += cost;
-        }
-        // 6. CT Metering (System Managed fallback)
-        else if (item.isSystemManaged && (item.systemTag === 'CT_METERING' || subcatContains('ct metering'))) {
-            buckets.ctMetering.items.push(item);
-            buckets.ctMetering.labour += labour;
-            buckets.ctMetering.cost += cost;
-        }
-        // 7. Basics
-        else if (cat === 'basics') {
-            buckets.basics.items.push(item);
-            buckets.basics.labour += labour;
-            buckets.basics.cost += cost;
-        }
-        // 8. Default: Other
-        else {
-            buckets.other.items.push(item);
-            buckets.other.labour += labour;
-            buckets.other.cost += cost;
-        }
-    });
-
     // -------------------------------------------------------------------------
-    // MANDATORY BUCKET ORDERING
+    // MANDATORY BUCKET ORDERING & META
     // -------------------------------------------------------------------------
     const mandatoryOrderKeys = [
         'circuitBreakers',
@@ -137,6 +58,26 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
         ctMetering: { label: 'CT Metering (System)', color: 'bg-teal-500', desc: 'Automated CT components' },
         other: { label: 'Other', color: 'bg-slate-400', desc: 'Uncategorized items' }
     };
+
+    items.forEach(item => {
+        const qty = Number(item.quantity) || 0;
+        const labour = qty * (item.labourHours || 0);
+        const cost = qty * (item.unitPrice || 0);
+
+        // ---------------------------------------------------------------------
+        // CENTRALIZED CATEGORIZATION (Single Source of Truth)
+        // ---------------------------------------------------------------------
+        const bucketLabel = resolveCostCategory(item);
+        
+        // Find bucket key by label matching
+        const bucketKey = Object.keys(groupMeta).find(key => groupMeta[key].label === bucketLabel) || 'other';
+
+        if (buckets[bucketKey]) {
+            buckets[bucketKey].items.push(item);
+            buckets[bucketKey].labour += labour;
+            buckets[bucketKey].cost += cost;
+        }
+    });
 
     const allGroups = [
         ...mandatoryOrderKeys,
