@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { calculateQuoteTotals } from '@/lib/pricing';
+import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
 
 export async function PATCH(
     request: Request,
@@ -132,22 +133,9 @@ export async function GET(
 
         console.log(`[API GET Project] Found: "${project.projectName}" with ${project.quotes.length} quotes`);
 
-        // Get global settings for calculation
-        const settings = await prisma.settings.findUnique({ where: { id: 'global' } });
-
-        const quotesWithTotal = project.quotes.map((quote: any) => {
-            if (!settings) return { ...quote, total: 0, totalIncGst: 0, boards: undefined };
-
-            const effectiveSettings = {
-                labourRate: quote.overrideLabourRate ?? settings.labourRate,
-                consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
-                overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
-                engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
-                targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
-                gstPct: quote.overrideGstPct ?? settings.gstPct,
-                roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
-                copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
-            };
+        // 4. Calculate totals for each quote with safe setting fallbacks
+        const quotesWithTotal = await Promise.all(project.quotes.map(async (quote: any) => {
+            const effectiveSettings = await getEffectiveSettingsForQuote(quote);
 
             const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
             
@@ -161,7 +149,7 @@ export async function GET(
                 total: grandTotals.sellPriceRounded,
                 totalIncGst: grandTotals.finalSellPrice
             };
-        });
+        }));
 
         console.log(`[API GET Project] SUCCESS: Returning project and ${quotesWithTotal.length} calculated quotes`);
         return NextResponse.json({

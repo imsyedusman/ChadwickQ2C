@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
 import { calculateQuoteTotals } from '@/lib/pricing';
+import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 import { 
     upsertPipedriveDealAsProject, 
@@ -103,22 +104,9 @@ export async function GET(request: Request) {
 
         console.log(`[API GET Quotes] Filtered total count: ${totalCount}, Returning ${quotes.length} on page ${page}`);
 
-        // Get global settings for calculation
-        const settings = await prisma.settings.findUnique({ where: { id: 'global' } });
-
-        const quotesWithTotals = quotes.map((quote: any) => {
-            if (!settings) return { ...quote, total: 0, totalIncGst: 0, boards: undefined };
-
-            const effectiveSettings = {
-                labourRate: quote.overrideLabourRate ?? settings.labourRate,
-                consumablesPct: quote.overrideConsumablesPct ?? settings.consumablesPct,
-                overheadPct: quote.overrideOverheadPct ?? settings.overheadPct,
-                engineeringPct: quote.overrideEngineeringPct ?? settings.engineeringPct,
-                targetMarginPct: quote.overrideTargetMarginPct ?? settings.targetMarginPct,
-                gstPct: quote.overrideGstPct ?? settings.gstPct,
-                roundingIncrement: quote.overrideRoundingIncrement ?? settings.roundingIncrement,
-                copperPricePerKg: quote.overrideCopperPricePerKg ?? settings.copperPricePerKg,
-            };
+        // 4. Calculate totals with safe setting fallbacks
+        const quotesWithTotals = await Promise.all(quotes.map(async (quote: any) => {
+            const effectiveSettings = await getEffectiveSettingsForQuote(quote);
 
             try {
                 const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
@@ -147,7 +135,7 @@ export async function GET(request: Request) {
                     calcError: true
                 };
             }
-        });
+        }));
 
         const totalPages = Math.ceil(totalCount / limit);
 

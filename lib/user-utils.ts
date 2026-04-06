@@ -48,3 +48,29 @@ export async function getOrCreateDefaultAdminUser() {
         return null;
     }
 }
+/**
+ * Resolves a valid User ID from a session or fallback, ensuring it exists in the DB
+ * to prevent Foreign Key constraint violations.
+ */
+export async function getResolvedUserId(session: any): Promise<string> {
+    const sessionUserId = (session?.user as any)?.id;
+    const sessionUserEmail = (session?.user as any)?.email;
+
+    // 1. Check if session ID exists in DB
+    if (sessionUserId) {
+        const user = await (prisma as any).user.findUnique({ where: { id: sessionUserId } });
+        if (user) return user.id;
+    }
+
+    // 2. Fallback to Email if ID resolution failed
+    if (sessionUserEmail) {
+        const user = await (prisma as any).user.findUnique({ where: { email: sessionUserEmail } });
+        if (user) return user.id;
+    }
+
+    // 3. Last Fallback: Get or create default admin
+    const defaultAdmin = await getOrCreateDefaultAdminUser();
+    if (defaultAdmin) return defaultAdmin.id;
+
+    throw new Error('No valid user found or could be created in database.');
+}

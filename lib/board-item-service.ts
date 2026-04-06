@@ -3,6 +3,7 @@ import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
 import { calculateBusbarUnitPrice } from './pricing';
 import { Prisma } from '@prisma/client'; // For Decimal
 import { isPermanentManualCategory } from './system-definitions';
+import { getGlobalSettings } from './settings-service';
 
 export interface BoardConfig {
     ctMetering: string;
@@ -313,12 +314,12 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // Calculate global pricing context
     let effectiveCopperPrice = 15.0;
-    const globalSettings = await prisma.settings.findUnique({ where: { id: 'global' } });
+    const globalSettings = await getGlobalSettings();
 
     if (board.quote?.overrideCopperPricePerKg != null) {
         effectiveCopperPrice = Number(board.quote.overrideCopperPricePerKg);
-    } else if (globalSettings?.copperPricePerKg != null) {
-        effectiveCopperPrice = Number(globalSettings.copperPricePerKg);
+    } else {
+        effectiveCopperPrice = globalSettings.copperPricePerKg;
     }
 
     const pricingContext = { copperPrice: effectiveCopperPrice };

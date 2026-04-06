@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { canEditQuote } from '@/lib/permissions';
 import { logAction } from '@/lib/audit';
+import { getResolvedUserId } from '@/lib/user-utils';
 import { enrichItems } from '@/lib/enrichment';
 import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedrive-sync-utils';
 
@@ -80,21 +81,21 @@ export async function DELETE(
         }
 
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
+        const resolvedUserId = await getResolvedUserId(session);
 
         if (permanent) {
             await prisma.quote.delete({
                 where: { id },
             });
             await triggerSequenceSync(quote.quoteNumber, true);
-            await logAction(userId, 'DELETE_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber, permanent: true });
+            await logAction(resolvedUserId, 'DELETE_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber, permanent: true });
             return NextResponse.json({ success: true, permanent: true });
         } else {
             await prisma.quote.update({
                 where: { id },
                 data: { status: 'TRASH' }
             });
-            await logAction(userId, 'TRASH_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber });
+            await logAction(resolvedUserId, 'TRASH_QUOTE', 'QUOTE', id, { quoteNumber: quote.quoteNumber });
             return NextResponse.json({ success: true, trashed: true });
         }
     } catch (error) {
@@ -125,14 +126,14 @@ export async function PUT(
         }
 
         const session = await getServerSession(authOptions);
-        const userId = session?.user?.id;
+        const resolvedUserId = await getResolvedUserId(session);
 
         // Handle Pipedrive Upserts if IDs provided
         const updateData: any = {
             ...Object.fromEntries(
                 Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier', 'pipedrive_org_id', 'pipedrive_person_id' ].includes(key))
             ),
-            lastModifiedBy: userId as string,
+            lastModifiedBy: resolvedUserId,
         };
 
         if (body.pipedrive_org_id) {
@@ -145,20 +146,32 @@ export async function PUT(
             if (contact) updateData.contactId = contact.id;
         }
 
+        console.log(`[API PUT Quote] Updating quote ${id} with data:`, JSON.stringify(updateData));
+
         const updatedQuote = await prisma.quote.update({
             where: { id },
             data: updateData,
+            include: {
+                modifier: { select: { name: true } },
+                creator: { select: { name: true } }
+            }
         } as any);
 
-        await logAction(userId, 'UPDATE_QUOTE', 'QUOTE', id, { quoteNumber: updatedQuote.quoteNumber });
+        console.log(`[API PUT Quote] SUCCESS: ${id} updated.`);
+
+        await logAction(resolvedUserId, 'UPDATE_QUOTE', 'QUOTE', id, { quoteNumber: updatedQuote.quoteNumber });
 
         if (body.quoteNumber && existingQuote && body.quoteNumber !== existingQuote.quoteNumber) {
             await triggerSequenceSync(body.quoteNumber);
         }
 
         return NextResponse.json(updatedQuote);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Failed to update quote:', error);
-        return NextResponse.json({ error: 'Failed to update quote' }, { status: 500 });
+        return NextResponse.json({ 
+            error: 'Failed to update quote', 
+            details: error.message,
+            success: false 
+        }, { status: 500 });
     }
 }

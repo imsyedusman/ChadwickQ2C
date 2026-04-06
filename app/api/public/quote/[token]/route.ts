@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { calculateQuoteTotals, PricingSettings } from '@/lib/pricing';
+import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
 
 export async function GET(
     request: Request,
@@ -34,17 +35,7 @@ export async function GET(
         const quote = shareLink.quote;
 
         // Apply default settings or quote overrides for pricing
-        const settingsRes = await prisma.settings.findUnique({ where: { id: 'global' } });
-        const settings: PricingSettings = {
-            labourRate: quote.overrideLabourRate ?? settingsRes?.labourRate ?? 100,
-            overheadPct: quote.overrideOverheadPct ?? settingsRes?.overheadPct ?? 0.20,
-            engineeringPct: quote.overrideEngineeringPct ?? settingsRes?.engineeringPct ?? 0.20,
-            targetMarginPct: quote.overrideTargetMarginPct ?? settingsRes?.targetMarginPct ?? 0.18,
-            consumablesPct: quote.overrideConsumablesPct ?? settingsRes?.consumablesPct ?? 0.03,
-            gstPct: quote.overrideGstPct ?? settingsRes?.gstPct ?? 0.10,
-            roundingIncrement: quote.overrideRoundingIncrement ?? settingsRes?.roundingIncrement ?? 100,
-            copperPricePerKg: quote.overrideCopperPricePerKg ?? settingsRes?.copperPricePerKg ?? 15.0,
-        };
+        const settings: PricingSettings = await getEffectiveSettingsForQuote(quote);
 
         const { grandTotals, boardTotals } = calculateQuoteTotals(quote.boards, settings);
 
