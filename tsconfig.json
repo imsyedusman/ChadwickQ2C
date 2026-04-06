@@ -39,6 +39,13 @@
   ],
   "exclude": [
     "node_modules",
-    "scripts"
+    "scripts",
+    "debug-*.ts",
+    "test-*.ts",
+    "script_*.ts",
+    "verify-*.ts",
+    "diagnose.ts",
+    "proxy.ts",
+    "find-catalog-item.ts"
   ]
 }

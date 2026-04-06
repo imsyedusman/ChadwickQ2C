@@ -14,10 +14,12 @@ const createItem = (overrides: Partial<Item>): Item => ({
     quantity: 1,
     unitPrice: 100,
     labourHours: 1,
+    cost: 100,
+    isDefault: false,
     notes: null,
     isSystemManaged: false,
     ...overrides
-});
+}) as Item;
 
 // Mock Data
 const atsBreaker = createItem({
