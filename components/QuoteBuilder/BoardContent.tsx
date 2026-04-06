@@ -764,18 +764,17 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                 <ChevronDown size={10} className="text-gray-400 group-hover:text-blue-500" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 bg-white shadow-lg border border-gray-100 p-1">
-                            <DropdownMenuLabel className="text-xs text-gray-500 font-semibold px-2 py-1.5">Select Format</DropdownMenuLabel>
-                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
-
+                        <DropdownMenuContent align="end" className="w-64 bg-white shadow-lg border border-gray-100 p-1">
+                            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Current Board BOM</DropdownMenuLabel>
+                            
                             <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
+                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
                                 className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
                             >
-                                <FileSpreadsheet size={14} className="text-green-600" />
+                                <FileText size={14} className="text-red-600" />
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export CSV (ERP)</span>
-                                    <span className="text-[10px] text-gray-400">Strict tabular data for import</span>
+                                    <span className="text-sm font-medium text-gray-700">Export PDF</span>
+                                    <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
                                 </div>
                             </DropdownMenuItem>
 
@@ -785,21 +784,45 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             >
                                 <FileSpreadsheet size={14} className="text-blue-600" />
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export CSV (Detailed)</span>
-                                    <span className="text-[10px] text-gray-400">Includes summary & formatting</span>
+                                    <span className="text-sm font-medium text-gray-700">Export CSV</span>
+                                    <span className="text-[10px] text-gray-400">Detailed list (Excel ready)</span>
                                 </div>
                             </DropdownMenuItem>
 
                             <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+                            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Full Quote BOM (All Boards)</DropdownMenuLabel>
 
                             <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
+                                onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=pdf`, '_blank')}
                                 className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
                             >
                                 <FileText size={14} className="text-red-600" />
                                 <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export PDF</span>
-                                    <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
+                                    <span className="text-sm font-medium text-gray-700">Export Full PDF</span>
+                                    <span className="text-[10px] text-gray-400">All boards as individual sections</span>
+                                </div>
+                            </DropdownMenuItem>
+
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=human`, '_blank')}
+                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                            >
+                                <FileSpreadsheet size={14} className="text-blue-600" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-700">Export Full CSV</span>
+                                    <span className="text-[10px] text-gray-400">Flat table with 'Board' column</span>
+                                </div>
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+                            <DropdownMenuItem
+                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
+                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none opacity-50 hover:opacity-100"
+                            >
+                                <FileSpreadsheet size={14} className="text-green-600" />
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium text-gray-700">ERP Export (CSV)</span>
+                                    <span className="text-[10px] text-gray-400">Strict machine format</span>
                                 </div>
                             </DropdownMenuItem>
                         </DropdownMenuContent>

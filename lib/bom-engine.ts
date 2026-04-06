@@ -24,6 +24,19 @@ export interface CanonicalBOM {
     };
 }
 
+export interface QuoteBOM {
+    quoteNumber: string;
+    clientName?: string | null;
+    companyName?: string | null;
+    projectName?: string | null;
+    boards: CanonicalBOM[];
+    grandTotals: {
+        totalMaterialCost: number;
+        totalLabourHours: number;
+    };
+    timestamp: string;
+}
+
 /**
  * Generates a deterministic, canonical BOM model from board items.
  * 

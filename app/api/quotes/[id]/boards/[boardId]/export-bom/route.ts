@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateCanonicalBOM } from '@/lib/bom-engine';
+import { generateCanonicalBOM, QuoteBOM } from '@/lib/bom-engine';
 import { generateCSV } from '@/lib/bom-exporters/csv';
 import { generatePDF } from '@/lib/bom-exporters/pdf';
 
@@ -11,21 +11,29 @@ export async function GET(
     { params }: { params: Promise<{ id: string; boardId: string }> }
 ) {
     try {
-        const { id, boardId } = await params;
+        const { boardId } = await params;
         const { searchParams } = new URL(request.url);
         const format = searchParams.get('format') || 'human'; // 'erp' | 'human' | 'pdf'
 
-        // 1. Fetch Board & Items
+        // 1. Fetch Board & Items and parent Quote metadata
         const board = await prisma.board.findUnique({
             where: { id: boardId },
             include: {
-                items: true
+                items: true,
+                quote: {
+                    include: {
+                        project: true,
+                        client: true
+                    }
+                }
             }
         });
 
         if (!board) {
             return NextResponse.json({ error: 'Board not found' }, { status: 404 });
         }
+
+        const quote = board.quote;
 
         // 2. Extract Unique Part Numbers
         const uniquePartNumbers = Array.from(new Set(
@@ -53,15 +61,28 @@ export async function GET(
             }
         }
 
-        // 5. Generate Canonical Model (The Source of Truth)
-        // Note: Casting board.items to any because Prisma/Item types might differ slightly but compatible props exist
+        // 5. Generate Canonical Model for this board
         const canonicalModel = generateCanonicalBOM(board.items as any, brandLookup, board.name);
 
-        // 6. Generate Requested Format
+        // 6. Wrap in QuoteBOM (Multi-board structure)
+        const quoteBOM: QuoteBOM = {
+            quoteNumber: quote.quoteNumber,
+            clientName: quote.clientName || quote.client?.name || null,
+            companyName: quote.clientCompany || quote.project?.companyName || null,
+            projectName: quote.projectRef || quote.project?.projectName || null,
+            boards: [canonicalModel],
+            grandTotals: {
+                totalMaterialCost: canonicalModel.totals.totalMaterialCost,
+                totalLabourHours: canonicalModel.totals.totalLabourHours
+            },
+            timestamp: new Date().toISOString()
+        };
+
+        // 7. Generate Requested Format
         const sanitizedName = board.name.replace(/[^a-zA-Z0-9-_]/g, '_');
 
         if (format === 'pdf') {
-            const pdfBuffer = await generatePDF(canonicalModel);
+            const pdfBuffer = await generatePDF(quoteBOM);
             const filename = `${sanitizedName}_BOM.pdf`;
 
             return new NextResponse(pdfBuffer as any, {
@@ -73,9 +94,8 @@ export async function GET(
             });
         }
         else {
-            // CSV (erp or human)
             const mode = format === 'erp' ? 'erp' : 'human';
-            const csvContent = generateCSV(canonicalModel, { mode });
+            const csvContent = generateCSV(quoteBOM, { mode });
             const suffix = format === 'erp' ? '_BOM_ERP.csv' : '_BOM.csv';
             const filename = `${sanitizedName}${suffix}`;
 

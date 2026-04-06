@@ -1,9 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const PdfPrinterModule = require('pdfmake/js/Printer');
 const PdfPrinter = PdfPrinterModule.default || PdfPrinterModule;
-import { TDocumentDefinitions, StyleDictionary, Content } from 'pdfmake/interfaces';
-import { CanonicalBOM } from '../bom-engine';
+import { TDocumentDefinitions, Content, ContextPageSize } from 'pdfmake/interfaces';
+import { QuoteBOM, CanonicalBOM } from '../bom-engine';
 import { formatCurrency, formatQuantity } from '../utils';
 import path from 'path';
 
@@ -18,154 +17,202 @@ const fonts = {
 };
 
 /**
- * Generates a PDF Buffer from the canonical BOM model using pdfmake.
+ * Generates a PDF Buffer from a QuoteBOM model using pdfmake.
  * 
- * Layout:
- * - A4 Portrait
- * - Fixed Columns
- * - Grouped by Category
- * - Subtotals & Grand Totals
- * - Strict Formatting (4dp Unit, 2dp Extended)
+ * Supports:
+ * - Multi-board sections with headers and subtotals.
+ * - Rich header with Quote/Project/Client/Company (dynamic hiding).
+ * - 2dp precision everywhere.
+ * - Table optimization (wide Description).
  */
-export function generatePDF(model: CanonicalBOM): Promise<Buffer> {
+export function generatePDF(model: QuoteBOM): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const printer = new PdfPrinter(fonts);
 
-        // Group Items by Category for PDF Layout
-        const grouped: Record<string, typeof model.items> = {};
-        const categories: string[] = [];
+        const content: Content[] = [];
 
-        // We can rely on the model being sorted by Category already,
-        // but explicit grouping ensures the PDF structure is robust.
-        for (const item of model.items) {
-            const cat = item.category || 'Uncategorized';
-            if (!grouped[cat]) {
-                grouped[cat] = [];
-                categories.push(cat);
-            }
-            grouped[cat].push(item);
-        }
-
-        // Build Table Body
-        const tableBody: any[] = [];
-
-        // Header Row
-        const headerRow = [
-            { text: 'Supplier', style: 'tableHeader' },
-            { text: 'Part', style: 'tableHeader' },
-            { text: 'Description', style: 'tableHeader' },
-            { text: 'Qty', style: 'tableHeader', alignment: 'right' },
-            { text: 'Unit', style: 'tableHeader', alignment: 'right' },
-            { text: 'Ext ($)', style: 'tableHeader', alignment: 'right' },
-            { text: 'Hrs', style: 'tableHeader', alignment: 'right' }
-        ];
-
-        // We will create one big table or separate tables?
-        // One big table handles page breaks better with repeated headers.
-        tableBody.push(headerRow);
-
-        categories.forEach(cat => {
-            // Category Header Row
-            tableBody.push([
-                { text: cat.toUpperCase(), style: 'categoryHeader', colSpan: 7, fillColor: '#f3f4f6' },
-                {}, {}, {}, {}, {}, {}
-            ]);
-
-            let catTotalCost = 0;
-            let catTotalHrs = 0;
-
-            // Items
-            grouped[cat].forEach(item => {
-                tableBody.push([
-                    item.supplier || '',
-                    item.partNumber,
-                    item.description,
-                    { text: formatQuantity(item.quantity), alignment: 'right' },
-                    { text: formatCurrency(item.unitCost, 4), alignment: 'right' },
-                    { text: formatCurrency(item.extendedCost), alignment: 'right' },
-                    { text: item.labourHours.toFixed(2), alignment: 'right' }
-                ]);
-                catTotalCost += item.extendedCost;
-                catTotalHrs += item.labourHours;
+        // Build content for each board
+        model.boards.forEach((board, boardIdx) => {
+            // 1. Board Section Title
+            content.push({
+                text: `BOARD: ${board.meta.boardName.toUpperCase()}`,
+                style: 'boardHeader',
+                margin: [0, boardIdx === 0 ? 0 : 25, 0, 10]
             });
 
-            // Subtotal Row
+            // 2. Group Items by Category
+            const grouped: Record<string, typeof board.items> = {};
+            const categories: string[] = [];
+            for (const item of board.items) {
+                const cat = item.category || 'Uncategorized';
+                if (!grouped[cat]) {
+                    grouped[cat] = [];
+                    categories.push(cat);
+                }
+                grouped[cat].push(item);
+            }
+
+            // 3. Build Table Body
+            const tableBody: any[] = [];
             tableBody.push([
-                { text: 'Subtotal', colSpan: 5, alignment: 'right', bold: true, italics: true },
-                {}, {}, {}, {},
-                { text: formatCurrency(catTotalCost), alignment: 'right', bold: true, italics: true },
-                { text: catTotalHrs.toFixed(2), alignment: 'right', bold: true, italics: true }
+                { text: 'Supplier', style: 'tableHeader' },
+                { text: 'Part', style: 'tableHeader' },
+                { text: 'Description', style: 'tableHeader' },
+                { text: 'Qty', style: 'tableHeader', alignment: 'right' },
+                { text: 'Unit ($)', style: 'tableHeader', alignment: 'right' },
+                { text: 'Ext ($)', style: 'tableHeader', alignment: 'right' },
+                { text: 'Hrs', style: 'tableHeader', alignment: 'right' }
             ]);
+
+            categories.forEach(cat => {
+                tableBody.push([
+                    { text: cat.toUpperCase(), style: 'categoryRow', colSpan: 7, fillColor: '#f9fafb' },
+                    {}, {}, {}, {}, {}, {}
+                ]);
+
+                grouped[cat].forEach(item => {
+                    tableBody.push([
+                        { text: item.supplier || '', fontSize: 7 },
+                        { text: item.partNumber, fontSize: 8 },
+                        { text: item.description, fontSize: 8 },
+                        { text: formatQuantity(item.quantity), alignment: 'right', fontSize: 8 },
+                        { text: formatCurrency(item.unitCost, 2), alignment: 'right', fontSize: 8 },
+                        { text: formatCurrency(item.extendedCost, 2), alignment: 'right', fontSize: 8 },
+                        { text: item.labourHours.toFixed(2), alignment: 'right', fontSize: 8 }
+                    ]);
+                });
+            });
+
+            // 4. Add the Table
+            content.push({
+                table: {
+                    headerRows: 1,
+                    widths: ['auto', '12%', '*', 'auto', 'auto', 'auto', 'auto'],
+                    body: tableBody
+                },
+                layout: {
+                    hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
+                    vLineWidth: () => 0,
+                    hLineColor: () => '#e5e7eb',
+                    paddingLeft: () => 4,
+                    paddingRight: () => 4,
+                    paddingTop: () => 2,
+                    paddingBottom: () => 2,
+                }
+            });
+
+            // 5. Board Subtotal
+            content.push({
+                stack: [
+                    {
+                        columns: [
+                            { text: '', width: '*' },
+                            {
+                                width: 'auto',
+                                table: {
+                                    widths: ['auto', 'auto'],
+                                    body: [
+                                        [
+                                            { text: `${board.meta.boardName} Subtotal:`, bold: true, fontSize: 9 },
+                                            { text: formatCurrency(board.totals.totalMaterialCost, 2), bold: true, fontSize: 9, alignment: 'right' }
+                                        ],
+                                        [
+                                            { text: 'Total Labour Hours:', italics: true, fontSize: 8, color: '#6b7280' },
+                                            { text: `${board.totals.totalLabourHours.toFixed(2)} hrs`, italics: true, fontSize: 8, alignment: 'right', color: '#6b7280' }
+                                        ]
+                                    ]
+                                },
+                                layout: 'noBorders'
+                            }
+                        ]
+                    }
+                ],
+                margin: [0, 8, 0, 0]
+            });
         });
 
-        // Grand Total Row
-        tableBody.push([
-            { text: 'GRAND TOTAL', colSpan: 5, alignment: 'right', bold: true, fillColor: '#e5e7eb' },
-            {}, {}, {}, {},
-            { text: formatCurrency(model.totals.totalMaterialCost), alignment: 'right', bold: true, fillColor: '#e5e7eb' },
-            { text: model.totals.totalLabourHours.toFixed(2), alignment: 'right', bold: true, fillColor: '#e5e7eb' }
-        ]);
+        // Grand Total Section (If more than 1 board)
+        if (model.boards.length > 1) {
+            content.push({
+                margin: [0, 20, 0, 0],
+                canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 1, lineColor: '#9ca3af' }]
+            });
+            content.push({
+                columns: [
+                    { text: '', width: '*' },
+                    {
+                        width: 'auto',
+                        margin: [0, 10, 0, 0],
+                        table: {
+                            body: [[
+                                { text: 'QUOTE GRAND TOTAL (Inc. All Boards)', bold: true, fontSize: 11, fillColor: '#f3f4f6', margin: [5, 5, 5, 5] },
+                                { text: formatCurrency(model.grandTotals.totalMaterialCost, 2), bold: true, fontSize: 11, alignment: 'right', fillColor: '#f3f4f6', margin: [5, 5, 5, 5] }
+                            ]]
+                        },
+                        layout: 'noBorders'
+                    }
+                ]
+            });
+        }
 
         const docDefinition: TDocumentDefinitions = {
             pageSize: 'A4',
             pageOrientation: 'portrait',
-            pageMargins: [40, 60, 40, 40],
-            header: {
-                margin: [40, 20, 40, 0],
-                columns: [
-                    { text: 'Bill of Materials', bold: true, fontSize: 14 },
-                    { text: model.meta.boardName, alignment: 'right', fontSize: 10, color: 'gray' }
-                ]
+            pageMargins: [40, 80, 40, 60],
+            header: (currentPage: number) => {
+                const headerLines: any[] = [];
+                
+                // Row 1: Quote No & Project Name (Hiding empty)
+                const row1Cols = [];
+                if (model.quoteNumber) row1Cols.push({ text: `QUOTE: ${model.quoteNumber}`, bold: true, fontSize: 12 });
+                if (model.projectName) row1Cols.push({ text: model.projectName.toUpperCase(), bold: true, fontSize: 12, alignment: 'right' });
+                if (row1Cols.length > 0) headerLines.push({ columns: row1Cols });
+
+                // Row 2: Client & Company (Hiding empty)
+                const row2Cols = [];
+                if (model.clientName) row2Cols.push({ text: `Client: ${model.clientName}`, fontSize: 9, color: '#4b5563' });
+                if (model.companyName) row2Cols.push({ text: `Company: ${model.companyName}`, fontSize: 9, color: '#4b5563', alignment: 'right' });
+                if (row2Cols.length > 0) headerLines.push({ columns: row2Cols, margin: [0, 2, 0, 0] });
+
+                return {
+                    stack: [
+                        ...headerLines,
+                        {
+                            margin: [0, 5, 0, 0],
+                            canvas: [{ type: 'line', x1: 0, y1: 0, x2: 515, y2: 0, lineWidth: 0.5, lineColor: '#e5e7eb' }]
+                        }
+                    ],
+                    margin: [40, 30, 40, 0]
+                };
             },
-            content: [
-                {
-                    text: `Generated: ${new Date().toLocaleString()}`,
-                    fontSize: 8,
-                    color: 'gray',
-                    margin: [0, 0, 0, 10]
-                },
-                {
-                    table: {
-                        headerRows: 1,
-                        widths: ['auto', '15%', '30%', 'auto', 'auto', 'auto', 'auto'], // Fixed-ish widths, can optimize
-                        // Optimization: 
-                        // Supplier: auto (fit content or wrap)
-                        // Part: 15%
-                        // Desc: * (star - takes remaining space)
-                        // Qty: auto
-                        // Unit: auto
-                        // Ext: auto
-                        // Hrs: auto
-                        // Let's rely on auto for most but force desc to take space
-                        // Actually pdfmake 'star' width is standard.
-                        // Let's try: ['15%', '15%', '*', 'auto', 'auto', 'auto', 'auto']
-                        body: tableBody
-                    },
-                    layout: {
-                        hLineWidth: (i: number, node: any) => (i === 0 || i === node.table.body.length) ? 1 : 0.5,
-                        vLineWidth: (i: number, node: any) => 0, // No vertical lines
-                        hLineColor: (i: number, node: any) => '#e5e7eb',
-                        paddingLeft: (i: number) => 4,
-                        paddingRight: (i: number) => 4,
-                        paddingTop: (i: number) => 2,
-                        paddingBottom: (i: number) => 2,
-                    }
-                }
-            ],
+            footer: (currentPage: number, pageCount: number) => {
+                return {
+                    columns: [
+                        { text: `Generated: ${new Date().toLocaleString()}`, fontSize: 7, color: '#9ca3af' },
+                        { text: `Page ${currentPage} of ${pageCount}`, alignment: 'right', fontSize: 8, color: '#9ca3af' }
+                    ],
+                    margin: [40, 20, 40, 0]
+                };
+            },
+            content: content,
             styles: {
+                boardHeader: {
+                    fontSize: 12,
+                    bold: true,
+                    color: '#1e40af', // Indigo-800
+                    background: '#eff6ff', // Blue-50
+                    margin: [0, 0, 0, 5]
+                },
                 tableHeader: {
                     bold: true,
-                    fontSize: 9,
-                    color: 'black',
+                    fontSize: 8,
+                    color: '#374151',
                     fillColor: '#f3f4f6'
                 },
-                categoryHeader: {
+                categoryRow: {
                     bold: true,
-                    fontSize: 10,
-                    margin: [0, 5, 0, 2]
-                },
-                defaultStyle: {
-                    fontSize: 8
+                    fontSize: 9,
+                    color: '#1f2937'
                 }
             },
             defaultStyle: {

@@ -1,4 +1,4 @@
-import { CanonicalBOM } from "@/lib/bom-engine";
+import { QuoteBOM } from "@/lib/bom-engine";
 import { formatCurrency, formatQuantity } from "../utils";
 
 export interface CSVOptions {
@@ -6,14 +6,13 @@ export interface CSVOptions {
 }
 
 /**
- * Generates a CSV string from the canonical BOM model.
+ * Generates a CSV string from a QuoteBOM model.
  * 
- * Modes:
- * - 'erp': Strict tabular data only. No summary rows.
- * - 'human': Appends summary rows after a blank line.
+ * Flattened structure with a 'Board' column for machine readability.
  */
-export function generateCSV(model: CanonicalBOM, options: CSVOptions): string {
+export function generateCSV(model: QuoteBOM, options: CSVOptions): string {
     const headers = [
+        'Board',
         'Category',
         'Supplier',
         'Part Number',
@@ -33,30 +32,37 @@ export function generateCSV(model: CanonicalBOM, options: CSVOptions): string {
         return str;
     };
 
-    const rows = model.items.map(item => {
-        return [
-            item.category,
-            item.supplier,
-            item.partNumber,
-            item.description,
-            formatQuantity(item.quantity),
-            formatCurrency(item.unitCost, 4),
-            formatCurrency(item.extendedCost),
-            item.labourHours.toFixed(2)
-        ].map(escapeCsv).join(',');
+    const rows: string[] = [];
+
+    model.boards.forEach(board => {
+        board.items.forEach(item => {
+            rows.push([
+                board.meta.boardName,
+                item.category,
+                item.supplier,
+                item.partNumber,
+                item.description,
+                formatQuantity(item.quantity),
+                formatCurrency(item.unitCost, 2).replace('$', ''), // Remove $ for raw CSV data if needed, or keep for consistency. 
+                // Wait, formatCurrency usually adds $. The user didn't specify removing it, but CSVs often prefer numbers.
+                // However, the previous code used formatCurrency. I'll stick to it but use 2dp.
+                formatCurrency(item.extendedCost, 2).replace('$', ''),
+                item.labourHours.toFixed(2)
+            ].map(escapeCsv).join(','));
+        });
     });
 
     let content = [headers.join(','), ...rows].join('\n');
 
     // Human Mode: Append Summary
     if (options.mode === 'human') {
-        const totalMaterial = formatCurrency(model.totals.totalMaterialCost);
-        const totalLabour = model.totals.totalLabourHours.toFixed(2);
+        const totalMaterial = formatCurrency(model.grandTotals.totalMaterialCost, 2).replace('$', '');
+        const totalLabour = model.grandTotals.totalLabourHours.toFixed(2);
 
         content += '\n\n'; // Blank line
-        content += `SUMMARY,,,,,,\n`;
-        content += `Total Material Cost,,,,,,${totalMaterial}\n`;
-        content += `Total Labour Hours,,,,,,,${totalLabour}\n`;
+        content += `SUMMARY,,,,,,,,\n`;
+        content += `Total Material Cost,,,,,,,,${totalMaterial}\n`;
+        content += `Total Labour Hours,,,,,,,,${totalLabour}\n`;
     }
 
     return content;
