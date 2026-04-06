@@ -1,4 +1,5 @@
 import { CanonicalBOM } from "@/lib/bom-engine";
+import { formatCurrency, formatQuantity } from "../utils";
 
 export interface CSVOptions {
     mode: 'erp' | 'human';
@@ -38,9 +39,9 @@ export function generateCSV(model: CanonicalBOM, options: CSVOptions): string {
             item.supplier,
             item.partNumber,
             item.description,
-            item.quantity,
-            item.unitCost.toFixed(4),     // Formatting happens HERE
-            item.extendedCost.toFixed(2), // Formatting happens HERE
+            formatQuantity(item.quantity),
+            formatCurrency(item.unitCost, 4),
+            formatCurrency(item.extendedCost),
             item.labourHours.toFixed(2)
         ].map(escapeCsv).join(',');
     });
@@ -49,12 +50,12 @@ export function generateCSV(model: CanonicalBOM, options: CSVOptions): string {
 
     // Human Mode: Append Summary
     if (options.mode === 'human') {
-        const totalMaterial = model.totals.totalMaterialCost.toFixed(2);
+        const totalMaterial = formatCurrency(model.totals.totalMaterialCost);
         const totalLabour = model.totals.totalLabourHours.toFixed(2);
 
         content += '\n\n'; // Blank line
         content += `SUMMARY,,,,,,\n`;
-        content += `Total Material Cost,,,,,,${totalMaterial},\n`;
+        content += `Total Material Cost,,,,,,${totalMaterial}\n`;
         content += `Total Labour Hours,,,,,,,${totalLabour}\n`;
     }
 

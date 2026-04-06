@@ -1,4 +1,5 @@
 import { Item } from "@/context/QuoteContext";
+import { consolidateItems } from "./items/consolidation";
 
 export interface BomItem {
     category: string;
@@ -26,81 +27,35 @@ export interface CanonicalBOM {
 /**
  * Generates a deterministic, canonical BOM model from board items.
  * 
- * - Aggregation Key: PartNumber + UnitPrice (toFixed(4))
- * - Values: Raw numbers (no rounding)
- * - Sorting: Category -> Supplier -> PartNumber
+ * Uses the Consolidation Layer to resolve duplicates.
  */
 export function generateCanonicalBOM(
     items: Item[],
     brandLookup: Record<string, string>,
     boardName: string
 ): CanonicalBOM {
-    const aggregation: Record<string, BomItem> = {};
+    const consolidated = consolidateItems(items);
+    
     let totalMaterialCost = 0;
     let totalLabourHours = 0;
 
-    for (const item of items) {
-        // Exclude items with <= 0 quantity
-        if (item.quantity <= 0) continue;
+    const resultItems: BomItem[] = consolidated.map(item => {
+        const itemExtendedCost = item.cost;
+        const itemLabourHoursTotal = item.labourHours * item.quantity;
 
-        const partNumber = item.partNumber || item.name || 'UNKNOWN';
-        const unitPrice = item.unitPrice || 0;
-
-        // Composite Key for Aggregation: PartNumber + Normalized Price
-        // Using 4dp for key generation ONLY to prevent float key mismatches
-        const priceKey = unitPrice.toFixed(4);
-        const compositeKey = `${partNumber}::${priceKey}`;
-
-        if (!aggregation[compositeKey]) {
-            // Initialize
-            const brand = brandLookup[partNumber] || null;
-
-            aggregation[compositeKey] = {
-                category: item.category || 'Uncategorized',
-                supplier: brand, // Map Brand -> Supplier field
-                partNumber: partNumber,
-                description: item.description || item.name,
-                quantity: 0,
-                unitCost: unitPrice, // Store raw unit price
-                extendedCost: 0,
-                labourHours: 0
-            };
-        }
-
-        // Aggregate
-        const bomItem = aggregation[compositeKey];
-        bomItem.quantity += item.quantity;
-
-        const itemExtendedCost = item.quantity * unitPrice;
-        const itemLabourHours = item.quantity * (item.labourHours || 0);
-
-        bomItem.extendedCost += itemExtendedCost;
-        bomItem.labourHours += itemLabourHours;
-
-        // Accumulate Grand Totals
         totalMaterialCost += itemExtendedCost;
-        totalLabourHours += itemLabourHours;
-    }
+        totalLabourHours += itemLabourHoursTotal;
 
-    // Convert to Array
-    const resultItems = Object.values(aggregation);
-
-    // Deterministic Sort
-    resultItems.sort((a, b) => {
-        // 1. Category (A-Z)
-        const catA = (a.category || '').toLowerCase();
-        const catB = (b.category || '').toLowerCase();
-        if (catA !== catB) return catA.localeCompare(catB);
-
-        // 2. Supplier (A-Z)
-        const supA = (a.supplier || '').toLowerCase();
-        const supB = (b.supplier || '').toLowerCase();
-        if (supA !== supB) return supA.localeCompare(supB);
-
-        // 3. Part Number (A-Z)
-        const partA = (a.partNumber || '').toLowerCase();
-        const partB = (b.partNumber || '').toLowerCase();
-        return partA.localeCompare(partB);
+        return {
+            category: item.category || 'Uncategorized',
+            supplier: brandLookup[item.partNumber || item.name || ''] || null,
+            partNumber: item.partNumber || item.name || 'UNKNOWN',
+            description: item.description || item.name,
+            quantity: item.quantity,
+            unitCost: item.unitPrice,
+            extendedCost: itemExtendedCost,
+            labourHours: itemLabourHoursTotal
+        };
     });
 
     return {

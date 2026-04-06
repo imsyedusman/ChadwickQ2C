@@ -1,4 +1,6 @@
 import { Item } from "@/context/QuoteContext";
+import { consolidateItems } from "./items/consolidation";
+import { formatCurrency, formatQuantity } from "./utils";
 
 export interface BOMItem {
     category: string;
@@ -17,77 +19,23 @@ export interface BOMOptions {
 
 /**
  * Generates a deterministic BOM from a list of board items.
- * 
- * Aggregation Key: PartNumber + UnitPrice (toFixed(4))
- * Sorting: Category -> Supplier -> PartNumber
+ * Forces consolidation as per system requirement.
+ * Sorting: Category -> Supplier -> PartNumber (handled by consolidation utility)
  */
 export function generateBoardBom(items: Item[], brandLookup: Record<string, string>, options?: BOMOptions): BOMItem[] {
-    const aggregation: Record<string, BOMItem> = {};
-
-    for (const item of items) {
-        // Skip items with <= 0 quantity
-        if (item.quantity <= 0) continue;
-
-        const partNumber = item.partNumber || item.name || 'UNKNOWN';
-        const unitPrice = item.unitPrice || 0;
-
-        // Composite Key for Aggregation: PartNumber + Normalized Price
-        // This ensures we don't merge items with different cost bases
-        const priceKey = unitPrice.toFixed(4);
-        const compositeKey = `${partNumber}::${priceKey}`;
-
-        if (!aggregation[compositeKey]) {
-            // Initialize
-            const brand = brandLookup[partNumber] || null;
-
-            aggregation[compositeKey] = {
-                category: item.category || 'Uncategorized',
-                supplier: brand, // Map Brand -> Supplier field
-                partNumber: partNumber,
-                description: item.description || item.name,
-                quantity: 0,
-                unitCost: unitPrice,
-                extendedCost: 0,
-                labourHours: 0
-            };
-        }
-
-        // Aggregate
-        const bomItem = aggregation[compositeKey];
-        bomItem.quantity += item.quantity;
-        bomItem.extendedCost += (item.quantity * unitPrice);
-        bomItem.labourHours += (item.quantity * (item.labourHours || 0));
-    }
-
-    // Convert to Array
-    const result = Object.values(aggregation);
-
-    // Deterministic Sort
-    result.sort((a, b) => {
-        // 1. Category (A-Z)
-        const catA = (a.category || '').toLowerCase();
-        const catB = (b.category || '').toLowerCase();
-        if (catA !== catB) return catA.localeCompare(catB);
-
-        // 2. Supplier (A-Z) - Nulls last or first? Usually empty strings effectively.
-        const supA = (a.supplier || '').toLowerCase();
-        const supB = (b.supplier || '').toLowerCase();
-        if (supA !== supB) return supA.localeCompare(supB);
-
-        // 3. Part Number (A-Z)
-        const partA = (a.partNumber || '').toLowerCase();
-        const partB = (b.partNumber || '').toLowerCase();
-        return partA.localeCompare(partB);
-    });
-
-    // Final Polish: Ensure extendedCost is 2dp (already numbers, but for cleanliness)
-    // Actually, we'll handle formatting in CSV string generation.
-    // However, JS float math might need rounding.
-    for (const item of result) {
-        item.extendedCost = Math.round(item.extendedCost * 100) / 100;
-    }
-
-    return result;
+    // FORCE CONSOLIDATION as per critical requirements
+    const consolidated = consolidateItems(items);
+    
+    return consolidated.map(item => ({
+        category: item.category || 'Uncategorized',
+        supplier: brandLookup[item.partNumber || item.name || ''] || null,
+        partNumber: item.partNumber || item.name || 'UNKNOWN',
+        description: item.description || item.name,
+        quantity: item.quantity,
+        unitCost: item.unitPrice,
+        extendedCost: item.cost,
+        labourHours: item.labourHours * item.quantity 
+    }));
 }
 
 /**
@@ -121,9 +69,9 @@ export function toCSV(bomItems: BOMItem[]): string {
             item.supplier,
             item.partNumber,
             item.description,
-            item.quantity,
-            item.unitCost.toFixed(4),     // 4 decimals for unit cost accuracy
-            item.extendedCost.toFixed(2), // 2 decimals for total validation
+            formatQuantity(item.quantity),
+            formatCurrency(item.unitCost),
+            formatCurrency(item.extendedCost),
             item.labourHours.toFixed(2)
         ].map(escapeCsv).join(',');
     });

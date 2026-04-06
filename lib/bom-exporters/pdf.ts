@@ -4,6 +4,7 @@ const PdfPrinterModule = require('pdfmake/js/Printer');
 const PdfPrinter = PdfPrinterModule.default || PdfPrinterModule;
 import { TDocumentDefinitions, StyleDictionary, Content } from 'pdfmake/interfaces';
 import { CanonicalBOM } from '../bom-engine';
+import { formatCurrency, formatQuantity } from '../utils';
 import path from 'path';
 
 // Define fonts with absolute paths for Node runtime consistency
@@ -79,9 +80,9 @@ export function generatePDF(model: CanonicalBOM): Promise<Buffer> {
                     item.supplier || '',
                     item.partNumber,
                     item.description,
-                    { text: item.quantity.toString(), alignment: 'right' },
-                    { text: item.unitCost.toFixed(4), alignment: 'right' },
-                    { text: item.extendedCost.toFixed(2), alignment: 'right' },
+                    { text: formatQuantity(item.quantity), alignment: 'right' },
+                    { text: formatCurrency(item.unitCost, 4), alignment: 'right' },
+                    { text: formatCurrency(item.extendedCost), alignment: 'right' },
                     { text: item.labourHours.toFixed(2), alignment: 'right' }
                 ]);
                 catTotalCost += item.extendedCost;
@@ -92,7 +93,7 @@ export function generatePDF(model: CanonicalBOM): Promise<Buffer> {
             tableBody.push([
                 { text: 'Subtotal', colSpan: 5, alignment: 'right', bold: true, italics: true },
                 {}, {}, {}, {},
-                { text: catTotalCost.toFixed(2), alignment: 'right', bold: true, italics: true },
+                { text: formatCurrency(catTotalCost), alignment: 'right', bold: true, italics: true },
                 { text: catTotalHrs.toFixed(2), alignment: 'right', bold: true, italics: true }
             ]);
         });
@@ -101,7 +102,7 @@ export function generatePDF(model: CanonicalBOM): Promise<Buffer> {
         tableBody.push([
             { text: 'GRAND TOTAL', colSpan: 5, alignment: 'right', bold: true, fillColor: '#e5e7eb' },
             {}, {}, {}, {},
-            { text: model.totals.totalMaterialCost.toFixed(2), alignment: 'right', bold: true, fillColor: '#e5e7eb' },
+            { text: formatCurrency(model.totals.totalMaterialCost), alignment: 'right', bold: true, fillColor: '#e5e7eb' },
             { text: model.totals.totalLabourHours.toFixed(2), alignment: 'right', bold: true, fillColor: '#e5e7eb' }
         ]);
 

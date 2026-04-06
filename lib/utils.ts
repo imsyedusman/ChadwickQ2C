@@ -12,10 +12,26 @@ export function cn(...inputs: ClassValue[]) {
  * @returns Formatted string like "$1,234.56"
  */
 export function formatCurrency(value: number, decimals: number = 2): string {
+  if (isNaN(value) || value === null) return "$0.00";
   return `$${value.toLocaleString('en-US', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals
   })}`;
+}
+
+/**
+ * Format a quantity for display.
+ * Removes unnecessary trailing zeros and handles nulls.
+ * e.g. 5.000 -> 5, 5.120 -> 5.12, 1234 -> 1,234
+ */
+export function formatQuantity(value: number): string {
+    if (isNaN(value) || value === null) return "0";
+    
+    // Use toLocaleString for thousands separators
+    return Number(value).toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 3 // Standard for the Decimal(10,3) in DB
+    });
 }
 
 /**

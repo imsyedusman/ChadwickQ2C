@@ -10,6 +10,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
+import { consolidateItems, ConsolidatedItem } from '@/lib/items/consolidation';
 import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
 import ManualItemForm from './ManualItemForm';
@@ -100,7 +101,18 @@ interface BoardContentProps {
 }
 
 export default function BoardContent({ onAddItems }: BoardContentProps) {
-    const { boards, selectedBoardId, updateItem, removeItem, effectiveSettings, quoteId, refreshQuote, addItemToBoard, updateBoardDetails } = useQuote();
+    const { 
+        boards, selectedBoardId, updateItem, effectiveSettings, 
+        quoteId, refreshQuote, addItemToBoard, updateBoardDetails,
+        viewMode, setViewMode, removeItem
+    } = useQuote();
+
+    // Force consolidated mode on mount if not already set
+    useEffect(() => {
+        if (viewMode !== 'consolidated') {
+            setViewMode('consolidated');
+        }
+    }, [viewMode, setViewMode]);
     const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
     const [showManualForm, setShowManualForm] = useState(false);
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -158,7 +170,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         );
     }
 
-    const items = selectedBoard.items || [];
+    const itemsRaw = selectedBoard.items || [];
+    const items = consolidateItems(itemsRaw);
 
     // Group items by master category (Basics, Switchboards, Busbars, Other)
     const groupedByMasterCategory = items.reduce((acc, item) => {
@@ -199,10 +212,46 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
 
 
 
-    const handleQuantityChange = (itemId: string, newQty: number) => {
-        // Ensure quantity is valid (>= 0, allow decimals)
-        const validQty = Math.max(0, newQty);
-        updateItem(itemId, { quantity: validQty });
+    const handleQuantityChange = async (itemId: string, newQty: number) => {
+        if (newQty < 0) return;
+        
+        const targetItem = items.find(i => i.id === itemId) as ConsolidatedItem;
+        if (!targetItem) return;
+
+        if (targetItem.isConsolidated && targetItem.originalIds && targetItem.originalIds.length > 1) {
+            // Multi-item update: Update first, delete others, break system link
+            const [firstId, ...otherIds] = targetItem.originalIds;
+            
+            // 1. Update first item to total quantity and make it manual
+            await updateItem(firstId, { 
+                quantity: newQty,
+                systemTag: null,
+                isSystemManaged: false
+            } as any);
+
+            // 2. Remove other items
+            for (const id of otherIds) {
+                await removeItem(id);
+            }
+        } else {
+            // Single item update
+            await updateItem(itemId, { quantity: newQty });
+        }
+    };
+
+    const handleRemoveItem = async (itemId: string) => {
+        const targetItem = items.find(i => i.id === itemId) as ConsolidatedItem;
+        if (!targetItem) return;
+
+        if (targetItem.isConsolidated && targetItem.originalIds && targetItem.originalIds.length > 1) {
+            // Multi-item delete
+            if (!confirm(`This will remove all ${targetItem.originalIds.length} merged instances of this part. Continue?`)) return;
+            for (const id of targetItem.originalIds) {
+                await removeItem(id);
+            }
+        } else {
+            await removeItem(itemId);
+        }
     };
 
     const renderItemRow = (item: Item, isGhost = false) => {
@@ -303,8 +352,8 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
         const isAutoAccessory = (item as any).autoAdded === true || item.systemTag === 'MCCB_ACCESSORIES';
         
         // Switchgear auto-items should be UNLOCKED as per user request
-        const isQtyLocked = !!autoManaged && !isAutoAccessory && !isSwitchgear;
-        const isDeleteLocked = !!autoManaged && !isAutoAccessory && !isSwitchgear;
+        const isQtyLocked = (!!autoManaged && !isAutoAccessory && !isSwitchgear);
+        const isDeleteLocked = false; // Always allow delete in summary view
 
         // Determine Tooltip Text
         let lockTooltip = "";
@@ -353,6 +402,17 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
                             {item.description || item.name}
                         </div>
+                        {(item as ConsolidatedItem).isConsolidated && (
+                            <span className="inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/10">
+                                Aggregated
+                            </span>
+                        )}
+                        {(item as ConsolidatedItem).pricingWarning && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-inset ring-red-600/10" title="Warning: Multiple prices found for this part number. Showing price group.">
+                                <Info size={8} />
+                                Price Mismatch
+                            </span>
+                        )}
                         {isCopper && (
                             <div className="flex items-center gap-1">
                                 <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
@@ -410,15 +470,6 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                 >
                     <button
                         onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - (isCopper ? 0.1 : 1))}
-                        // Note: Busbars might need decimal decrement. 
-                        // But wait, the original code had `- 1`.
-                        // I should probably make the step context aware or just use input.
-                        // I'll leave the button as -1 for now unless user asked for step change on buttons?
-                        // User: "Decimal qty supported (parseFloat)".
-                        // "Change Busbar length (decimal)".
-                        // Buttons usually do integer steps, but for busbars 0.1 might be better?
-                        // The prompt didn't strictly specify button step, but `ItemSelection` has specific logic.
-                        // I will assume the input is the primary method for decimals.
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
@@ -515,7 +566,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         </button>
                     </SystemItemHoverCard>
                 )}
-                {!isNSX100Handle && !isDeleteLocked && (
+                {!isNSX100Handle && (
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         {item.category === 'Other' && (
                             <button
@@ -527,7 +578,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                             </button>
                         )}
                         <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => handleRemoveItem(item.id)}
                             className="text-gray-300 hover:text-red-500 p-1 rounded"
                             title="Remove item"
                         >
@@ -673,10 +724,15 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             <div className="flex flex-col h-full bg-gray-50/30">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <div>
-                    <h3 className="font-bold text-gray-800">{selectedBoard.name}</h3>
-                    <p className="text-xs text-gray-500">{items.length} items selected</p>
+                    <h3 className="text-sm font-bold text-gray-900 group-flex items-center gap-2">
+                        {selectedBoard.name} 
+                        <span className="text-[10px] font-normal text-gray-400 ml-2">Summary View</span>
+                    </h3>
+                    <p className="text-xs text-gray-500">{items.length} line items</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    {/* View Toggle Removed - Forcing Summary View */}
+
                     {onAddItems && (
                         <button
                             onClick={() => {

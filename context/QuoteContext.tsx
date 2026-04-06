@@ -39,6 +39,7 @@ export interface Item {
     quantity: number;
     unitPrice: number;
     labourHours: number;
+    cost: number;
     notes: string | null;
     isDefault?: boolean;
     isSheetmetal?: boolean;
@@ -47,6 +48,7 @@ export interface Item {
     systemTag?: string | null;
     partNumber?: string | null;
     systemRuleType?: string | null; // Provenance Rule ID
+    mergeable?: boolean;
 
     // Dynamic Pricing (Optional)
     totalCopperWeightKgPerMeter?: number | null;
@@ -150,6 +152,8 @@ interface QuoteContextType {
     updateUiState: (key: string, value: any) => void;
     updateBoardConfig: (boardId: string, config: any) => Promise<void>;
     updateBoardDetails: (boardId: string, updates: Partial<Board>) => Promise<void>;
+    viewMode: 'raw' | 'consolidated';
+    setViewMode: (mode: 'raw' | 'consolidated') => void;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -175,6 +179,13 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const setSelectedBoardId = (id: string | null) => {
         _setSelectedBoardId(id);
         updateUiState('lastSelectedBoardId', id);
+    };
+
+    const [viewMode, _setViewMode] = useState<'raw' | 'consolidated'>('consolidated');
+
+    const setViewMode = (mode: 'raw' | 'consolidated') => {
+        _setViewMode(mode);
+        updateUiState('viewMode', mode);
     };
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
@@ -309,6 +320,18 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 if (selectedBoardId !== boardToSelect) {
                     setSelectedBoardId(boardToSelect);
                 }
+
+                // Restore viewMode
+                try {
+                    const storageKey = `chadwick_ui_state_${quoteId}`;
+                    const savedState = localStorage.getItem(storageKey);
+                    if (savedState) {
+                        const parsed = JSON.parse(savedState);
+                        if (parsed.viewMode) {
+                            _setViewMode(parsed.viewMode);
+                        }
+                    }
+                } catch (e) {}
             }
         } catch (error) {
             console.error('Failed to fetch quote data', error);
@@ -706,6 +729,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateUiState,
                 updateBoardConfig,
                 updateBoardDetails,
+                viewMode,
+                setViewMode,
             }}
         >
             {children}

@@ -294,6 +294,7 @@ model Item {
   autoAdded       Boolean  @default(false)
   parentItemId    String?
   isIncluded      Boolean  @default(true)
+  mergeable       Boolean  @default(true)
   board           Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
   parentItem      Item?    @relation("ItemDependencies", fields: [parentItemId], references: [id], onDelete: Cascade)
   children        Item[]   @relation("ItemDependencies")
