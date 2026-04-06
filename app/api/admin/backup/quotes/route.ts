@@ -43,7 +43,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid backup file format' }, { status: 400 });
         }
 
-        const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const result = await prisma.$transaction(async (tx) => {
             let createdCount = 0;
             let updatedCount = 0;
 

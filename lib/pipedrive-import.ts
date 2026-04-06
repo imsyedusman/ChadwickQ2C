@@ -147,7 +147,7 @@ export async function syncPipedriveData(
     try {
         heartbeatTimer = setInterval(updateHeartbeat, HEARTBEAT_INTERVAL_MS);
 
-        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await prisma.$transaction(async (tx) => {
             if (options.mode === 'REPLACE') {
                 const linkedCount = await tx.quote.count({ where: { project: { source } } });
                 if (linkedCount > 0) throw new Error(`Replace blocked: ${linkedCount} quotes exist.`);
