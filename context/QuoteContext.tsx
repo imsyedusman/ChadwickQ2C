@@ -73,6 +73,7 @@ export interface Board {
 }
 
 export interface BoardTotals {
+    baseMaterialCost: number;
     materialCost: number;
     labourHours: number;
     labourCost: number;
@@ -112,6 +113,7 @@ interface QuoteContextType {
     totals: BoardTotals;
     allBoardTotals: Record<string, BoardTotals>;
     grandTotals: {
+        baseMaterialCost: number;
         materialCost: number;
         labourHours: number;
         labourCost: number;
@@ -359,7 +361,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
     const calculateTotals = () => {
         const emptyTotals: BoardTotals = {
-            materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+            baseMaterialCost: 0, materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
             costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
             sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
         };

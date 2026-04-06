@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Item } from '../../context/QuoteContext';
+import { Item, useQuote } from '../../context/QuoteContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -15,6 +15,11 @@ interface Bucket {
 
 const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const { totals } = useQuote();
+
+    // AUTHORITATIVE TOTALS FROM SINGLE SOURCE OF TRUTH
+    const totalBoardLabour = totals.labourHours;
+    const totalBoardCost = totals.baseMaterialCost;
 
     // -------------------------------------------------------------------------
     // HIERARCHY-SAFE DETERMINISTIC AGGREGATION
@@ -31,16 +36,10 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
         other: { items: [], labour: 0, cost: 0 }
     };
 
-    let totalBoardLabour = 0;
-    let totalBoardCost = 0;
-
     items.forEach(item => {
         const qty = Number(item.quantity) || 0;
         const labour = qty * (item.labourHours || 0);
         const cost = qty * (item.unitPrice || 0);
-
-        totalBoardLabour += labour;
-        totalBoardCost += cost;
 
         const cat = (item.category || '').toLowerCase();
         const subcat = (item.subcategory || '').toLowerCase();

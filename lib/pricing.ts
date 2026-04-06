@@ -81,6 +81,7 @@ export interface PricingSettings {
 }
 
 export interface PricingBoardTotals {
+    baseMaterialCost: number;
     materialCost: number;
     labourHours: number;
     labourCost: number;
@@ -212,6 +213,7 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
     const sellPriceRounded = preAdjustmentRounded + priceAdjustmentsTotal;
 
     return {
+        baseMaterialCost,
         materialCost,
         labourHours,
         labourCost,
@@ -247,6 +249,7 @@ export function calculateQuoteTotals(boards: PricingBoard[], settings: PricingSe
     });
 
     const grandTotalBase = boardResults.reduce((acc, curr) => ({
+        baseMaterialCost: acc.baseMaterialCost + curr.baseMaterialCost,
         materialCost: acc.materialCost + curr.materialCost,
         labourHours: acc.labourHours + curr.labourHours,
         labourCost: acc.labourCost + curr.labourCost,
@@ -262,7 +265,7 @@ export function calculateQuoteTotals(boards: PricingBoard[], settings: PricingSe
         sheetmetalUplift: acc.sheetmetalUplift + curr.sheetmetalUplift,
         cubicSubtotal: acc.cubicSubtotal + curr.cubicSubtotal
     }), {
-        materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
+        baseMaterialCost: 0, materialCost: 0, labourHours: 0, labourCost: 0, consumablesCost: 0,
         costBase: 0, overheadAmount: 0, engineeringCost: 0, totalCost: 0, profit: 0,
         sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
     });

@@ -47,7 +47,7 @@ export function generateCanonicalBOM(
     brandLookup: Record<string, string>,
     boardName: string
 ): CanonicalBOM {
-    const consolidated = consolidateItems(items);
+    const consolidated = consolidateItems(items).filter(i => i.subcategory !== 'Price Adjustment');
     
     let totalMaterialCost = 0;
     let totalLabourHours = 0;

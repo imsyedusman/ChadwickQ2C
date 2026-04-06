@@ -44,7 +44,8 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
             const grouped: Record<string, typeof board.items> = {};
             const categories: string[] = [];
             for (const item of board.items) {
-                const cat = item.category || 'Uncategorized';
+                const rawCat = item.category || 'Uncategorized';
+                const cat = rawCat === 'Switchboard' ? 'Switchgear' : rawCat;
                 if (!grouped[cat]) {
                     grouped[cat] = [];
                     categories.push(cat);
@@ -113,7 +114,7 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
                                     widths: ['auto', 'auto'],
                                     body: [
                                         [
-                                            { text: `${board.meta.boardName} Subtotal:`, bold: true, fontSize: 9 },
+                                            { text: `Material Subtotal (Board: ${board.meta.boardName}):`, bold: true, fontSize: 9 },
                                             { text: formatCurrency(board.totals.totalMaterialCost, 2), bold: true, fontSize: 9, alignment: 'right' }
                                         ],
                                         [
@@ -145,7 +146,7 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
                         margin: [0, 10, 0, 0],
                         table: {
                             body: [[
-                                { text: 'QUOTE GRAND TOTAL (Inc. All Boards)', bold: true, fontSize: 11, fillColor: '#f3f4f6', margin: [5, 5, 5, 5] },
+                                { text: 'Total Material Cost (All Boards)', bold: true, fontSize: 11, fillColor: '#f3f4f6', margin: [5, 5, 5, 5] },
                                 { text: formatCurrency(model.grandTotals.totalMaterialCost, 2), bold: true, fontSize: 11, alignment: 'right', fillColor: '#f3f4f6', margin: [5, 5, 5, 5] }
                             ]]
                         },
@@ -162,16 +163,30 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
             header: (currentPage: number) => {
                 const headerLines: any[] = [];
                 
-                // Row 1: Quote No & Project Name (Hiding empty)
-                const row1Cols = [];
-                if (model.quoteNumber) row1Cols.push({ text: `QUOTE: ${model.quoteNumber}`, bold: true, fontSize: 12 });
-                if (model.projectName) row1Cols.push({ text: model.projectName.toUpperCase(), bold: true, fontSize: 12, alignment: 'right' });
+                // Row 1: Quote No & Project Name (Hiding empty robustly)
+                const row1Cols: any[] = [];
+                if (model.quoteNumber && model.projectName) {
+                    row1Cols.push({ text: `QUOTE: ${model.quoteNumber}`, bold: true, fontSize: 12, width: '*' });
+                    row1Cols.push({ text: model.projectName.toUpperCase(), bold: true, fontSize: 12, alignment: 'right', width: 'auto' });
+                } else if (model.quoteNumber) {
+                    row1Cols.push({ text: `QUOTE: ${model.quoteNumber}`, bold: true, fontSize: 12, width: '*' });
+                } else if (model.projectName) {
+                    row1Cols.push({ text: model.projectName.toUpperCase(), bold: true, fontSize: 12, alignment: 'right', width: '*' });
+                }
+
                 if (row1Cols.length > 0) headerLines.push({ columns: row1Cols });
 
-                // Row 2: Client & Company (Hiding empty)
-                const row2Cols = [];
-                if (model.clientName) row2Cols.push({ text: `Client: ${model.clientName}`, fontSize: 9, color: '#4b5563' });
-                if (model.companyName) row2Cols.push({ text: `Company: ${model.companyName}`, fontSize: 9, color: '#4b5563', alignment: 'right' });
+                // Row 2: Client & Company (Hiding empty robustly)
+                const row2Cols: any[] = [];
+                if (model.clientName && model.companyName) {
+                    row2Cols.push({ text: `Client: ${model.clientName}`, fontSize: 9, color: '#4b5563', width: '*' });
+                    row2Cols.push({ text: `Company: ${model.companyName}`, fontSize: 9, color: '#4b5563', alignment: 'right', width: 'auto' });
+                } else if (model.clientName) {
+                    row2Cols.push({ text: `Client: ${model.clientName}`, fontSize: 9, color: '#4b5563', width: '*' });
+                } else if (model.companyName) {
+                    row2Cols.push({ text: `Company: ${model.companyName}`, fontSize: 9, color: '#4b5563', alignment: 'right', width: '*' });
+                }
+
                 if (row2Cols.length > 0) headerLines.push({ columns: row2Cols, margin: [0, 2, 0, 0] });
 
                 return {
