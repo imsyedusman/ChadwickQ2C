@@ -8,9 +8,9 @@ import { logAction } from '@/lib/audit';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 import { prepareBoardCloneData } from '@/lib/board-service';
 import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedrive-sync-utils';
-import { calculateQuoteTotals } from '@/lib/pricing';
-import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
+import { getGlobalSettings, getEffectiveSettingsForQuote, ensureQuoteSnapshot } from '@/lib/settings-service';
 import { getResolvedUserId } from '@/lib/user-utils';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export async function POST(
     request: Request,
@@ -167,11 +167,11 @@ export async function POST(
             });
         });
 
-        // 2. FETCH SETTINGS FOR CALCULATION (Safe Defaults)
-        const effectiveSettings = await getEffectiveSettingsForQuote(newQuote);
-        
-        // 3. ATOMIC RECALCULATION & UPDATE (Ensures totalExGST is saved immediately)
-        const { grandTotals } = calculateQuoteTotals(newQuote.boards as any, effectiveSettings);
+        // 1. Ensure Snapshot is frozen
+        await ensureQuoteSnapshot(newQuote.id);
+
+        // 2. Perform a fresh calculation with frozen settings using the definitive source of truth
+        const { grandTotals } = await calculateQuoteTotalsServerSide(newQuote);
 
         // Resolve valid user ID for lastModifiedBy (prevents P2003)
         const session = await getServerSession(authOptions);

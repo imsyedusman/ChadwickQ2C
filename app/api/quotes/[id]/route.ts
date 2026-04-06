@@ -8,6 +8,8 @@ import { logAction } from '@/lib/audit';
 import { getResolvedUserId } from '@/lib/user-utils';
 import { enrichItems } from '@/lib/enrichment';
 import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedrive-sync-utils';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
+import { ensureQuoteSnapshot } from '@/lib/settings-service';
 
 export async function GET(
     request: Request,
@@ -47,9 +49,16 @@ export async function GET(
             items: board.items.map((item: any) => itemMap.get(item.id) || item)
         }));
 
-        return NextResponse.json({
+        // 3. Calculate Totals using the definitive source of truth
+        const calculatedTotals = await calculateQuoteTotalsServerSide({
             ...quote,
             boards: enrichedBoards
+        });
+
+        return NextResponse.json({
+            ...quote,
+            boards: enrichedBoards,
+            calculatedTotals
         });
 
     } catch (error) {
@@ -114,7 +123,7 @@ export async function PUT(
         
         const existingQuote: any = await prisma.quote.findUnique({
             where: { id },
-            select: { quoteNumber: true, createdBy: true }
+            select: { quoteNumber: true, createdBy: true, settingsSnapshot: true } // Include snapshot check
         } as any);
 
         if (!existingQuote) {
@@ -131,10 +140,15 @@ export async function PUT(
         // Handle Pipedrive Upserts if IDs provided
         const updateData: any = {
             ...Object.fromEntries(
-                Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier', 'pipedrive_org_id', 'pipedrive_person_id' ].includes(key))
+                Object.entries(body).filter(([key]) => ![ 'id', 'createdAt', 'updatedAt', 'boards', 'creator', 'modifier', 'pipedrive_org_id', 'pipedrive_person_id', 'settingsSnapshot' ].includes(key))
             ),
             lastModifiedBy: resolvedUserId,
         };
+
+        // Snapshot Freezing Constraint: Never overwrite an existing snapshot via manual PUT
+        if (!existingQuote.settingsSnapshot && body.settingsSnapshot) {
+            updateData.settingsSnapshot = body.settingsSnapshot;
+        }
 
         if (body.pipedrive_org_id) {
             const client = await upsertPipedriveOrganization(body.pipedrive_org_id);
@@ -153,19 +167,23 @@ export async function PUT(
             data: updateData,
             include: {
                 modifier: { select: { name: true } },
-                creator: { select: { name: true } }
+                creator: { select: { name: true } },
+                boards: {
+                    include: { items: true }
+                }
             }
         } as any);
 
-        console.log(`[API PUT Quote] SUCCESS: ${id} updated.`);
+        // 1. Ensure Snapshot is frozen (Phase 1 logic)
+        await ensureQuoteSnapshot(id);
 
-        await logAction(resolvedUserId, 'UPDATE_QUOTE', 'QUOTE', id, { quoteNumber: updatedQuote.quoteNumber });
+        // 2. Perform a fresh calculation with frozen settings using the definitive source of truth
+        const calculatedTotals = await calculateQuoteTotalsServerSide(updatedQuote);
 
-        if (body.quoteNumber && existingQuote && body.quoteNumber !== existingQuote.quoteNumber) {
-            await triggerSequenceSync(body.quoteNumber);
-        }
-
-        return NextResponse.json(updatedQuote);
+        return NextResponse.json({
+            ...updatedQuote,
+            calculatedTotals
+        });
     } catch (error: any) {
         console.error('Failed to update quote:', error);
         return NextResponse.json({ 

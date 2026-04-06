@@ -12,7 +12,19 @@ import {
 } from "@/components/ui/tooltip";
 
 export default function GrandTotalView() {
-    const { grandTotals, quoteNumber, clientName, clientCompany, projectRef, description, boards, effectiveSettings, allBoardTotals, creator } = useQuote();
+    const { 
+        grandTotals, 
+        quoteNumber, 
+        clientName, 
+        clientCompany, 
+        projectRef, 
+        description, 
+        boards, 
+        effectiveSettings, 
+        allBoardTotals, 
+        creator,
+        isSyncing 
+    } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
     const [isDetailed, setIsDetailed] = useState(true);
 
@@ -117,6 +129,7 @@ export default function GrandTotalView() {
                     marginPercent={marginPercent}
                     targetMarginPercent={targetMarginPercent}
                     gst={gst}
+                    isSyncing={isSyncing}
                 />
 
                 <div className="p-4 space-y-6 pb-12">
@@ -290,12 +303,22 @@ export default function GrandTotalView() {
                         </div>
                     </div>
                     
-                    <div className="pt-4 border-t border-dashed border-gray-100 flex justify-between items-end">
+                    <div className="pt-4 border-t border-dashed border-gray-100 flex justify-between items-end relative">
+                        {isSyncing && (
+                            <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-lg animate-pulse">
+                                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-2">
+                                    <Loader2 className="animate-spin" size={10} />
+                                    Updating Totals...
+                                </span>
+                            </div>
+                        )}
                         <div className="flex flex-col">
                             <span className="text-sm font-bold text-blue-600 leading-none mb-1">Selling Price</span>
                             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">ex GST</span>
                         </div>
-                        <span className="text-3xl font-black text-gray-900 tracking-tighter leading-none">{formatCurrency(sellPriceRounded, 0)}</span>
+                        <span className={`text-3xl font-black text-gray-900 tracking-tighter leading-none transition-opacity duration-200 ${isSyncing ? 'opacity-30' : 'opacity-100'}`}>
+                            {formatCurrency(sellPriceRounded, 0)}
+                        </span>
                     </div>
 
                     <div className="flex justify-between items-center pt-2 px-0.5">

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logItemMutation } from '@/lib/telemetry';
 import { isPermanentManualCategory } from '@/lib/system-definitions';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
+import { fetchEnrichedBoardItems } from '@/lib/enrichment';
 
 export async function PUT(
     request: Request,
@@ -126,10 +128,20 @@ export async function PUT(
             return NextResponse.json({ error: 'Board ID not found' }, { status: 500 });
         }
 
-        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
-        const allItems = await fetchEnrichedBoardItems(boardId);
+        const [allItems, quoteWithBoards] = await Promise.all([
+            fetchEnrichedBoardItems(boardId),
+            prisma.board.findUnique({
+                where: { id: boardId },
+                select: { quote: { include: { boards: { include: { items: true } } } } }
+            })
+        ]);
+        
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards?.quote);
 
-        return NextResponse.json(allItems);
+        return NextResponse.json({
+            items: allItems,
+            calculatedTotals
+        });
     } catch (error) {
         console.error('Failed to update item', error);
         return NextResponse.json({ error: 'Failed to update item' }, { status: 500 });
@@ -284,12 +296,20 @@ export async function DELETE(
         await AutomationService.applyAdditionalControlWiringRules(boardId);
 
         // Return the full updated list of items to ensure frontend is in sync
-        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
-        const allItems = await fetchEnrichedBoardItems(boardId);
+        const [allItems, quoteWithBoards] = await Promise.all([
+            fetchEnrichedBoardItems(boardId),
+            prisma.board.findUnique({
+                where: { id: boardId },
+                select: { quote: { include: { boards: { include: { items: true } } } } }
+            })
+        ]);
+        
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards?.quote);
 
         return NextResponse.json({
             success: true,
-            items: allItems
+            items: allItems,
+            calculatedTotals
         });
     } catch (error) {
         console.error('Failed to delete item', error);

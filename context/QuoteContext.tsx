@@ -90,6 +90,30 @@ export interface BoardTotals {
     cubicSubtotal: number;
 }
 
+export interface CalculatedTotals {
+    grandTotals: {
+        baseMaterialCost: number;
+        materialCost: number;
+        labourHours: number;
+        labourCost: number;
+        consumablesCost: number;
+        costBase: number;
+        overheadAmount: number;
+        engineeringCost: number;
+        totalCost: number;
+        profit: number;
+        sellPrice: number;
+        sellPriceRounded: number;
+        gst: number;
+        finalSellPrice: number;
+        sheetmetalSubtotal: number;
+        sheetmetalUplift: number;
+        cubicSubtotal: number;
+    };
+    boardTotals: Record<string, BoardTotals>;
+    effectiveSettings: QuoteSettings;
+}
+
 interface QuoteContextType {
     quoteId: string;
     quoteNumber: string;
@@ -110,27 +134,11 @@ interface QuoteContextType {
     effectiveSettings: QuoteSettings; // Merged settings (Global + Snapshot + Overrides)
     loading: boolean;
     saving: boolean;
+    isSyncing: boolean; // True during optimistic updates
+    serverTotals: CalculatedTotals | null; // Definitive source of truth from backend
     totals: BoardTotals;
     allBoardTotals: Record<string, BoardTotals>;
-    grandTotals: {
-        baseMaterialCost: number;
-        materialCost: number;
-        labourHours: number;
-        labourCost: number;
-        consumablesCost: number;
-        costBase: number;
-        overheadAmount: number;
-        engineeringCost: number;
-        totalCost: number;
-        profit: number;
-        sellPrice: number;
-        sellPriceRounded: number;
-        gst: number;
-        finalSellPrice: number;
-        sheetmetalSubtotal: number;
-        sheetmetalUplift: number;
-        cubicSubtotal: number;
-    };
+    grandTotals: CalculatedTotals['grandTotals'];
     selectedBoardId: string | null;
     setSelectedBoardId: (id: string | null) => void;
     addBoard: (boardData: { name: string; type: string; config?: any; internalNotes?: string }) => Promise<void>;
@@ -216,6 +224,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const [quoteSnapshot, setQuoteSnapshot] = useState<Partial<QuoteSettings> | null>(null);
     const [overrides, setOverrides] = useState<QuoteOverrides>({});
     const [loading, setLoading] = useState(true);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [serverTotals, setServerTotals] = useState<CalculatedTotals | null>(null);
 
     const fetchQuoteData = async () => {
         try {
@@ -273,6 +283,11 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     }
                 } else {
                     setQuoteSnapshot(null);
+                }
+
+                // Load server-calculated totals
+                if (data.calculatedTotals) {
+                    setServerTotals(data.calculatedTotals);
                 }
             }
 
@@ -366,13 +381,29 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             sellPrice: 0, sellPriceRounded: 0, sheetmetalSubtotal: 0, sheetmetalUplift: 0, cubicSubtotal: 0
         };
 
+        const emptyGrandTotals = {
+            ...emptyTotals,
+            gst: 0, finalSellPrice: 0
+        };
+
+        // 1. Prioritize Server Totals if available and NOT currently syncing an override
+        if (serverTotals && !isSyncing) {
+            const boardTotals = selectedBoardId && serverTotals.boardTotals[selectedBoardId]
+                ? serverTotals.boardTotals[selectedBoardId]
+                : emptyTotals;
+            
+            return { 
+                boardTotals, 
+                allBoardTotals: serverTotals.boardTotals, 
+                grandTotals: serverTotals.grandTotals 
+            };
+        }
+
+        // 2. Fallback to local calculation for Optimistic UI
         if (!globalSettings) return {
             boardTotals: emptyTotals,
             allBoardTotals: {},
-            grandTotals: {
-                ...emptyTotals,
-                gst: 0, finalSellPrice: 0
-            }
+            grandTotals: emptyGrandTotals
         };
 
         const { boardTotals: allBoardTotals, grandTotals } = calculateQuoteTotals(boards as any, effectiveSettings as any);
@@ -385,7 +416,10 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         return { boardTotals, allBoardTotals: allBoardTotals as Record<string, BoardTotals>, grandTotals: grandTotals as any };
     };
 
-    const { boardTotals, allBoardTotals, grandTotals } = calculateTotals();
+    const totalsResult = calculateTotals();
+    const boardTotals = totalsResult.boardTotals;
+    const allBoardTotals = totalsResult.allBoardTotals;
+    const grandTotals = totalsResult.grandTotals;
 
     const addBoard = async (boardData: { name: string; type: string; config?: any; internalNotes?: string }) => {
         try {
@@ -396,11 +430,13 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
 
             if (res.ok) {
-                const newBoard = await res.json();
+                const data = await res.json();
+                // data = { board, calculatedTotals }
+                setServerTotals(data.calculatedTotals);
                 await fetchQuoteData();
 
                 // Explicitly select and persist the new board
-                setSelectedBoardId(newBoard.id); // This now auto-persists via our wrapper
+                setSelectedBoardId(data.board.id); 
             }
         } catch (error) {
             console.error('Failed to add board', error);
@@ -408,6 +444,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const addItemToBoard = async (boardId: string, item: any) => {
+        setIsSyncing(true);
         try {
             const res = await fetch(`/api/quotes/${quoteId}/items`, {
                 method: 'POST',
@@ -419,33 +456,24 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             });
 
             if (res.ok) {
-                const updatedItems = await res.json();
-
-                if (Array.isArray(updatedItems)) {
-                    // Update local state immediately for responsiveness and correctness
-                    setBoards(prev => prev.map(b => {
-                        if (b.id === boardId) {
-                            return { ...b, items: updatedItems };
-                        }
-                        return b;
-                    }));
-
-                    // Also trigger full refresh to be safe (calculations etc)
-                    // But maybe debounce or skip if we trust the items?
-                    // Calculations happen in calculateTotals() which depends on `boards`.
-                    // So updating `boards` is sufficient for totals!
-                } else {
-                    // Fallback to old behavior if API returns single item (legacy safety)
-                    await fetchQuoteData();
-                }
+                const data = await res.json();
+                setServerTotals(data.calculatedTotals);
+                setBoards(prev => prev.map(b => {
+                    if (b.id === boardId) {
+                        return { ...b, items: data.items };
+                    }
+                    return b;
+                }));
             }
         } catch (error) {
             console.error('Failed to add item', error);
+        } finally {
+            setIsSyncing(false);
         }
     };
 
     const updateItem = async (itemId: string, updates: Partial<Item>) => {
-        // Optimistic Update
+        setIsSyncing(true);
         const previousBoards = JSON.parse(JSON.stringify(boards));
         let boardId: string | null = null;
 
@@ -469,25 +497,24 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
             if (!res.ok) throw new Error('Failed to update item');
 
-            // Consume the returned items array (includes GC automation items)
             const data = await res.json();
-            if (Array.isArray(data) && boardId) {
+            if (data.items && Array.isArray(data.items) && boardId) {
                 const finalBoardId = boardId;
+                setServerTotals(data.calculatedTotals);
                 setBoards(prev => prev.map(b =>
-                    b.id === finalBoardId ? { ...b, items: data } : b
+                    b.id === finalBoardId ? { ...b, items: data.items } : b
                 ));
             }
         } catch (error) {
             console.error('Failed to update item', error);
-            // Rollback
             setBoards(previousBoards);
-            alert('Failed to update item. Restored previous state.');
+        } finally {
+            setIsSyncing(false);
         }
     };
 
     const removeItem = async (itemId: string) => {
-        // Find which board this item belongs to BEFORE deleting it from state
-        // This ensures we know which board to update with the refreshed items
+        setIsSyncing(true);
         let boardId: string | null = null;
         for (const board of boards) {
             if (board.items.some(i => i.id === itemId)) {
@@ -496,7 +523,6 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             }
         }
 
-        // Optimistic Update
         const previousBoards = JSON.parse(JSON.stringify(boards));
 
         setBoards(prev => prev.map(board => ({
@@ -512,15 +538,10 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             if (!res.ok) throw new Error('Failed to remove item');
             
             const data = await res.json();
-            // Data structure is { success: true, items: [...] }
             if (data.success && Array.isArray(data.items)) {
+                setServerTotals(data.calculatedTotals);
                 setBoards(prev => prev.map(b => {
-                    // Update the specific board we identified earlier
                     if (boardId && b.id === boardId) {
-                        return { ...b, items: data.items };
-                    }
-                    // Fallback: If we couldn't identify the board or it's cross-item board refresh
-                    if (!boardId && b.items.some(i => i.id === itemId)) {
                         return { ...b, items: data.items };
                     }
                     return b;
@@ -528,28 +549,34 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
             }
         } catch (error) {
             console.error('Failed to remove item', error);
-            // Rollback
             setBoards(previousBoards);
-            alert('Failed to remove item. Restored previous state.');
+        } finally {
+            setIsSyncing(false);
         }
     };
 
 
     const updateOverrides = async (newOverrides: Partial<QuoteOverrides>) => {
+        setIsSyncing(true);
         const updated = { ...overrides, ...newOverrides };
         setOverrides(updated);
         setSaving(true);
 
         try {
-            await fetch(`/api/quotes/${quoteId}`, {
+            const res = await fetch(`/api/quotes/${quoteId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(updated),
             });
+            if (res.ok) {
+                const data = await res.json();
+                setServerTotals(data.calculatedTotals);
+            }
         } catch (error) {
             console.error("Failed to save overrides", error);
         } finally {
             setSaving(false);
+            setIsSyncing(false);
         }
     };
 
@@ -658,6 +685,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     };
 
     const updateBoardConfig = async (boardId: string, config: any) => {
+        setIsSyncing(true);
         try {
             const response = await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
                 method: 'PUT',
@@ -667,14 +695,21 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
             if (!response.ok) throw new Error('Failed to update board config');
 
+            const data = await response.json();
+            // data = { ...board, calculatedTotals }
+            setServerTotals(data.calculatedTotals);
+            
             await fetchQuoteData();
         } catch (error) {
             console.error('Error updating board config:', error);
             throw error;
+        } finally {
+            setIsSyncing(false);
         }
     };
 
     const updateBoardDetails = async (boardId: string, updates: Partial<Board>) => {
+        setIsSyncing(true);
         try {
             const response = await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
                 method: 'PUT',
@@ -684,10 +719,16 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
 
             if (!response.ok) throw new Error('Failed to update board details');
 
+            const data = await response.json();
+            // data = { ...board, calculatedTotals }
+            setServerTotals(data.calculatedTotals);
+
             await fetchQuoteData();
         } catch (error) {
             console.error('Error updating board details:', error);
             throw error;
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -713,6 +754,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 effectiveSettings,
                 loading,
                 saving,
+                isSyncing,
+                serverTotals,
                 totals: boardTotals,
                 allBoardTotals,
                 grandTotals,

@@ -4,6 +4,7 @@ import { Board, Item } from '@prisma/client';
 import { ExportService } from '@/lib/export-service';
 import { enrichItems } from '@/lib/enrichment';
 import { calculateQuoteTotals } from '@/lib/pricing';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export async function GET(
     request: Request,
@@ -56,62 +57,22 @@ export async function GET(
             templatePath = '/templates/Estimating Standard Tender Template (2026).docx';
         }
 
-        // Calculate effective settings
-        const q = quote as any; // Cast to any to avoid lint errors until prisma generate runs
-        const effectiveSettings = {
-            ...settings,
-            labourRate: q.overrideLabourRate ?? settings.labourRate,
-            overheadPct: q.overrideOverheadPct ?? settings.overheadPct,
-            engineeringPct: q.overrideEngineeringPct ?? settings.engineeringPct,
-            targetMarginPct: q.overrideTargetMarginPct ?? settings.targetMarginPct,
-            consumablesPct: q.overrideConsumablesPct ?? settings.consumablesPct,
-            gstPct: q.overrideGstPct ?? settings.gstPct,
-            roundingIncrement: q.overrideRoundingIncrement ?? settings.roundingIncrement,
-        };
+        // 3. Calculate Totals using the definitive source of truth
+        const { grandTotals: pricingGrandTotals, boardTotals, effectiveSettings } = await calculateQuoteTotalsServerSide(quote);
 
         console.log("=== EXPORT DEBUG ===");
-        console.log("Global Settings:", JSON.stringify(settings, null, 2));
-        console.log("Quote Overrides:", {
-            labourRate: q.overrideLabourRate,
-            overheadPct: q.overrideOverheadPct,
-            engineeringPct: q.overrideEngineeringPct,
-            targetMarginPct: q.overrideTargetMarginPct,
-            consumablesPct: q.overrideConsumablesPct,
-            gstPct: q.overrideGstPct,
-            roundingIncrement: q.overrideRoundingIncrement
-        });
         console.log("Effective Settings:", JSON.stringify(effectiveSettings, null, 2));
 
-        // 1. Collect and Enrich all items
-        const allItemsRaw = quote.boards.flatMap(b => b.items);
-        const allItemsEnriched = await enrichItems(allItemsRaw);
-
-        // 2. Re-distribute enriched items back to boards
-        const itemMap = new Map(allItemsEnriched.map(i => [i.id, i]));
-        const enrichedBoards = quote.boards.map(board => ({
-            ...board,
-            items: board.items.map(item => itemMap.get(item.id) || item)
-        }));
-
-        // 3. Calculate Totals using shared logic (same as UI)
-        const pricingBoards = enrichedBoards.map(b => ({
-            id: b.id,
-            config: b.config ? (typeof b.config === 'string' ? JSON.parse(b.config) : b.config) : {},
-            items: b.items as any[]
-        }));
-
-        const quoteTotals = calculateQuoteTotals(pricingBoards, effectiveSettings);
-
         // Map to format expected by ExportService
-        const boardTotalsMap = Object.entries(quoteTotals.boardTotals).map(([boardId, totals]) => ({
+        const boardTotalsMap = Object.entries(boardTotals).map(([boardId, totals]) => ({
             boardId,
             sellPriceRounded: totals.sellPriceRounded
         }));
 
         const grandTotals = {
-            ...quoteTotals.grandTotals,
-            gst: quoteTotals.grandTotals.gst,
-            finalSellPrice: quoteTotals.grandTotals.finalSellPrice
+            ...pricingGrandTotals,
+            gst: pricingGrandTotals.gst,
+            finalSellPrice: pricingGrandTotals.finalSellPrice
         };
 
         const quoteData = {
@@ -120,7 +81,7 @@ export async function GET(
             clientCompany: quote.clientCompany,
             projectRef: quote.projectRef,
             description: quote.description,
-            boards: enrichedBoards,
+            boards: quote.boards,
             totals: {
                 sellPrice: grandTotals.sellPrice
             },

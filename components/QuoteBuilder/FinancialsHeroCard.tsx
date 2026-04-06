@@ -7,6 +7,7 @@ interface FinancialsHeroCardProps {
     marginPercent: number;
     targetMarginPercent: number;
     gst?: number; // Optional, for Quote totals
+    isSyncing?: boolean;
 }
 
 export default function FinancialsHeroCard({ 
@@ -15,7 +16,8 @@ export default function FinancialsHeroCard({
     profit, 
     marginPercent, 
     targetMarginPercent,
-    gst 
+    gst,
+    isSyncing = false
 }: FinancialsHeroCardProps) {
     const hasDeviation = Math.abs(marginPercent - targetMarginPercent * 100) > 0.1;
 
@@ -28,9 +30,12 @@ export default function FinancialsHeroCard({
                 </div>
 
                 {/* Main Price Focus - Selling Price (ex GST) */}
-                <div className="flex flex-col">
+                <div className="flex flex-col relative">
+                    {isSyncing && (
+                        <div className="absolute -left-1 -top-1 -right-1 -bottom-1 bg-white/40 backdrop-blur-[1px] z-10 rounded-lg animate-pulse" />
+                    )}
                     <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-black text-gray-900 tracking-tighter leading-none">
+                        <span className={`text-4xl font-black text-gray-900 tracking-tighter leading-none transition-opacity duration-200 ${isSyncing ? 'opacity-20' : 'opacity-100'}`}>
                             {formatCurrency(sellPrice, 0)}
                         </span>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">ex GST</span>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export async function POST(
     request: Request,
@@ -133,7 +134,18 @@ export async function POST(
             }
         }
 
-        return NextResponse.json(newBoard);
+        // Calculate updated totals for the entire quote
+        const quoteWithBoards = await prisma.quote.findUnique({
+            where: { id: quoteId },
+            include: { boards: { include: { items: true } } }
+        });
+
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards);
+
+        return NextResponse.json({
+            board: newBoard,
+            calculatedTotals
+        });
     } catch (error) {
         console.error('Failed to create board', error);
         return NextResponse.json({ error: 'Failed to create board' }, { status: 500 });

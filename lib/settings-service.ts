@@ -48,7 +48,11 @@ export async function getGlobalSettings(): Promise<CalculationSettings> {
 }
 
 /**
- * Gets effective settings for a quote, considering overrides and global defaults.
+ * Gets effective settings for a quote, considering overrides, snapshots, and global defaults.
+ * PRIORITY: Overrides > Snapshot > Global Default
+ * 
+ * @param quote Quote object containing overrides and potentially a settingsSnapshot string
+ * @returns {CalculationSettings}
  */
 export async function getEffectiveSettingsForQuote(quote: {
   overrideLabourRate?: number | null;
@@ -59,17 +63,54 @@ export async function getEffectiveSettingsForQuote(quote: {
   overrideGstPct?: number | null;
   overrideRoundingIncrement?: number | null;
   overrideCopperPricePerKg?: number | null;
+  settingsSnapshot?: string | null;
 }): Promise<CalculationSettings> {
   const global = await getGlobalSettings();
   
+  // 1. Parse Snapshot if it exists
+  let snapshot: Partial<CalculationSettings> = {};
+  if (quote.settingsSnapshot) {
+    try {
+      snapshot = JSON.parse(quote.settingsSnapshot);
+    } catch (e) {
+      console.error(`[Settings Service] Failed to parse snapshot for quote:`, e);
+    }
+  }
+
+  // 2. Resolve with strict priority: Overrides > Snapshot > Global
   return {
-    labourRate: quote.overrideLabourRate ?? global.labourRate,
-    consumablesPct: quote.overrideConsumablesPct ?? global.consumablesPct,
-    overheadPct: quote.overrideOverheadPct ?? global.overheadPct,
-    engineeringPct: quote.overrideEngineeringPct ?? global.engineeringPct,
-    targetMarginPct: quote.overrideTargetMarginPct ?? global.targetMarginPct,
-    gstPct: quote.overrideGstPct ?? global.gstPct,
-    roundingIncrement: quote.overrideRoundingIncrement ?? global.roundingIncrement,
-    copperPricePerKg: quote.overrideCopperPricePerKg ?? global.copperPricePerKg,
+    labourRate: quote.overrideLabourRate ?? snapshot.labourRate ?? global.labourRate,
+    consumablesPct: quote.overrideConsumablesPct ?? snapshot.consumablesPct ?? global.consumablesPct,
+    overheadPct: quote.overrideOverheadPct ?? snapshot.overheadPct ?? global.overheadPct,
+    engineeringPct: quote.overrideEngineeringPct ?? snapshot.engineeringPct ?? global.engineeringPct,
+    targetMarginPct: quote.overrideTargetMarginPct ?? snapshot.targetMarginPct ?? global.targetMarginPct,
+    gstPct: quote.overrideGstPct ?? snapshot.gstPct ?? global.gstPct,
+    roundingIncrement: quote.overrideRoundingIncrement ?? snapshot.roundingIncrement ?? global.roundingIncrement,
+    copperPricePerKg: quote.overrideCopperPricePerKg ?? snapshot.copperPricePerKg ?? global.copperPricePerKg,
   };
+}
+
+/**
+ * Ensures a quote has a settings snapshot. If one doesn't exist, it captures the current global settings.
+ * This should be called whenever a quote is created or first "stabilized".
+ * 
+ * @param quoteId Quote ID to snapshot
+ */
+export async function ensureQuoteSnapshot(quoteId: string) {
+    const quote = await prisma.quote.findUnique({
+        where: { id: quoteId },
+        select: { settingsSnapshot: true }
+    });
+
+    if (!quote || quote.settingsSnapshot) return; // Already snapshotted or doesn't exist
+
+    const global = await getGlobalSettings();
+    await prisma.quote.update({
+        where: { id: quoteId },
+        data: {
+            settingsSnapshot: JSON.stringify(global)
+        }
+    });
+
+    console.log(`[Settings Service] Froze global settings into snapshot for quote ${quoteId}`);
 }

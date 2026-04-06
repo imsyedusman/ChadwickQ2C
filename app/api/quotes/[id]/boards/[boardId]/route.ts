@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export async function PUT(
     request: Request,
@@ -74,7 +75,19 @@ export async function PUT(
             include: { items: true }
         });
 
-        return NextResponse.json({ ...freshBoard, debugConfig: config });
+        // Calculate updated totals for the entire quote
+        const quoteWithBoards = await prisma.quote.findUnique({
+            where: { id: (params as any).id || updatedBoard.quoteId },
+            include: { boards: { include: { items: true } } }
+        });
+
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards);
+
+        return NextResponse.json({
+            ...freshBoard,
+            debugConfig: config,
+            calculatedTotals
+        });
     } catch (error) {
         console.error('Failed to update board', error);
         return NextResponse.json({ error: 'Failed to update board' }, { status: 500 });
@@ -92,7 +105,18 @@ export async function DELETE(
             where: { id: boardId },
         });
 
-        return NextResponse.json({ success: true });
+        // Calculate updated totals for the entire quote
+        const quoteWithBoards = await prisma.quote.findUnique({
+            where: { id: (params as any).id }, // We assume 'id' is quoteId from params
+            include: { boards: { include: { items: true } } }
+        });
+
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards);
+
+        return NextResponse.json({
+            success: true,
+            calculatedTotals
+        });
     } catch (error) {
         console.error('Failed to delete board', error);
         return NextResponse.json({ error: 'Failed to delete board' }, { status: 500 });

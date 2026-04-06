@@ -4,8 +4,8 @@ import { generateNextQuoteNumber } from '@/lib/quote-numbering';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { logAction } from '@/lib/audit';
-import { calculateQuoteTotals } from '@/lib/pricing';
-import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
+import { getGlobalSettings, getEffectiveSettingsForQuote, ensureQuoteSnapshot } from '@/lib/settings-service';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 import { getOrCreateDefaultAdminUser } from '@/lib/user-utils';
 import { 
     upsertPipedriveDealAsProject, 
@@ -104,12 +104,10 @@ export async function GET(request: Request) {
 
         console.log(`[API GET Quotes] Filtered total count: ${totalCount}, Returning ${quotes.length} on page ${page}`);
 
-        // 4. Calculate totals with safe setting fallbacks
+        // 4. Calculate totals for each quote using the definitive source of truth
         const quotesWithTotals = await Promise.all(quotes.map(async (quote: any) => {
-            const effectiveSettings = await getEffectiveSettingsForQuote(quote);
-
             try {
-                const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
+                const { grandTotals } = await calculateQuoteTotalsServerSide(quote);
 
                 const { boards, ...quoteWithoutBoards } = quote;
                 return {
@@ -289,6 +287,9 @@ export async function POST(request: Request) {
         */
 
         await logAction(userId, 'CREATE_QUOTE', 'QUOTE', newQuote.id, { quoteNumber });
+
+        // Ensure the new quote has a settings snapshot immediately
+        await ensureQuoteSnapshot(newQuote.id);
 
         return NextResponse.json(newQuote);
     } catch (error: any) {

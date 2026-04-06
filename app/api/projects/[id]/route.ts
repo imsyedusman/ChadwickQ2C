@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
-import { calculateQuoteTotals } from '@/lib/pricing';
 import { getGlobalSettings, getEffectiveSettingsForQuote } from '@/lib/settings-service';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export async function PATCH(
     request: Request,
@@ -133,11 +133,9 @@ export async function GET(
 
         console.log(`[API GET Project] Found: "${project.projectName}" with ${project.quotes.length} quotes`);
 
-        // 4. Calculate totals for each quote with safe setting fallbacks
+        // 4. Calculate totals for each quote using the definitive source of truth
         const quotesWithTotal = await Promise.all(project.quotes.map(async (quote: any) => {
-            const effectiveSettings = await getEffectiveSettingsForQuote(quote);
-
-            const { grandTotals } = calculateQuoteTotals(quote.boards || [], effectiveSettings);
+            const { grandTotals } = await calculateQuoteTotalsServerSide(quote);
             
             const { boards, ...quoteWithoutBoards } = quote;
             return {

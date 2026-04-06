@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { logItemMutation } from '@/lib/telemetry';
 import { isPermanentManualCategory } from '@/lib/system-definitions';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
+import { fetchEnrichedBoardItems } from '@/lib/enrichment';
 
 export async function POST(
     request: Request,
@@ -54,10 +56,21 @@ export async function POST(
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyGeneralControlRules(boardId);
 
-            // Return full enriched item list so UI picks up auto-created fuse/wiring items
-            const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
-            const allItems = await fetchEnrichedBoardItems(boardId);
-            return NextResponse.json(allItems);
+            // Return full enriched item list and updated totals
+            const [allItems, quoteWithBoards] = await Promise.all([
+                fetchEnrichedBoardItems(boardId),
+                prisma.quote.findUnique({
+                    where: { id: quoteId },
+                    include: { boards: { include: { items: true } } }
+                })
+            ]);
+            
+            const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards);
+            
+            return NextResponse.json({
+                items: allItems,
+                calculatedTotals
+            });
         }
 
         if (catalogItem) {
@@ -227,11 +240,21 @@ export async function POST(
             await AutomationService.applyAdditionalControlWiringRules(boardId);
         }
 
-        // Return the full updated list of items for the board to ensure frontend is in sync
-        const { fetchEnrichedBoardItems } = await import('@/lib/enrichment');
-        const allItems = await fetchEnrichedBoardItems(boardId);
+        // Return full enriched item list and updated totals
+        const [allItems, quoteWithBoards] = await Promise.all([
+            fetchEnrichedBoardItems(boardId),
+            prisma.quote.findUnique({
+                where: { id: quoteId },
+                include: { boards: { include: { items: true } } }
+            })
+        ]);
+        
+        const calculatedTotals = await calculateQuoteTotalsServerSide(quoteWithBoards);
 
-        return NextResponse.json(allItems);
+        return NextResponse.json({
+            items: allItems,
+            calculatedTotals
+        });
     } catch (error) {
         console.error('Failed to create/update item:', error);
         return NextResponse.json({ error: 'Failed to create item' }, { status: 500 });
