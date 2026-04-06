@@ -5,7 +5,7 @@ interface FinancialsHeroCardProps {
     sellPrice: number;
     profit: number;
     marginPercent: number;
-    markupPercent: number;
+    targetMarginPercent: number;
     gst?: number; // Optional, for Quote totals
 }
 
@@ -14,9 +14,11 @@ export default function FinancialsHeroCard({
     sellPrice, 
     profit, 
     marginPercent, 
-    markupPercent,
+    targetMarginPercent,
     gst 
 }: FinancialsHeroCardProps) {
+    const hasDeviation = Math.abs(marginPercent - targetMarginPercent * 100) > 0.1;
+
     return (
         <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
             <div className="p-4 space-y-4">
@@ -40,18 +42,25 @@ export default function FinancialsHeroCard({
                             Profit {formatCurrency(profit, 0)}
                         </span>
                         <div className="h-3 w-[1px] bg-gray-200"></div>
-                        <span className="text-[13px] font-medium text-blue-600">
-                            {marginPercent.toFixed(1)}% Margin
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-medium text-blue-600">
+                                {marginPercent.toFixed(1)}% Margin
+                            </span>
+                            {hasDeviation && (
+                                <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100 uppercase tracking-tighter">
+                                    Target: {(targetMarginPercent * 100).toFixed(1)}%
+                                </span>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* Secondary Pricing & Details */}
                 <div className="pt-3.5 border-t border-gray-100 flex justify-between items-center">
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mb-1">Markup Breakdown</span>
+                        <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest mb-1">Profit Breakdown</span>
                         <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
-                            <span>{markupPercent.toFixed(1)}%</span>
+                            <span>{marginPercent.toFixed(1)}% Margin</span>
                             <span className="text-gray-200">/</span>
                             <span>+{formatCurrency(profit, 0)}</span>
                         </div>

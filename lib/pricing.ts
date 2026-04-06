@@ -206,11 +206,11 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
     }, 0);
 
     const sellPrice = preAdjustmentSellPrice + priceAdjustmentsTotal;
-    const profit = sellPrice - totalCost;
-
+    
     const rInc = settings.roundingIncrement;
     const preAdjustmentRounded = (rInc && rInc > 0) ? Math.round(preAdjustmentSellPrice / rInc) * rInc : preAdjustmentSellPrice;
     const sellPriceRounded = preAdjustmentRounded + priceAdjustmentsTotal;
+    const profit = sellPriceRounded - totalCost;
 
     return {
         baseMaterialCost,

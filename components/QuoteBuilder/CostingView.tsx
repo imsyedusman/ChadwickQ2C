@@ -28,9 +28,10 @@ export default function CostingView() {
         sellPriceRounded,
     } = totals;
 
-    // Calculate margins & markups
+    // Calculate margin
     const marginPercent = sellPriceRounded > 0 ? (profit / sellPriceRounded) * 100 : 0;
-    const markupPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+    const targetMarginPercent = effectiveSettings.targetMarginPct;
+    const hasDeviation = Math.abs(marginPercent - targetMarginPercent * 100) > 0.1;
 
     // Manufacturing breakdown
     const consumablesPctLabel = (effectiveSettings.consumablesPct * 100).toFixed(0);
@@ -52,7 +53,7 @@ export default function CostingView() {
                     sellPrice={sellPriceRounded}
                     profit={profit}
                     marginPercent={marginPercent}
-                    markupPercent={markupPercent}
+                    targetMarginPercent={targetMarginPercent}
                 />
 
                 <div className="p-4 space-y-6 pb-12">
@@ -212,8 +213,15 @@ export default function CostingView() {
                         </div>
                         <div className="flex justify-between items-center text-gray-400">
                             <div className="flex items-center gap-2">
-                                <span className="text-[12px] font-medium">Markup</span>
-                                <span className="text-[10px] font-bold text-blue-600/80 bg-blue-50/50 px-1.5 py-0.5 rounded border border-blue-100/50">{markupPercent.toFixed(1)}%</span>
+                                <span className="text-[12px] font-medium">Margin</span>
+                                <span className="text-[10px] font-bold text-blue-600/80 bg-blue-50/50 px-1.5 py-0.5 rounded border border-blue-100/50">
+                                    {marginPercent.toFixed(1)}%
+                                </span>
+                                {hasDeviation && (
+                                    <span className="text-[9px] font-bold text-gray-300 uppercase tracking-tighter">
+                                        (Target: {(targetMarginPercent * 100).toFixed(1)}%)
+                                    </span>
+                                )}
                             </div>
                             <span className="text-[12px] font-medium">+{formatCurrency(profit, 0)}</span>
                         </div>
