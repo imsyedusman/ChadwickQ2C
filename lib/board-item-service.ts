@@ -1152,17 +1152,19 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // 1. Process Existing Items first
     existingItems.forEach((item: Item) => {
         if (item.name === BUSBAR_INSULATION_ITEM) return;
-        const isBusbar = (item.category?.toUpperCase() === 'BUSBAR') ||
-            (item.name.startsWith('BB-') || item.name.startsWith('BBC-'));
+        
+        // Identify if item is a true busbar (excluding cleats/supports)
+        const isBusbar = ((item.category?.toUpperCase() === 'BUSBAR') ||
+            (item.name.startsWith('BB-') || item.name.startsWith('BBC-'))) &&
+            !isPermanentManualCategory(item.category, item.subcategory);
+
         if (isBusbar) {
-            if (isBusbar) {
-                effectiveBusbarItems.set(item.name, {
-                    qty: Number(item.quantity), // Convert Decimal to Number for logic math
-                    price: item.unitPrice,
-                    labour: item.labourHours,
-                    category: item.category
-                });
-            }
+            effectiveBusbarItems.set(item.name, {
+                qty: Number(item.quantity), // Convert Decimal to Number for logic math
+                price: item.unitPrice,
+                labour: item.labourHours,
+                category: item.category
+            });
         }
     });
 
@@ -1182,7 +1184,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         const existing = existingItems.find((i: Item) => i.name === pn);
         if (existing) category = existing.category;
 
-        if (category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) {
+        if ((category?.toUpperCase() === 'BUSBAR' || pn.startsWith('BB-') || pn.startsWith('BBC-')) &&
+            !isPermanentManualCategory(category, existing?.subcategory)) {
             isBusbar = true;
         }
 
