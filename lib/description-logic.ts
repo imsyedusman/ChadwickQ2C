@@ -209,16 +209,38 @@ export function generateDescriptionBullets(board: BoardLike): { id: string, text
         }
 
         // 4. CT Metering
-        if (hasCategory("CT Metering") || hasItem("CT")) {
-            if (hasItem("Meter Panel") || hasItem("Panel")) {
-                bullets.push({ id: "msb-ct", text: "Supply Authority CT Metering (Meter Panel included)" });
-            } else {
-                bullets.push({ id: "msb-ct", text: "Supply Authority CT Metering (Meter Panel not included)" });
-            }
+        const ctPref = config.ctMetering;
+        let showCt = false;
+        if (ctPref === 'Yes') {
+            showCt = true;
+        } else if (ctPref === 'No') {
+            showCt = false;
+        } else {
+            // Fallback for older boards: pure category check only
+            showCt = hasCategory("CT Metering");
+        }
+
+        if (showCt) {
+            const hasPanel = config.meterPanel === 'Yes' || hasItem("Meter Panel") || hasItem("Panel");
+            bullets.push({ 
+                id: "msb-ct", 
+                text: `Supply Authority CT Metering (Meter Panel ${hasPanel ? 'included' : 'not included'})` 
+            });
         }
 
         // 5. Whole Current Metering
-        if (hasCategory("Whole Current Metering") || hasCategory("Whole Current") || hasItem("Whole Current") || hasItem("100A") || hasItem("100 A")) {
+        const wcPref = config.wholeCurrentMetering;
+        let showWc = false;
+        if (wcPref === 'Yes') {
+            showWc = true;
+        } else if (wcPref === 'No') {
+            showWc = false;
+        } else {
+            // Fallback for older boards: pure category check only
+            showWc = hasCategory("Whole Current Metering") || hasCategory("Whole Current");
+        }
+
+        if (showWc) {
             bullets.push({ id: "msb-vcm", text: "Supply Authority Whole Current Metering Positions per Single Line Diagram" });
         }
 
