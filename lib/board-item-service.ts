@@ -781,7 +781,7 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
             // Dynamic Pricing for 1B-TIERS-400
             // Rule: 1 Tier = $1800, >1 Tier = $1400 each
             const tierPrice = tierCount === 1 ? 1800 : 1400;
-            addTarget('1B-TIERS-400', tierCount, tierPrice);
+            addTarget('1B-TIERS-400', tierCount, tierPrice, 1);
         }
     }
 
