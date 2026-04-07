@@ -65,6 +65,7 @@ interface Project {
         totalIncGST: number;
         createdAt: string;
         updatedAt: string;
+        revisionGroupId?: string | null;
         modifier?: { name: string };
     }[];
 }
@@ -302,26 +303,26 @@ export default function ProjectDetail() {
 
         // Revision grouping logic
         const groups = sorted.reduce((acc, quote) => {
-            const match = quote.quoteNumber.match(/^(Q\d{2}-\d{4})/);
-            const base = match ? match[1] : quote.quoteNumber;
-            if (!acc[base]) acc[base] = [];
-            acc[base].push(quote);
+            const groupId = quote.revisionGroupId || quote.id;
+            if (!acc[groupId]) acc[groupId] = [];
+            acc[groupId].push(quote);
             return acc;
         }, {} as Record<string, any[]>);
 
         const flat: any[] = [];
-        const processedBases = new Set();
+        const processedGroups = new Set();
         
         // Use the initial sorted order to determine which group base comes first
         for (const quote of sorted) {
-            const match = quote.quoteNumber.match(/^(Q\d{2}-\d{4})/);
-            const base = match ? match[1] : quote.quoteNumber;
+            const groupId = quote.revisionGroupId || quote.id;
             
-            if (processedBases.has(base)) continue;
-            processedBases.add(base);
+            if (processedGroups.has(groupId)) continue;
+            processedGroups.add(groupId);
 
-            const group = groups[base];
-            group.sort((a: any, b: any) => a.revision - b.revision);
+            const group = groups[groupId];
+            // Parent always remains the one with the earliest createdAt
+            group.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            
             if (group.length > 0) {
                 flat.push({ ...group[0], _isChild: false });
                 for (let i = 1; i < group.length; i++) {

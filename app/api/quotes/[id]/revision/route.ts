@@ -34,6 +34,11 @@ export async function POST(
             return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
         }
 
+        // --- 1. PRE-TRANSACTION: Resolve User & Session ---
+        // Moving this OUTSIDE the transaction prevents timeouts and transaction-lifecycle conflicts.
+        const session = await getServerSession(authOptions);
+        const resolvedUserId = await getResolvedUserId(session);
+
         const newQuote = await prisma.$transaction(async (tx) => {
             const groupId = originalQuote.revisionGroupId || originalQuote.id;
             
@@ -47,29 +52,7 @@ export async function POST(
 
             // REVISION RULE: Alphabetical suffix (e.g., -A, -B)
             // generateRevisionNumber extracts base and finds next suffix within the group
-            const newFullQuoteNumber = await generateRevisionNumber(originalQuote.quoteNumber, groupId);
-
-            const session = await getServerSession(authOptions);
-            let userId = (session?.user as any)?.id;
-            const userEmail = (session?.user as any)?.email;
-
-            // Robust User Resolution
-            let dbUser = null;
-            if (userId) {
-                dbUser = await (tx as any).user.findUnique({ where: { id: userId } });
-            }
-            if (!dbUser && userEmail) {
-                dbUser = await (tx as any).user.findUnique({ where: { email: userEmail } });
-                if (dbUser) userId = dbUser.id;
-            }
-            if (!dbUser) {
-                dbUser = await getOrCreateDefaultAdminUser();
-                if (dbUser) userId = dbUser.id;
-            }
-
-            if (!dbUser || !userId) {
-                throw new Error('Quote revision failed: No valid users found in database.');
-            }
+            const newFullQuoteNumber = await generateRevisionNumber(originalQuote.quoteNumber, groupId, tx);
 
             // Create the new quote with all boards and items
             return await (tx.quote as any).create({
@@ -98,9 +81,9 @@ export async function POST(
                     overrideRoundingIncrement: originalQuote.overrideRoundingIncrement,
                     overrideCopperPricePerKg: originalQuote.overrideCopperPricePerKg,
                     
-                    // Ownership
-                    createdBy: userId as string,
-                    lastModifiedBy: userId as string,
+                    // Ownership (already resolved outside)
+                    createdBy: resolvedUserId,
+                    lastModifiedBy: resolvedUserId,
 
                     boards: {
                         create: originalQuote.boards.map((board: Board & { items: Item[] }) => {
@@ -147,10 +130,7 @@ export async function POST(
         // 2. Perform a fresh calculation with frozen settings using the definitive source of truth
         const { grandTotals } = await calculateQuoteTotalsServerSide(newQuote);
 
-        // Resolve valid user ID for lastModifiedBy (prevents P2003)
-        const session = await getServerSession(authOptions);
-        const resolvedUserId = await getResolvedUserId(session);
-
+        // --- 3. Final Update ---
         // Update with calculated totals (Note: only persist fields that exist in Quote model)
         const finalizedQuote = await (prisma.quote as any).update({
             where: { id: newQuote.id },

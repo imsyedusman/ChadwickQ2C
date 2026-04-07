@@ -79,9 +79,14 @@ export async function generateNextQuoteNumber(): Promise<string> {
  * 
  * @param {string} originalQuoteNumber The quote number string to derive from.
  * @param {string} revisionGroupId The group ID to search within for existing suffixes.
+ * @param {any} client Optional prisma/transaction client to use for querying.
  * @returns {Promise<string>} The new quote number with the next alphabetical suffix.
  */
-export async function generateRevisionNumber(originalQuoteNumber: string, revisionGroupId?: string): Promise<string> {
+export async function generateRevisionNumber(
+    originalQuoteNumber: string, 
+    revisionGroupId?: string,
+    client: any = prisma
+): Promise<string> {
     // Extract base number (e.g., "Q26-0243" from "Q26-0243-A")
     // We look for the standard QYY-NNNN pattern at the start
     const match = originalQuoteNumber.match(/^(Q\d{2}-\d{4})/);
@@ -90,30 +95,18 @@ export async function generateRevisionNumber(originalQuoteNumber: string, revisi
     // Determine existing suffixes in the group
     let existingSuffixes: string[] = [];
 
-    if (revisionGroupId) {
-        // Preferred: Search by group ID to ensure isolation
-        const groupQuotes = await prisma.quote.findMany({
-            where: { revisionGroupId },
-            select: { quoteNumber: true }
-        });
+    // Search by prefix (baseNumber) to ensure global uniqueness across all groups.
+    // Even if using revisionGroupId for logical grouping, quoteNumber-revision must be unique.
+    const existingQuotes = await client.quote.findMany({
+        where: {
+            quoteNumber: { startsWith: baseNumber }
+        },
+        select: { quoteNumber: true }
+    });
 
-        for (const q of groupQuotes) {
-            const suffix = extractSuffix(q.quoteNumber, baseNumber);
-            if (suffix) existingSuffixes.push(suffix);
-        }
-    } else {
-        // Fallback: Search by prefix (Legacy or if group ID isn't provided)
-        const existingQuotes = await prisma.quote.findMany({
-            where: {
-                quoteNumber: { startsWith: baseNumber }
-            },
-            select: { quoteNumber: true }
-        });
-
-        for (const q of existingQuotes) {
-            const suffix = extractSuffix(q.quoteNumber, baseNumber);
-            if (suffix) existingSuffixes.push(suffix);
-        }
+    for (const q of existingQuotes) {
+        const suffix = extractSuffix(q.quoteNumber, baseNumber);
+        if (suffix) existingSuffixes.push(suffix);
     }
 
     if (existingSuffixes.length === 0) {
