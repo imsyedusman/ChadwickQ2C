@@ -399,7 +399,7 @@ export default function ProjectsPage() {
             let url = `/api/projects?page=${page}&limit=${pageSize}`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (estimatorId && estimatorId !== 'all') url += `&estimatorId=${estimatorId}`;
-            
+
             const res = await fetch(url);
             const data = await res.json();
 
@@ -711,7 +711,7 @@ export default function ProjectsPage() {
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Init</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 {/* ADJUST PROJECT COLUMN WIDTH HERE: change w-[...] value below */}
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[800px]">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px] text-center">Status</th>
