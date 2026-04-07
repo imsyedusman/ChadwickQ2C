@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X, Trash2 } from 'lucide-react';
+import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X, Trash2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { isAutoManaged, isPermanentManualCategory } from '@/lib/system-definitions';
 import { useQuote } from '@/context/QuoteContext';
@@ -204,15 +204,27 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                 </div>
 
                 {/* Price */}
-                <div className="text-right min-w-[80px]">
+                <div className="text-right min-w-[120px]">
                     <div className="font-bold text-lg text-gray-900">{formatCurrency(displayTotalPrice)}</div>
-                    <div className="flex flex-col items-end gap-0.5 mt-1">
+                    <div className="flex items-center justify-end gap-1.5 mt-1">
                         {(qty > 1 || isCopper) && (
-                            <div className="text-xs text-gray-400 font-medium">{formatCurrency(displayUnitPrice)} {isCopper ? '/m' : 'ea'}</div>
+                            <div className="text-xs text-gray-400 font-medium whitespace-nowrap">{formatCurrency(displayUnitPrice)} {isCopper ? '/m' : 'ea'}</div>
                         )}
-                        <div className="text-xs text-blue-600 font-medium bg-blue-50 px-1.5 py-0.5 rounded">
-                            {item.labourHours}h
-                        </div>
+                        {(qty > 1 || isCopper) && item.labourHours > 0 && (
+                            <span className="text-xs text-gray-300">•</span>
+                        )}
+                        {item.labourHours > 0 && (
+                            <div 
+                                className="text-xs text-gray-400 font-medium flex items-center gap-1 cursor-help transition-all"
+                                title={`${qty} × ${item.labourHours}hr = ${(qty * item.labourHours).toFixed(1).replace(/\.0$/, '')} hrs\n@ ${formatCurrency(effectiveSettings.labourRate)}/hr\nLabour Total: ${formatCurrency(qty * item.labourHours * effectiveSettings.labourRate)}`}
+                            >
+                                {(qty > 1 || existingQty > 0) 
+                                    ? <span className="font-bold text-gray-500">{(qty * item.labourHours).toFixed(1).replace(/\.0$/, '')}h</span>
+                                    : <span>{item.labourHours}h</span>
+                                }
+                                <Clock size={12} className="text-gray-400" />
+                            </div>
+                        )}
                     </div>
                 </div>
 

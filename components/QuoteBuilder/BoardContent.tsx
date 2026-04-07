@@ -518,23 +518,27 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                     </button>
                 </div>
 
-                {/* Price & Total (Lock if Formula-Priced - though price edit UI not fully exposed here anyway) */}
-                <div className="text-right w-20">
+                {/* Price & Total */}
+                <div className="text-right min-w-[120px]">
                     <div className="font-medium text-gray-900">{formatCurrency(displayTotalPrice)}</div>
-                    <div className="flex justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
                         <div
-                            className="text-[10px] text-gray-400 cursor-help"
+                            className="text-[10px] text-gray-400 cursor-help whitespace-nowrap"
                             title={isCopper ? `Live Copper: ${item.totalCopperWeightKgPerMeter?.toFixed(2)}kg/m * ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg` : formulaPriced ? "Price is formula-driven" : "Unit Price"}
                         >
                             {formatCurrency(displayUnitPrice)} {isCopper ? '/m' : 'ea'}
                         </div>
                         {item.labourHours > 0 && (
-                            <div
-                                className="text-gray-400 cursor-help flex items-center"
-                                title={`Material: ${formatCurrency(displayUnitPrice)} ${isCopper ? '/m' : 'ea'}\nLabor: ${item.quantity} x ${item.labourHours}hr = ${(item.quantity * item.labourHours).toFixed(2)}hr @ ${formatCurrency(effectiveSettings.labourRate)}/hr\nTotal: ${formatCurrency((displayTotalPrice) + (item.quantity * item.labourHours * effectiveSettings.labourRate))}`}
-                            >
-                                <Clock size={14} />
-                            </div>
+                            <>
+                                <span className="text-[10px] text-gray-300">•</span>
+                                <div
+                                    className="text-gray-400 cursor-help flex items-center gap-1"
+                                    title={`${item.quantity} × ${item.labourHours}hr = ${(item.quantity * item.labourHours).toFixed(1).replace(/\.0$/, '')} hrs\n@ ${formatCurrency(effectiveSettings.labourRate)}/hr\nLabour Total: ${formatCurrency(item.quantity * item.labourHours * effectiveSettings.labourRate)}`}
+                                >
+                                    <span className="text-[10px] font-medium">{(item.quantity * item.labourHours).toFixed(1).replace(/\.0$/, '')}h</span>
+                                    <Clock size={14} />
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
