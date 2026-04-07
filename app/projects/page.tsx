@@ -59,6 +59,12 @@ import {
     getProjectContactDisplay
 } from '@/lib/project-utils';
 
+interface Estimator {
+    id: string;
+    name: string | null;
+    email: string | null;
+}
+
 interface Project {
     id: string;
     projectName: string;
@@ -77,9 +83,81 @@ interface Project {
     pipedriveDealUrl: string | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
+    quotes: { creator: Estimator | null }[];
     _count?: {
         quotes: number;
     };
+}
+
+function getInitials(name: string | null) {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length === 0) return '?';
+    if (parts.length === 1) return parts[0].substring(0, 1).toUpperCase();
+    return (parts[0][0] + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
+}
+
+function EstimatorBadges({ quotes }: { quotes: { creator: Estimator | null }[] }) {
+    // Extract unique creators
+    const creators = Array.from(new Map(
+        quotes
+            .filter(q => q.creator)
+            .map(q => [q.creator?.id, q.creator])
+    ).values()) as Estimator[];
+
+    if (creators.length === 0) return <span className="text-gray-300 italic text-[10px]">No Estimator</span>;
+
+    const displayLimit = 2;
+    const items = creators.slice(0, displayLimit);
+    const overflow = creators.length - displayLimit;
+
+    const colors = [
+        'bg-blue-50 text-blue-700 border-blue-100',
+        'bg-emerald-50 text-emerald-700 border-emerald-100',
+        'bg-amber-50 text-amber-700 border-amber-100',
+        'bg-purple-50 text-purple-700 border-purple-100',
+        'bg-rose-50 text-rose-700 border-rose-100',
+        'bg-slate-50 text-slate-700 border-slate-100'
+    ];
+
+    const getColor = (id: string) => {
+        let hash = 0;
+        for (let i = 0; i < id.length; i++) {
+            hash = id.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
+    return (
+        <div className="flex items-center -space-x-1.5">
+            {items.map((creator) => (
+                <TooltipProvider key={creator.id}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn(
+                                "w-7 h-7 rounded-full border border-white flex items-center justify-center text-[10px] font-bold shadow-sm cursor-help transition-transform hover:scale-110",
+                                getColor(creator.id)
+                            )}>
+                                {getInitials(creator.name)}
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                            <div className="space-y-0.5">
+                                <p className="font-bold text-gray-900">{creator.name || 'Unknown'}</p>
+                                <p className="text-[10px] text-gray-500 font-medium">{creator.email}</p>
+                                <p className="text-[9px] text-blue-600 font-bold uppercase tracking-wider pt-1">Estimator</p>
+                            </div>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            ))}
+            {overflow > 0 && (
+                <div className="w-7 h-7 rounded-full border border-white bg-white flex items-center justify-center text-[10px] font-bold text-gray-500 shadow-sm">
+                    +{overflow}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function ProjectsPage() {
@@ -90,8 +168,10 @@ export default function ProjectsPage() {
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('limit') || '25');
     const search = searchParams.get('search') || '';
+    const estimatorId = searchParams.get('estimatorId') || 'all';
 
     const [projects, setProjects] = useState<Project[]>([]);
+    const [estimators, setEstimators] = useState<Estimator[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [totalProjects, setTotalProjects] = useState(0);
@@ -274,7 +354,7 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchProjects();
         checkPipedriveStatus();
-    }, [page, pageSize, search]);
+    }, [page, pageSize, search, estimatorId]);
 
     const checkPipedriveStatus = async () => {
         try {
@@ -298,7 +378,7 @@ export default function ProjectsPage() {
         return () => clearTimeout(timer);
     }, [searchInput]);
 
-    const updateUrl = (updates: { page?: number; limit?: number; search?: string }) => {
+    const updateUrl = (updates: { page?: number; limit?: number; search?: string; estimatorId?: string }) => {
         const params = new URLSearchParams(searchParams.toString());
         if (updates.page !== undefined) params.set('page', updates.page.toString());
         if (updates.limit !== undefined) params.set('limit', updates.limit.toString());
@@ -306,17 +386,25 @@ export default function ProjectsPage() {
             if (updates.search) params.set('search', updates.search);
             else params.delete('search');
         }
+        if (updates.estimatorId !== undefined) {
+            if (updates.estimatorId && updates.estimatorId !== 'all') params.set('estimatorId', updates.estimatorId);
+            else params.delete('estimatorId');
+        }
         router.push(`/projects?${params.toString()}`, { scroll: false });
     };
 
     const fetchProjects = async () => {
         setLoading(true);
         try {
-            const url = `/api/projects?page=${page}&limit=${pageSize}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+            let url = `/api/projects?page=${page}&limit=${pageSize}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            if (estimatorId && estimatorId !== 'all') url += `&estimatorId=${estimatorId}`;
+            
             const res = await fetch(url);
             const data = await res.json();
 
             setProjects(data.projects || []);
+            setEstimators(data.estimators || []);
             setTotalProjects(data.total || 0);
             setTotalPages(data.totalPages || 0);
 
@@ -507,15 +595,39 @@ export default function ProjectsPage() {
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="relative flex-1 max-w-md w-full">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Search projects, clients, or companies..."
-                            value={searchInput}
-                            onChange={(e) => setSearchInput(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm italic shadow-sm"
-                        />
+                    <div className="flex flex-1 items-center gap-3 max-w-2xl w-full">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                            <input
+                                type="text"
+                                placeholder="Search projects, clients, or companies..."
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm italic shadow-sm"
+                            />
+                        </div>
+
+                        <div className="w-[200px] shrink-0">
+                            <Select
+                                value={estimatorId}
+                                onValueChange={(val) => updateUrl({ estimatorId: val, page: 1 })}
+                            >
+                                <SelectTrigger className="w-full h-10 rounded-xl border-gray-200 bg-white font-bold text-slate-700 italic shadow-sm text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <User size={14} className="text-blue-500" />
+                                        <SelectValue placeholder="All Estimators" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all" className="font-bold italic">All Estimators</SelectItem>
+                                    {estimators.map(est => (
+                                        <SelectItem key={est.id} value={est.id} className="font-medium">
+                                            {est.name || est.email}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
@@ -599,6 +711,7 @@ export default function ProjectsPage() {
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Init</th>
                                 {/* ADJUST PROJECT COLUMN WIDTH HERE: change w-[...] value below */}
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[800px]">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px] text-center">Status</th>
@@ -645,6 +758,11 @@ export default function ProjectsPage() {
                                                 onChange={() => toggleSelect(project.id)}
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             />
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center">
+                                                <EstimatorBadges quotes={project.quotes} />
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">

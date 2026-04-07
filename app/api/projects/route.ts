@@ -39,6 +39,7 @@ export async function GET(request: Request) {
 
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '25');
+        const estimatorId = searchParams.get('estimatorId');
         const skip = (page - 1) * limit;
 
         // Build a robust OR condition using ONLY base fields for Phase 1
@@ -60,7 +61,20 @@ export async function GET(request: Request) {
             }
         }
 
-        const where = conditions.length > 0 ? { OR: conditions } : {};
+        let where: any = conditions.length > 0 ? { OR: conditions } : {};
+
+        // Add estimator filtering
+        if (estimatorId) {
+            where = {
+                ...where,
+                quotes: {
+                    some: {
+                        createdBy: estimatorId
+                    }
+                }
+            };
+        }
+
         console.log(`[API GET Projects] Search conditions generated:`, JSON.stringify(where, null, 2));
 
         // Get total count for filtered results
@@ -76,6 +90,13 @@ export async function GET(request: Request) {
                 contact: {
                     select: { id: true, name: true, source: true, pipedrive_person_id: true }
                 },
+                quotes: {
+                    select: {
+                        creator: {
+                            select: { id: true, name: true, email: true }
+                        }
+                    }
+                },
                 _count: {
                     select: { quotes: true }
                 }
@@ -85,14 +106,32 @@ export async function GET(request: Request) {
             take: limit,
         });
 
-        console.log(`[API GET Projects] Returning ${projects.length} projects on page ${page}`);
+        // To populate the filter, we need a list of all users who have created quotes.
+        // We can either fetch this separately or include a unique list from all projects.
+        // For performance, let's just fetch users who have at least one quote.
+        const estimators = await (prisma as any).user.findMany({
+            where: {
+                createdQuotes: {
+                    some: {}
+                }
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true
+            },
+            orderBy: { name: 'asc' }
+        });
+
+        console.log(`[API GET Projects] Returning ${projects.length} projects and ${estimators.length} estimators`);
 
         return NextResponse.json({
             projects,
             total,
             page,
             limit,
-            totalPages: Math.ceil(total / limit)
+            totalPages: Math.ceil(total / limit),
+            estimators
         });
     } catch (error: any) {
         console.error('[API GET Projects] CRITICAL ERROR:', error);
