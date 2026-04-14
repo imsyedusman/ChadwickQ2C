@@ -14,3 +14,15 @@ export function getProjectContactDisplay(project: { contact?: { name: string } |
     // Contact display Priority: contact.name -> clientName -> "No Contact"
     return project.contact?.name || project.clientName || 'No Contact';
 }
+
+/**
+ * Normalizes a project name for grouping and routing.
+ * Trims whitespace, converts to lowercase, and replaces multiple spaces with a single space.
+ */
+export function normalizeProjectName(name: string | null | undefined): string {
+    if (!name) return 'unnamed project';
+    return name
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+}

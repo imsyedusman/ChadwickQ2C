@@ -77,7 +77,6 @@ export default function ProjectDetail() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    // Sort parameters
     const currentSort = searchParams.get('sort') || 'updatedAt';
     const currentDir = (searchParams.get('dir') || 'desc') as 'asc' | 'desc';
 
@@ -248,14 +247,6 @@ export default function ProjectDetail() {
         }
     };
 
-    const parseQuoteNumberForSort = (quoteNumber: string) => {
-        const match = quoteNumber.match(/Q(\d+)-(\d+)/);
-        if (match) {
-            return parseInt(match[1]) * 1000000 + parseInt(match[2]);
-        }
-        return 0;
-    };
-
     const toggleSort = (column: string) => {
         const newDir = currentSort === column && currentDir === 'desc' ? 'asc' : 'desc';
         const params = new URLSearchParams(searchParams.toString());
@@ -268,70 +259,6 @@ export default function ProjectDetail() {
         if (currentSort !== column) return null;
         return currentDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
     };
-
-    const sortedQuotes = (() => {
-        let sorted = [...optimisticQuotes].sort((a: any, b: any) => {
-            let aVal, bVal;
-            
-            switch (currentSort) {
-                case 'total':
-                    aVal = a.totalExGST || 0;
-                    bVal = b.totalExGST || 0;
-                    break;
-                case 'status':
-                    aVal = a.status || '';
-                    bVal = b.status || '';
-                    break;
-                case 'estimator':
-                    aVal = a.modifier?.name || '';
-                    bVal = b.modifier?.name || '';
-                    break;
-                case 'quoteNumber':
-                    aVal = parseQuoteNumberForSort(a.quoteNumber);
-                    bVal = parseQuoteNumberForSort(b.quoteNumber);
-                    break;
-                case 'updatedAt':
-                default:
-                    aVal = new Date(a.updatedAt).getTime();
-                    bVal = new Date(b.updatedAt).getTime();
-            }
-
-            if (aVal < bVal) return currentDir === 'asc' ? -1 : 1;
-            if (aVal > bVal) return currentDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-
-        // Revision grouping logic
-        const groups = sorted.reduce((acc, quote) => {
-            const groupId = quote.revisionGroupId || quote.id;
-            if (!acc[groupId]) acc[groupId] = [];
-            acc[groupId].push(quote);
-            return acc;
-        }, {} as Record<string, any[]>);
-
-        const flat: any[] = [];
-        const processedGroups = new Set();
-        
-        // Use the initial sorted order to determine which group base comes first
-        for (const quote of sorted) {
-            const groupId = quote.revisionGroupId || quote.id;
-            
-            if (processedGroups.has(groupId)) continue;
-            processedGroups.add(groupId);
-
-            const group = groups[groupId];
-            // Parent always remains the one with the earliest createdAt
-            group.sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-            
-            if (group.length > 0) {
-                flat.push({ ...group[0], _isChild: false });
-                for (let i = 1; i < group.length; i++) {
-                    flat.push({ ...group[i], _isChild: true });
-                }
-            }
-        }
-        return flat;
-    })();
 
     const handleLinkDeal = async (deal: any) => {
         setIsLinkModalOpen(false);
@@ -650,7 +577,6 @@ export default function ProjectDetail() {
                         </div>
                     </div>
 
-                    {/* Associated Quotes Table */}
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden w-full">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                             <h2 className="font-bold text-gray-900 flex items-center gap-2">
@@ -659,67 +585,17 @@ export default function ProjectDetail() {
                             </h2>
                         </div>
                         
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead>
-                                    <tr className="bg-gray-50/50">
-                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[80px]">Est.</th>
-                                        <th 
-                                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[160px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
-                                            onClick={() => toggleSort('quoteNumber')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Quote Number
-                                                {renderSortIcon('quoteNumber')}
-                                            </div>
-                                        </th>
-                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[200px]">Project Name</th>
-                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Company</th>
-                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Client</th>
-                                        <th 
-                                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[110px] cursor-pointer hover:bg-gray-100 transition-colors"
-                                            onClick={() => toggleSort('status')}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                Status
-                                                {renderSortIcon('status')}
-                                            </div>
-                                        </th>
-                                        <th 
-                                            className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[140px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
-                                            onClick={() => toggleSort('total')}
-                                        >
-                                            <div className="flex items-center justify-end gap-2">
-                                                Total (ex GST)
-                                                {renderSortIcon('total')}
-                                            </div>
-                                        </th>
-                                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notes</th>
-                                        <th className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[80px]"></th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {sortedQuotes.map((quote: any) => (
-                                        <QuoteRow 
-                                            key={quote.id} 
-                                            quote={quote} 
-                                            isChild={quote._isChild}
-                                            onUpdate={handleUpdateQuote}
-                                            onDuplicate={handleDuplicateQuoteClick}
-                                            onCreateRevision={handleCreateRevision}
-                                            onDelete={handleDeleteQuote}
-                                        />
-                                    ))}
-                                    {optimisticQuotes.length === 0 && (
-                                        <tr>
-                                            <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium italic">
-                                                No quotes found for this project.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        <ProjectQuotesTable 
+                            quotes={optimisticQuotes}
+                            currentSort={currentSort}
+                            currentDir={currentDir}
+                            toggleSort={toggleSort}
+                            renderSortIcon={renderSortIcon}
+                            onUpdate={handleUpdateQuote}
+                            onDuplicate={handleDuplicateQuoteClick}
+                            onCreateRevision={handleCreateRevision}
+                            onDelete={handleDeleteQuote}
+                        />
                     </div>
                 </div>
 

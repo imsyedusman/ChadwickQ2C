@@ -17,7 +17,10 @@ import {
     Building2,
     Calendar,
     FileText,
-    Settings2
+    Settings2,
+    Layers,
+    Info,
+    ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -56,8 +59,10 @@ import { toast } from 'sonner';
 import {
     getProjectClientDisplay,
     getProjectCompanyDisplay,
-    getProjectContactDisplay
+    getProjectContactDisplay,
+    normalizeProjectName
 } from '@/lib/project-utils';
+import { useMemo } from 'react';
 
 interface Estimator {
     id: string;
@@ -166,7 +171,7 @@ export default function ProjectsPage() {
 
     // URL-based state
     const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('limit') || '25');
+    const pageSize = parseInt(searchParams.get('limit') || '100');
     const search = searchParams.get('search') || '';
     const estimatorId = searchParams.get('estimatorId') || 'all';
 
@@ -177,6 +182,7 @@ export default function ProjectsPage() {
     const [totalProjects, setTotalProjects] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [isGrouped, setIsGrouped] = useState(true);
     const [searchInput, setSearchInput] = useState(search);
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -417,6 +423,59 @@ export default function ProjectsPage() {
             setLoading(false);
         }
     };
+    
+    // Grouping Logic
+    const groupedProjects = useMemo(() => {
+        if (!isGrouped) return [];
+        
+        const groups = new Map<string, {
+            name: string;
+            normalizedName: string;
+            projects: Project[];
+            totalDealValue: number;
+            totalQuotes: number;
+            latestActivity: Date;
+            clients: Set<string>;
+            companies: Set<string>;
+        }>();
+
+        projects.forEach(project => {
+            const normalized = normalizeProjectName(project.projectName);
+            const existing = groups.get(normalized);
+            
+            const projectDate = new Date(project.createdAt);
+            const dealVal = Number(project.dealValue) || 0;
+            const quoteCount = project._count?.quotes || 0;
+            
+            const client = getProjectClientDisplay(project);
+            const company = getProjectCompanyDisplay(project);
+
+            if (existing) {
+                existing.projects.push(project);
+                existing.totalDealValue += dealVal;
+                existing.totalQuotes += quoteCount;
+                if (projectDate > existing.latestActivity) {
+                    existing.latestActivity = projectDate;
+                    existing.name = project.projectName; // Use most recent name
+                }
+                if (client && client !== 'No Contact') existing.clients.add(client);
+                if (company && company !== 'No Company') existing.companies.add(company);
+            } else {
+                groups.set(normalized, {
+                    name: project.projectName,
+                    normalizedName: normalized,
+                    projects: [project],
+                    totalDealValue: dealVal,
+                    totalQuotes: quoteCount,
+                    latestActivity: projectDate,
+                    clients: new Set(client && client !== 'No Contact' ? [client] : []),
+                    companies: new Set(company && company !== 'No Company' ? [company] : [])
+                });
+            }
+        });
+
+        return Array.from(groups.values()).sort((a, b) => b.latestActivity.getTime() - a.latestActivity.getTime());
+    }, [projects, isGrouped]);
 
     const handleEditOpen = (project: Project) => {
         setSelectedProject(project);
@@ -530,6 +589,42 @@ export default function ProjectsPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
+                    <div className="flex flex-col items-end mr-2">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">View Mode</span>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Info size={12} className="text-gray-300 cursor-help hover:text-gray-400 transition-colors" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-[200px] text-[11px]">
+                                        Grouping is based on project name and applies to currently loaded results only.
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
+                            <button
+                                onClick={() => setIsGrouped(true)}
+                                className={cn(
+                                    "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
+                                    isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                                )}
+                            >
+                                Grouped
+                            </button>
+                            <button
+                                onClick={() => setIsGrouped(false)}
+                                className={cn(
+                                    "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
+                                    !isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                                )}
+                            >
+                                List
+                            </button>
+                        </div>
+                    </div>
+
                     {syncingPipedrive && syncProgress && (
                         <div className="flex flex-col items-end mr-4 animate-pulse">
                             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-none">Syncing deals...</span>
@@ -744,10 +839,165 @@ export default function ProjectsPage() {
                                         </div>
                                     </td>
                                 </tr>
+                            ) : isGrouped ? (
+                                // Grouped View
+                                groupedProjects.map((group) => (
+                                    <tr key={group.normalizedName} className={cn(
+                                        "hover:bg-[#f8faff] transition-colors group cursor-pointer",
+                                        loading && "opacity-50 pointer-events-none"
+                                    )} onClick={() => router.push(`/projects/group/${encodeURIComponent(group.normalizedName)}`)}>
+                                        <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                            <div className="w-4 h-4 rounded border border-gray-200 bg-gray-50/50" />
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center">
+                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm border border-blue-200">
+                                                    <Layers size={14} />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-slate-50 text-slate-400 rounded-lg group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors shadow-sm shrink-0">
+                                                    <Briefcase size={18} />
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="flex items-center gap-2 mb-0.5">
+                                                        <span className="font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
+                                                            {group.name}
+                                                        </span>
+                                                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-tight rounded border border-blue-100 whitespace-nowrap">
+                                                            Grouped Project
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                                            <Briefcase size={10} />
+                                                            {group.projects.length} Projects
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-300">•</span>
+                                                        <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
+                                                            <FileText size={10} />
+                                                            {group.totalQuotes} Quotes
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center">
+                                                <span className={cn(
+                                                    "px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-widest shadow-sm",
+                                                    getStatusStyle(group.projects[0].projectStatus)
+                                                )}>
+                                                    {group.projects[0].projectStatus}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm font-bold text-gray-900">{group.totalQuotes}</span>
+                                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter font-medium">Quotes</span>
+                                            </div>
+                                        </td>
+                                        {visibleColumns.client && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <User size={14} className="text-gray-400 shrink-0" />
+                                                    <span className="text-sm font-medium text-gray-700 truncate">
+                                                        {group.clients.size > 0 ? Array.from(group.clients)[0] : 'No Contact'}
+                                                    </span>
+                                                    {group.clients.size > 1 && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded cursor-help whitespace-nowrap">
+                                                                        +{group.clients.size - 1} more
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">Multiple Clients:</p>
+                                                                        {Array.from(group.clients).map((c, i) => (
+                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                                                                                <User size={10} className="text-gray-400" />
+                                                                                {c}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.company && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Building2 size={14} className="text-gray-400 shrink-0" />
+                                                    <span className="text-sm font-medium text-gray-700 truncate">
+                                                        {group.companies.size > 0 ? Array.from(group.companies)[0] : 'No Company'}
+                                                    </span>
+                                                    {group.companies.size > 1 && (
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded cursor-help whitespace-nowrap">
+                                                                        +{group.companies.size - 1} more
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">Multiple Companies:</p>
+                                                                        {Array.from(group.companies).map((c, i) => (
+                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                                                                                <Building2 size={10} className="text-gray-400" />
+                                                                                {c}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.dealValue && (
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-sm font-bold text-blue-600">
+                                                        ${group.totalDealValue.toLocaleString()}
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Aggregated Total</span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        {visibleColumns.created && (
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {format(group.latestActivity, 'dd MMM yyyy')}
+                                                    </span>
+                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Latest Activity</span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        <td className="px-6 py-4 sticky right-0 z-10 bg-white group-hover:bg-[#f8faff] transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
+                                            <div className="flex justify-center">
+                                                <div className="p-2 hover:bg-white hover:shadow-sm rounded-lg text-gray-400 hover:text-blue-600 transition-all border border-transparent">
+                                                    <ChevronRight size={20} />
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
                             ) : (
+                                // Original Individual View
                                 projects.map((project) => (
                                     <tr key={project.id} className={cn(
-                                        "hover:bg-blue-50/30 transition-colors group",
+                                        "hover:bg-[#f8faff] transition-colors group",
                                         loading && "opacity-50 pointer-events-none",
                                         selectedIds.includes(project.id) && "bg-blue-50/50"
                                     )}>
@@ -897,7 +1147,7 @@ export default function ProjectsPage() {
                                                     if (project.dealValue && !isNaN(val)) {
                                                         return (
                                                             <div className="flex flex-col items-end">
-                                                                <span className="text-sm font-bold text-gray-900">
+                                                                  <span className="text-sm font-bold text-gray-900">
                                                                     ${val.toLocaleString()}
                                                                 </span>
                                                                 {project.pipedrive_deal_id && (
