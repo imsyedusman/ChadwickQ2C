@@ -17,19 +17,22 @@ import {
     AlertCircle,
     Clock,
     Plus,
-    ExternalLink
+    ExternalLink,
+    ArrowUpRight,
+    Link as LinkIcon,
+    Link2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import QuoteRow from '@/components/Project/QuoteRow';
 import ProjectQuotesTable from '@/components/Project/ProjectQuotesTable';
 import DuplicateQuoteDialog from '@/components/Dashboard/DuplicateQuoteDialog';
 import { 
     getProjectClientDisplay, 
     getProjectCompanyDisplay, 
-    normalizeProjectName 
+    normalizeProjectName,
+    getProjectStatusDisplay
 } from '@/lib/project-utils';
 import {
     Tooltip,
@@ -37,17 +40,34 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import LinkDealModal from '@/components/Project/LinkDealModal';
 
 interface SimplifiedProject {
     id: string;
     projectName: string;
     clientName: string | null;
     companyName: string | null;
+    projectReference: string | null;
+    projectDescription: string | null;
     projectStatus: string;
     createdAt: string;
+    updatedAt: string;
+    pipedrive_deal_id?: number | null;
     dealValue: number | null;
+    currency?: string | null;
+    dealCreatedAt?: string | null;
+    expectedCloseDate?: string | null;
+    quoteFolder?: string | null;
     pipedriveDealUrl?: string | null;
-    projectDescription?: string | null;
+    client?: { name: string } | null;
+    contact?: { name: string } | null;
 }
 
 interface FullProject extends SimplifiedProject {
@@ -71,19 +91,8 @@ export default function GroupDetail() {
     const [refreshing, setRefreshing] = useState(false);
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
     
-    const [duplicateDialog, setDuplicateDialog] = useState<{
-        isOpen: boolean;
-        quoteId: string;
-        clientName: string;
-        clientCompany: string;
-    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
-    
-    const [stats, setStats] = useState({
-        totalQuotes: 0,
-        totalValue: 0,
-        latestActivity: new Date(0),
-    });
-
+    const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
+    const [linkingProjectId, setLinkingProjectId] = useState<string | null>(null);
     const [isCapped, setIsCapped] = useState(false);
 
     const fetchData = async () => {
@@ -171,6 +180,20 @@ export default function GroupDetail() {
             setRefreshing(false);
         }
     };
+
+    const [duplicateDialog, setDuplicateDialog] = useState<{
+        isOpen: boolean;
+        quoteId: string;
+        projectId?: string;
+        clientName: string;
+        clientCompany: string;
+    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
+
+    const [stats, setStats] = useState({
+        totalQuotes: 0,
+        totalValue: 0,
+        latestActivity: new Date(0),
+    });
 
     useEffect(() => {
         fetchData();
@@ -311,6 +334,112 @@ export default function GroupDetail() {
         }
     };
 
+    const handleProjectStatusChange = async (projectId: string, newStatus: string) => {
+        setProjects(prev => prev.map(p => p.id === projectId ? { ...p, projectStatus: newStatus } : p));
+        try {
+            await fetch(`/api/projects/${projectId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectStatus: newStatus })
+            });
+        } catch (err) {
+            toast.error('Failed to update project status');
+            fetchData();
+        }
+    };
+
+    const handleRefresh = async (project: FullProject) => {
+        if (!project?.pipedrive_deal_id) return;
+
+        setRefreshing(true);
+        try {
+            const detailRes = await fetch(`/api/pipedrive/deal/${project.pipedrive_deal_id}`);
+            const fullDeal = await detailRes.json();
+
+            const res = await fetch(`/api/projects/${project.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectName: fullDeal.title,
+                    dealValue: fullDeal.value,
+                    currency: fullDeal.currency,
+                    dealCreatedAt: fullDeal.add_time ? new Date(fullDeal.add_time) : undefined,
+                    expectedCloseDate: fullDeal.expected_close_date ? new Date(fullDeal.expected_close_date) : undefined,
+                    quoteFolder: fullDeal.quote_folder,
+                    pipedriveDealUrl: `https://app.pipedrive.com/deal/${project.pipedrive_deal_id}`,
+                    client: fullDeal.organization ? {
+                        pipedrive_org_id: fullDeal.organization.id,
+                        name: fullDeal.organization.name
+                    } : undefined,
+                    contact: fullDeal.person ? {
+                        pipedrive_person_id: fullDeal.person.id,
+                        name: fullDeal.person.name
+                    } : undefined
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Refreshed from Pipedrive');
+                // Deep update
+                const updatedData = await res.json();
+                setProjects(prev => prev.map(p => p.id === project.id ? { ...p, ...updatedData } : p));
+                fetchData(); // Full refresh to be safe
+            } else {
+                toast.error('Failed to refresh');
+            }
+        } catch (error) {
+            toast.error('Error refreshing project');
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
+    const handleLinkDeal = async (deal: any) => {
+        if (!linkingProjectId) return;
+        
+        setIsLinkModalOpen(false);
+        setRefreshing(true);
+        try {
+            const detailRes = await fetch(`/api/pipedrive/deal/${deal.id}`);
+            const fullDeal = await detailRes.json();
+
+            const res = await fetch(`/api/projects/${linkingProjectId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pipedrive_deal_id: deal.id,
+                    projectName: deal.title,
+                    dealValue: fullDeal.value,
+                    currency: fullDeal.currency,
+                    dealCreatedAt: fullDeal.add_time ? new Date(fullDeal.add_time) : undefined,
+                    expectedCloseDate: fullDeal.expected_close_date ? new Date(fullDeal.expected_close_date) : undefined,
+                    quoteFolder: fullDeal.quote_folder,
+                    pipedriveDealUrl: `https://app.pipedrive.com/deal/${deal.id}`,
+                    client: fullDeal.organization ? {
+                        pipedrive_org_id: fullDeal.organization.id,
+                        name: fullDeal.organization.name
+                    } : undefined,
+                    contact: fullDeal.person ? {
+                        pipedrive_person_id: fullDeal.person.id,
+                        name: fullDeal.person.name
+                    } : undefined
+                })
+            });
+
+            if (res.ok) {
+                toast.success('Project linked to Pipedrive deal');
+                fetchData();
+            } else {
+                toast.error('Failed to link deal');
+            }
+        } catch (error) {
+            toast.error('Error linking deal');
+        } finally {
+            setRefreshing(false);
+            setLinkingProjectId(null);
+        }
+    };
+
     if (loading) {
         return (
             <div className="p-8 space-y-8 animate-in fade-in duration-500">
@@ -412,6 +541,34 @@ export default function GroupDetail() {
                                         <h3 className="text-2xl font-black text-gray-900 truncate tracking-tight">
                                             {getProjectCompanyDisplay(project)}
                                         </h3>
+                                        <div className="flex items-center gap-3">
+                                            <Select 
+                                                value={project.projectStatus} 
+                                                onValueChange={(val) => handleProjectStatusChange(project.id, val)}
+                                            >
+                                                <SelectTrigger 
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className={cn(
+                                                        "px-3 py-1 h-8 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm w-[120px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
+                                                        getProjectStatusDisplay(project.projectStatus).className
+                                                    )}
+                                                >
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent onClick={(e) => e.stopPropagation()}>
+                                                    <SelectItem value="Budget">Budget</SelectItem>
+                                                    <SelectItem value="Tender">Tender</SelectItem>
+                                                    <SelectItem value="Live">Live</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            
+                                            {project.pipedrive_deal_id && (
+                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                                                    <Link2 size={12} />
+                                                    Linked Deal #{project.pipedrive_deal_id}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden md:block" />
                                         <span className="text-lg font-bold text-gray-500 truncate">
                                             {getProjectClientDisplay(project)}
@@ -438,24 +595,80 @@ export default function GroupDetail() {
                             </div>
 
                             <div className="flex items-center gap-3">
-                                {project.pipedriveDealUrl && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger asChild>
-                                                <a 
-                                                    href={project.pipedriveDealUrl} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group"
-                                                >
-                                                    <ExternalLink size={14} className="group-hover:scale-110 transition-transform" />
-                                                </a>
-                                            </TooltipTrigger>
-                                            <TooltipContent>View in Pipedrive</TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
+                                {project.pipedrive_deal_id && (
+                                    <div className="flex items-center gap-2 mr-2">
+                                        {project.quoteFolder && (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <a 
+                                                            href={project.quoteFolder}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group"
+                                                        >
+                                                            <FileText size={14} className="group-hover:scale-110 transition-transform" />
+                                                        </a>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>Open Sharepoint Folder</TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        )}
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRefresh(project);
+                                                        }}
+                                                        disabled={refreshing}
+                                                        className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group disabled:opacity-50"
+                                                    >
+                                                        <RefreshCw size={14} className={cn("group-hover:scale-110 transition-transform", refreshing && "animate-spin")} />
+                                                    </button>
+                                                </TooltipTrigger>
+                                                <TooltipContent>Sync from Pipedrive</TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                        {project.pipedriveDealUrl && (
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <a 
+                                                            href={project.pipedriveDealUrl} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group"
+                                                        >
+                                                            <ArrowUpRight size={14} className="group-hover:scale-110 transition-transform" />
+                                                        </a>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>View in Pipedrive</TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        )}
+                                    </div>
                                 )}
+                                
+                                {!project.pipedrive_deal_id && (
+                                    <Button 
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLinkingProjectId(project.id);
+                                            setIsLinkModalOpen(true);
+                                        }}
+                                        className="h-8 border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 px-3 rounded-lg transition-all font-bold text-[10px] uppercase tracking-wider"
+                                    >
+                                        <Link2 size={14} />
+                                        Link Deal
+                                    </Button>
+                                )}
+
                                 <div className={cn(
                                     "w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 transition-transform duration-300 bg-white",
                                     expandedProjects.has(project.id) && "rotate-180 border-blue-200 text-blue-500 shadow-sm"
@@ -512,6 +725,15 @@ export default function GroupDetail() {
                 onDuplicate={handleDuplicateConfirm}
                 initialClientName={duplicateDialog.clientName}
                 initialClientCompany={duplicateDialog.clientCompany}
+            />
+
+            <LinkDealModal 
+                isOpen={isLinkModalOpen} 
+                onClose={() => {
+                    setIsLinkModalOpen(false);
+                    setLinkingProjectId(null);
+                }} 
+                onSelect={handleLinkDeal} 
             />
         </div>
     );

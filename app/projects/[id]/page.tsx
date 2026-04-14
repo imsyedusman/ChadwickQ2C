@@ -30,14 +30,14 @@ import { format } from 'date-fns';
 import { cn, formatQuoteNumber } from '@/lib/utils';
 import { toast } from 'sonner';
 import LinkDealModal from '@/components/Project/LinkDealModal';
-import QuoteRow from '@/components/Project/QuoteRow';
-import DuplicateQuoteDialog from '@/components/Dashboard/DuplicateQuoteDialog';
-
 import { 
     getProjectClientDisplay, 
     getProjectCompanyDisplay, 
-    getProjectContactDisplay 
+    getProjectContactDisplay,
+    getProjectStatusDisplay
 } from '@/lib/project-utils';
+import ProjectQuotesTable from '@/components/Project/ProjectQuotesTable';
+import DuplicateQuoteDialog from '@/components/Dashboard/DuplicateQuoteDialog';
 
 interface Project {
     id: string;
@@ -367,14 +367,6 @@ export default function ProjectDetail() {
         );
     }
 
-    const getProjectStatusDisplay = (status: string) => {
-        const statusMap: Record<string, { label: string; className: string }> = {
-            'Budget': { label: 'Budget', className: 'bg-purple-100 text-purple-700 border-purple-200' },
-            'Tender': { label: 'Tender', className: 'bg-orange-100 text-orange-700 border-orange-200' },
-            'Live': { label: 'Live', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-        };
-        return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' };
-    };
 
     return (
         <main className="w-full max-w-[1600px] mx-auto px-6 py-8 animate-in fade-in duration-500">

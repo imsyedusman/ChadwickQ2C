@@ -26,3 +26,15 @@ export function normalizeProjectName(name: string | null | undefined): string {
         .toLowerCase()
         .replace(/\s+/g, ' ');
 }
+
+/**
+ * Returns consistent styling and labels for project statuses.
+ */
+export function getProjectStatusDisplay(status: string) {
+    const statusMap: Record<string, { label: string; className: string }> = {
+        'Budget': { label: 'Budget', className: 'bg-purple-100 text-purple-700 border-purple-200' },
+        'Tender': { label: 'Tender', className: 'bg-orange-100 text-orange-700 border-orange-200' },
+        'Live': { label: 'Live', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    };
+    return statusMap[status] || { label: status, className: 'bg-gray-100 text-gray-700 border-gray-200' };
+}

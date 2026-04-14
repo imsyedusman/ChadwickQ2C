@@ -79,6 +79,7 @@ interface Project {
     projectDescription: string | null;
     projectStatus: string;
     createdAt: string;
+    updatedAt: string;
     pipedrive_deal_id: number | null;
     dealValue: number | null;
     currency: string | null;
@@ -88,7 +89,10 @@ interface Project {
     pipedriveDealUrl: string | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
-    quotes: { creator: Estimator | null }[];
+    quotes: { 
+        updatedAt: string;
+        creator: Estimator | null 
+    }[];
     _count?: {
         quotes: number;
     };
@@ -102,7 +106,7 @@ function getInitials(name: string | null) {
     return (parts[0][0] + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
 }
 
-function EstimatorBadges({ quotes }: { quotes: { creator: Estimator | null }[] }) {
+function EstimatorBadges({ quotes, limit = 2 }: { quotes: { creator: Estimator | null }[], limit?: number }) {
     // Extract unique creators
     const creators = Array.from(new Map(
         quotes
@@ -112,7 +116,7 @@ function EstimatorBadges({ quotes }: { quotes: { creator: Estimator | null }[] }
 
     if (creators.length === 0) return <span className="text-gray-300 italic text-[10px]">No Estimator</span>;
 
-    const displayLimit = 2;
+    const displayLimit = limit;
     const items = creators.slice(0, displayLimit);
     const overflow = creators.length - displayLimit;
 
@@ -851,9 +855,17 @@ export default function ProjectsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm border border-blue-200">
-                                                    <Layers size={14} />
-                                                </div>
+                                                {(() => {
+                                                    // Flatten all quotes from all projects in this group
+                                                    const allQuotes = group.projects.flatMap(p => p.quotes);
+                                                    // Sort by updatedAt desc to ensure the "most recent" estimator is first
+                                                    const sortedQuotes = [...allQuotes].sort((a, b) => 
+                                                        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+                                                    );
+                                                    return (
+                                                        <EstimatorBadges quotes={sortedQuotes} limit={1} />
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -866,9 +878,11 @@ export default function ProjectsPage() {
                                                         <span className="font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors truncate">
                                                             {group.name}
                                                         </span>
-                                                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-tight rounded border border-blue-100 whitespace-nowrap">
-                                                            Grouped Project
-                                                        </span>
+                                                        {group.projects.length > 1 && (
+                                                            <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-bold uppercase tracking-tight rounded border border-blue-100 whitespace-nowrap">
+                                                                Grouped Project
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
