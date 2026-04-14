@@ -11,6 +11,7 @@ import { upsertPipedriveOrganization, upsertPipedrivePerson } from '@/lib/pipedr
 import { getGlobalSettings, getEffectiveSettingsForQuote, ensureQuoteSnapshot } from '@/lib/settings-service';
 import { getResolvedUserId } from '@/lib/user-utils';
 import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
+import { normalizeProjectName } from '@/lib/project-utils';
 
 export async function POST(
     request: Request,
@@ -22,6 +23,7 @@ export async function POST(
         const { 
             clientName: overrideClientName, 
             clientCompany: overrideClientCompany,
+            projectName: overrideProjectName,
             pipedrivePersonId,
             pipedriveOrgId
         } = body;
@@ -61,6 +63,46 @@ export async function POST(
         const session = await getServerSession(authOptions);
         const resolvedUserId = await getResolvedUserId(session);
 
+        // --- 2. PROJECT LINKAGE LOGIC ---
+        // Determine if we should link to an existing project or create a new one.
+        let targetProjectId = null;
+        let linkedToExistingProject = false;
+        
+        const finalProjectName = overrideProjectName || originalQuote.projectRef || 'Unnamed Project';
+        const normalizedTargetName = normalizeProjectName(finalProjectName);
+
+        if (linkedClientId) {
+            // Find all projects for this client
+            const candidateProjects = await prisma.project.findMany({
+                where: { clientId: linkedClientId },
+                orderBy: { updatedAt: 'desc' }
+            });
+
+            // Find first match using normalization
+            const match = candidateProjects.find(p => normalizeProjectName(p.projectName) === normalizedTargetName);
+            
+            if (match) {
+                targetProjectId = match.id;
+                linkedToExistingProject = true;
+            }
+        }
+
+        // Fallback: If no match found, create a NEW project
+        if (!targetProjectId) {
+            const newProject = await prisma.project.create({
+                data: {
+                    projectName: finalProjectName,
+                    clientId: linkedClientId,
+                    contactId: linkedContactId,
+                    clientName: overrideClientName || originalQuote.clientName,
+                    companyName: overrideClientCompany || originalQuote.clientCompany,
+                    projectStatus: 'Budget',
+                    projectDescription: originalQuote.description
+                }
+            });
+            targetProjectId = newProject.id;
+        }
+
         const newQuote = await prisma.$transaction(async (tx) => {
             // DUPLICATE RULE: Keep quote number EXACTLY the same
             const newFullQuoteNumber = originalQuote.quoteNumber;
@@ -90,8 +132,8 @@ export async function POST(
                     clientCompany: overrideClientCompany || originalQuote.clientCompany,
                     clientId: linkedClientId,
                     contactId: linkedContactId,
-                    projectId: originalQuote.projectId, 
-                    projectRef: originalQuote.projectRef,
+                    projectId: targetProjectId, 
+                    projectRef: finalProjectName,
                     description: originalQuote.description,
                     status: 'DRAFT',
                     settingsSnapshot: originalQuote.settingsSnapshot,
@@ -183,6 +225,8 @@ export async function POST(
             totalExGST: grandTotals.sellPriceRounded,
             totalIncGST: grandTotals.finalSellPrice,
             gstAmount: grandTotals.gst,
+            linkedToExistingProject,
+            projectName: finalProjectName,
             // Legacy support
             total: grandTotals.sellPriceRounded,
             totalIncGst: grandTotals.finalSellPrice

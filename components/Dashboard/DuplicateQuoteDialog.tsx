@@ -16,9 +16,16 @@ import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchable
 interface DuplicateQuoteDialogProps {
     isOpen: boolean;
     onClose: () => void;
-    onDuplicate: (clientName: string, clientCompany: string, pipedrivePersonId?: number | null, pipedriveOrgId?: number | null) => Promise<void>;
+    onDuplicate: (
+        clientName: string, 
+        clientCompany: string, 
+        projectName: string,
+        pipedrivePersonId?: number | null, 
+        pipedriveOrgId?: number | null
+    ) => Promise<void>;
     initialClientName?: string;
     initialClientCompany?: string;
+    initialProjectName?: string;
 }
 
 export default function DuplicateQuoteDialog({
@@ -27,9 +34,11 @@ export default function DuplicateQuoteDialog({
     onDuplicate,
     initialClientName = '',
     initialClientCompany = '',
+    initialProjectName = '',
 }: DuplicateQuoteDialogProps) {
     const [clientName, setClientName] = useState(initialClientName);
     const [clientCompany, setClientCompany] = useState(initialClientCompany);
+    const [projectName, setProjectName] = useState(initialProjectName);
     const [pipedrivePersonId, setPipedrivePersonId] = useState<number | null>(null);
     const [pipedriveOrgId, setPipedriveOrgId] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,13 +47,14 @@ export default function DuplicateQuoteDialog({
         if (isOpen) {
             setClientName(initialClientName);
             setClientCompany(initialClientCompany);
+            setProjectName(initialProjectName);
         }
-    }, [isOpen, initialClientName, initialClientCompany]);
+    }, [isOpen, initialClientName, initialClientCompany, initialProjectName]);
 
     const handleConfirm = async () => {
         setIsSubmitting(true);
         try {
-            await onDuplicate(clientName, clientCompany, pipedrivePersonId, pipedriveOrgId);
+            await onDuplicate(clientName, clientCompany, projectName, pipedrivePersonId, pipedriveOrgId);
             onClose();
         } catch (error) {
             console.error('Duplication failed', error);
@@ -67,6 +77,16 @@ export default function DuplicateQuoteDialog({
                 </DialogHeader>
                 
                 <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <label className="text-sm font-semibold text-gray-700" htmlFor="projectName">Project Name</label>
+                        <input
+                            id="projectName"
+                            className="flex h-10 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={projectName}
+                            onChange={(e) => setProjectName(e.target.value)}
+                            placeholder="e.g., Office Renovation"
+                        />
+                    </div>
                     <div className="grid gap-2">
                         <label className="text-sm font-semibold text-gray-700" htmlFor="clientCompany">Client / Company Name</label>
                         <PipedriveSearchableDropdown

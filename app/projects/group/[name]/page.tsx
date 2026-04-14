@@ -187,7 +187,8 @@ export default function GroupDetail() {
         projectId?: string;
         clientName: string;
         clientCompany: string;
-    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
+        initialProjectName: string;
+    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '', initialProjectName: '' });
 
     const [stats, setStats] = useState({
         totalQuotes: 0,
@@ -273,12 +274,14 @@ export default function GroupDetail() {
             projectId: projectId, 
             clientName: quote.clientName || '',
             clientCompany: quote.clientCompany || '',
+            initialProjectName: groupName, // In grouped view, the project name is the group name
         } as any);
     };
 
     const handleDuplicateConfirm = async (
         clientName: string, 
         clientCompany: string,
+        projectName: string,
         pipedrivePersonId?: number | null,
         pipedriveOrgId?: number | null
     ) => {
@@ -289,6 +292,7 @@ export default function GroupDetail() {
                 body: JSON.stringify({ 
                     clientName, 
                     clientCompany,
+                    projectName,
                     pipedrivePersonId,
                     pipedriveOrgId
                 }),
@@ -296,22 +300,60 @@ export default function GroupDetail() {
             if (!res.ok) throw new Error('Failed to duplicate');
             const newQuote = await res.json();
             
-            setProjects(prev => prev.map(p => {
-                if (p.id !== (duplicateDialog as any).projectId) return p;
-                const exists = p.quotes.some(q => q.id === newQuote.id);
-                if (exists) {
-                    return { ...p, quotes: p.quotes.map(q => q.id === newQuote.id ? newQuote : q) };
-                }
-                const idx = p.quotes.findIndex(q => q.id === duplicateDialog.quoteId);
-                if (idx > -1) {
-                    const newArr = [...p.quotes];
-                    newArr.splice(idx + 1, 0, newQuote);
-                    return { ...p, quotes: newArr };
-                }
-                return { ...p, quotes: [newQuote, ...p.quotes] };
-            }));
+            // Check if this project already exists in our group state
+            const projectExists = projects.some(p => p.id === newQuote.projectId);
 
-            toast.success('Quote duplicated');
+            if (projectExists) {
+                // Update specific project in state
+                setProjects(prev => prev.map(p => {
+                    if (p.id !== newQuote.projectId) return p;
+                    
+                    const exists = p.quotes.some(q => q.id === newQuote.id);
+                    if (exists) {
+                        return { ...p, quotes: p.quotes.map(q => q.id === newQuote.id ? newQuote : q) };
+                    }
+                    
+                    // Logic to insert near the original quote if possible, or just at top
+                    const idx = p.quotes.findIndex(q => q.id === duplicateDialog.quoteId);
+                    if (idx > -1) {
+                        const newArr = [...p.quotes];
+                        newArr.splice(idx + 1, 0, newQuote);
+                        return { ...p, quotes: newArr };
+                    }
+                    return { ...p, quotes: [newQuote, ...p.quotes] };
+                }));
+
+                if (newQuote.linkedToExistingProject) {
+                    toast.success(`Linked to existing project: ${newQuote.projectName || projectName}`);
+                } else {
+                    toast.success('Quote duplicated');
+                }
+            } else {
+                // It's a new project or linked project not currently in state.
+                // Does it belong to this group?
+                const normalizedGroupName = normalizeProjectName(groupName);
+                const normalizedTargetName = normalizeProjectName(newQuote.projectName || projectName);
+
+                if (normalizedGroupName === normalizedTargetName) {
+                    // It belongs to this group! Fetch again to get the full project metadata
+                    toast.success('New project created in group');
+                    fetchData();
+                } else {
+                    // It was duplicated to a COMPLETELY DIFFERENT project group
+                    toast.success(
+                        <div className="flex flex-col gap-1">
+                            <span>Duplicated to different project: <b>{newQuote.projectName || projectName}</b></span>
+                            <Button 
+                                variant="link" 
+                                className="h-auto p-0 text-blue-600 justify-start font-bold"
+                                onClick={() => router.push(`/projects/${newQuote.projectId}`)}
+                            >
+                                View Project
+                            </Button>
+                        </div>
+                    );
+                }
+            }
         } catch (error) {
             toast.error('Failed to duplicate quote');
         }
@@ -725,6 +767,7 @@ export default function GroupDetail() {
                 onDuplicate={handleDuplicateConfirm}
                 initialClientName={duplicateDialog.clientName}
                 initialClientCompany={duplicateDialog.clientCompany}
+                initialProjectName={duplicateDialog.initialProjectName}
             />
 
             <LinkDealModal 

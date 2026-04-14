@@ -439,12 +439,14 @@ export default function QuoteList() {
             quoteId: quote.id,
             clientName: quote.clientName || '',
             clientCompany: quote.clientCompany || '',
-        });
+            initialProjectName: quote.project?.projectName || quote.projectRef || ''
+        } as any);
     };
 
     const handleDuplicateConfirm = async (
         clientName: string, 
         clientCompany: string, 
+        projectName: string,
         pipedrivePersonId?: number | null, 
         pipedriveOrgId?: number | null
     ) => {
@@ -457,6 +459,7 @@ export default function QuoteList() {
                 body: JSON.stringify({ 
                     clientName, 
                     clientCompany,
+                    projectName,
                     pipedrivePersonId,
                     pipedriveOrgId
                 }),
@@ -468,6 +471,13 @@ export default function QuoteList() {
 
             const newQuote = await res.json();
             await fetchQuotes();
+            
+            if (newQuote.linkedToExistingProject) {
+                toast.success(`Linked to existing project: ${newQuote.projectName || projectName}`);
+            } else {
+                toast.success('Quote duplicated and link to new project');
+            }
+            
             router.push(`/quote/${newQuote.id}`);
         } catch (error) {
             console.error('Failed to duplicate quote', error);
@@ -1509,6 +1519,7 @@ export default function QuoteList() {
                 onDuplicate={handleDuplicateConfirm}
                 initialClientName={duplicateDialog.clientName}
                 initialClientCompany={duplicateDialog.clientCompany}
+                initialProjectName={(duplicateDialog as any).initialProjectName}
             />
             {/* Bulk Delete Dialog */}
             <Dialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>

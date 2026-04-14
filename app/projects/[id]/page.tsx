@@ -90,7 +90,8 @@ export default function ProjectDetail() {
         quoteId: string;
         clientName: string;
         clientCompany: string;
-    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '' });
+        initialProjectName: string;
+    }>({ isOpen: false, quoteId: '', clientName: '', clientCompany: '', initialProjectName: '' });
     const [actionLoading, setActionLoading] = useState(false);
 
     const fetchProject = async () => {
@@ -167,12 +168,14 @@ export default function ProjectDetail() {
             quoteId: quote.id,
             clientName: quote.clientName || '',
             clientCompany: quote.clientCompany || '',
+            initialProjectName: project?.projectName || quote.projectRef || '',
         });
     };
 
     const handleDuplicateConfirm = async (
         clientName: string, 
         clientCompany: string,
+        projectName: string,
         pipedrivePersonId?: number | null,
         pipedriveOrgId?: number | null
     ) => {
@@ -183,6 +186,7 @@ export default function ProjectDetail() {
                 body: JSON.stringify({ 
                     clientName, 
                     clientCompany,
+                    projectName,
                     pipedrivePersonId,
                     pipedriveOrgId
                 }),
@@ -191,20 +195,42 @@ export default function ProjectDetail() {
             if (!res.ok) throw new Error('Failed to duplicate quote');
             const newQuote = await res.json();
             
-            setOptimisticQuotes(prev => {
-                const exists = prev.some(q => q.id === newQuote.id);
-                if (exists) {
-                    return prev.map(q => q.id === newQuote.id ? newQuote : q);
+            // Only update local table if it still belongs to this project
+            if (newQuote.projectId === params.id) {
+                setOptimisticQuotes(prev => {
+                    const exists = prev.some(q => q.id === newQuote.id);
+                    if (exists) {
+                        return prev.map(q => q.id === newQuote.id ? newQuote : q);
+                    }
+                    const idx = prev.findIndex(q => q.id === duplicateDialog.quoteId);
+                    if (idx > -1) {
+                        const newArr = [...prev];
+                        newArr.splice(idx + 1, 0, newQuote);
+                        return newArr;
+                    }
+                    return [newQuote, ...prev];
+                });
+                
+                if (newQuote.linkedToExistingProject) {
+                    toast.success(`Linked to existing project: ${newQuote.projectName}`);
+                } else {
+                    toast.success('Quote duplicated successfully');
                 }
-                const idx = prev.findIndex(q => q.id === duplicateDialog.quoteId);
-                if (idx > -1) {
-                    const newArr = [...prev];
-                    newArr.splice(idx + 1, 0, newQuote);
-                    return newArr;
-                }
-                return [newQuote, ...prev];
-            });
-            toast.success('Quote duplicated successfully');
+            } else {
+                // It was duplicated to a DIFFERENT project
+                toast.success(
+                    <div className="flex flex-col gap-1">
+                        <span>Duplicated to different project: <b>{newQuote.projectName}</b></span>
+                        <Button 
+                            variant="link" 
+                            className="h-auto p-0 text-blue-600 justify-start font-bold"
+                            onClick={() => router.push(`/projects/${newQuote.projectId}`)}
+                        >
+                            View Project
+                        </Button>
+                    </div>
+                );
+            }
             fetchProject();
         } catch (error) {
             toast.error('Failed to duplicate quote');
@@ -598,6 +624,7 @@ export default function ProjectDetail() {
                     onDuplicate={handleDuplicateConfirm}
                     initialClientName={duplicateDialog.clientName}
                     initialClientCompany={duplicateDialog.clientCompany}
+                    initialProjectName={duplicateDialog.initialProjectName}
                 />
             </main>
     );
