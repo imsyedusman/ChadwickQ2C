@@ -17,6 +17,7 @@ import RevisionSelector from '@/components/QuoteBuilder/RevisionSelector';
 import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
 import { Share2 } from 'lucide-react';
 import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchableDropdown';
+import StepRail from '@/components/QuoteBuilder/StepFlow';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, projectStatus, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
@@ -24,8 +25,10 @@ function QuoteBuilderContent() {
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
     const [drawerCategory, setDrawerCategory] = useState<'Basics' | 'Switchboard' | 'Busbar' | undefined>(undefined);
+    const [drawerL1, setDrawerL1] = useState<string | undefined>(undefined);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [activeStep, setActiveStep] = useState<string | undefined>('switchgear');
 
     // Load persisted preferences on mount
     useEffect(() => {
@@ -331,10 +334,32 @@ function QuoteBuilderContent() {
 
                 {/* Panel 2: Board Content (Center) */}
                 <div className="h-full min-h-0 bg-white flex flex-col min-w-0">
-                    <BoardContent onAddItems={(cat) => {
-                        setDrawerCategory(cat);
-                        setIsItemDrawerOpen(true);
-                    }} />
+                    <BoardContent 
+                        activeStep={activeStep}
+                        onStepClick={(stepId) => {
+                            setActiveStep(stepId);
+                            if (stepId === 'switchgear') {
+                                setDrawerCategory('Switchboard');
+                                setDrawerL1(undefined);
+                                setIsItemDrawerOpen(true);
+                            } else if (stepId === 'miscellaneous') {
+                                setDrawerCategory('Switchboard');
+                                setDrawerL1('Miscellaneous');
+                                setIsItemDrawerOpen(true);
+                            } else if (stepId === 'busbars') {
+                                setDrawerCategory('Busbar');
+                                setDrawerL1(undefined);
+                                setIsItemDrawerOpen(true);
+                            }
+                        }}
+                        onAddItems={(cat) => {
+                            setDrawerCategory(cat);
+                            setIsItemDrawerOpen(true);
+                            // Sync active step
+                            if (cat === 'Switchboard') setActiveStep('switchgear');
+                            else if (cat === 'Busbar') setActiveStep('busbars');
+                        }} 
+                    />
                 </div>
 
                 {/* Panel 3: Costing View (Collapsible) */}
@@ -383,7 +408,14 @@ function QuoteBuilderContent() {
                         {/* Slide-over Panel */}
                         {/* WIDTH ADJUSTMENT: Change w-[60%] to w-1/2 or other values to adjust drawer width */}
                         <div className="relative w-[60%] bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
-                            <ItemSelection onClose={() => setIsItemDrawerOpen(false)} initialCategory={drawerCategory} />
+                            <ItemSelection 
+                                onClose={() => {
+                                    setIsItemDrawerOpen(false);
+                                    setDrawerL1(undefined);
+                                }} 
+                                initialCategory={drawerCategory} 
+                                initialL1={drawerL1}
+                            />
                         </div>
                     </div>
                 )

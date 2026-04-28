@@ -11,9 +11,11 @@ import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
 import { compareItems } from '@/lib/sorting';
 import { consolidateItems, ConsolidatedItem } from '@/lib/items/consolidation';
+import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-utils';
 import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
 import ManualItemForm from './ManualItemForm';
+import StepIndicator from './StepFlow';
 
 // ONLY these categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -98,9 +100,11 @@ const BASICS_STRICT_ORDER = [
 
 interface BoardContentProps {
     onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar') => void;
+    activeStep?: string;
+    onStepClick?: (stepId: string) => void;
 }
 
-export default function BoardContent({ onAddItems }: BoardContentProps) {
+export default function BoardContent({ onAddItems, activeStep, onStepClick }: BoardContentProps) {
     const { 
         boards, selectedBoardId, updateItem, effectiveSettings, 
         quoteId, refreshQuote, addItemToBoard, updateBoardDetails,
@@ -118,9 +122,52 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
     const [localCustomDesc, setLocalCustomDesc] = useState('');
     const [isDescDialogOpen, setIsDescDialogOpen] = useState(false);
+    const [dismissedHints, setDismissedHints] = useState<Set<string>>(new Set());
+
+    // Load dismissed hints on mount
+    useEffect(() => {
+        const saved = localStorage.getItem('quote_builder_dismissed_hints');
+        if (saved) {
+            try {
+                setDismissedHints(new Set(JSON.parse(saved)));
+            } catch (e) {
+                console.warn("Failed to load dismissed hints", e);
+            }
+        }
+    }, []);
+
+    const dismissHint = (hintId: string) => {
+        const newDismissed = new Set(dismissedHints);
+        newDismissed.add(hintId);
+        setDismissedHints(newDismissed);
+        localStorage.setItem('quote_builder_dismissed_hints', JSON.stringify(Array.from(newDismissed)));
+    };
 
     // New unified description state: local draft of bullets
     const [descriptionDraft, setDescriptionDraft] = useState<{ id?: string; text: string; isManual?: boolean }[]>([]);
+
+    // Automatically expand section based on activeStep
+    useEffect(() => {
+        if (!activeStep) return;
+        
+        let sectionToExpand = '';
+        if (activeStep === 'switchgear') sectionToExpand = 'Switchboard';
+        else if (activeStep === 'busbars') sectionToExpand = 'Busbar';
+        else if (activeStep === 'miscellaneous') sectionToExpand = 'Switchboard'; // Misc is in Switchboard
+
+        if (sectionToExpand) {
+            setCollapsedSections(prev => ({
+                ...prev,
+                [sectionToExpand]: false
+            }));
+            
+            // Optional: Scroll to section
+            const el = document.getElementById(`section-${sectionToExpand}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }, [activeStep]);
 
     const selectedBoard = boards.find(b => b.id === selectedBoardId);
 
@@ -595,9 +642,10 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
     };
 
     const renderCategoryWithSubsections = (items: Item[], isBasics: boolean) => {
-        // Group items by subcategory
+        // Group items by normalized subcategory
         const groupedBySubcat = items.reduce((acc, item) => {
-            const subcat = item.subcategory || 'Other';
+            const parts = normalizeSubcategory(item.subcategory, item.category);
+            const subcat = parts.join(' > ') || 'Other';
             if (!acc[subcat]) acc[subcat] = [];
             acc[subcat].push(item);
             return acc;
@@ -728,11 +776,23 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
             <div className="flex flex-col h-full bg-gray-50/30">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <div>
-                    <h3 className="text-sm font-bold text-gray-900 group-flex items-center gap-2">
-                        {selectedBoard.name} 
-                        <span className="text-[10px] font-normal text-gray-400 ml-2">Summary View</span>
-                    </h3>
-                    <p className="text-xs text-gray-500">{items.length} line items</p>
+                    <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-sm font-bold text-gray-900">
+                            {selectedBoard.name} 
+                        </h3>
+                        <div className="h-3 w-px bg-gray-200" />
+                        {onStepClick && (
+                            <StepIndicator 
+                                currentStepId={activeStep}
+                                onStepClick={onStepClick}
+                            />
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Summary View</span>
+                        <span className="text-gray-300">·</span>
+                        <p className="text-xs text-gray-500">{items.length} line items</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     {/* View Toggle Removed - Forcing Summary View */}
@@ -931,7 +991,7 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                         const isMasterCollapsed = collapsedSections[masterCat];
 
                         return (
-                            <div key={masterCat} className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div key={masterCat} id={`section-${masterCat}`} className="border border-gray-200 rounded-lg overflow-hidden">
                                 {/* Master category header */}
                                 <button
                                     onClick={() => toggleSection(masterCat)}
@@ -954,6 +1014,31 @@ export default function BoardContent({ onAddItems }: BoardContentProps) {
                                         ) : (
                                             // For Busbars and Other, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
+                                                {masterCat === 'Busbar' && !dismissedHints.has('busbar-jump-ahead') && (() => {
+                                                    const swItems = items.filter(i => i.category === 'Switchboard');
+                                                    const isSwgComplete = swItems.some(i => 
+                                                        (i.subcategory?.includes('Circuit Breaker') || i.subcategory?.includes('Switch')) &&
+                                                        !i.subcategory?.includes('Miscellaneous')
+                                                    );
+                                                    
+                                                    if (!isSwgComplete) {
+                                                        return (
+                                                            <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center justify-between group/hint animate-in fade-in slide-in-from-top duration-300">
+                                                                <div className="flex items-center gap-2 text-amber-700">
+                                                                    <Info size={14} />
+                                                                    <span className="text-[11px] font-medium">Switchgear is typically completed first — results may be incomplete</span>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => dismissHint('busbar-jump-ahead')}
+                                                                    className="text-amber-400 hover:text-amber-600 opacity-0 group-hover/hint:opacity-100 transition-opacity"
+                                                                >
+                                                                    <Plus size={14} className="rotate-45" />
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
                                                 {[...categoryItems].sort(compareItems).map(item => renderItemRow(item, false))}
                                             </div>
                                         )}

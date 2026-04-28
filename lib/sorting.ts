@@ -1,5 +1,5 @@
 import { CatalogItem } from '@prisma/client';
-
+import { normalizeSubcategory } from './category-utils';
 // Define a type that covers both CatalogItem and board Item (which has similar fields)
 // We align fields to ensure both can be passed in.
 export interface SortableItem {
@@ -18,6 +18,19 @@ const MASTER_CATEGORY_ORDER: Record<string, number> = {
     'Basics': 0,
     'Switchboard': 1,
     'Busbar': 2
+};
+
+const SWITCHGEAR_L1_ORDER: Record<string, number> = {
+    'Circuit Breakers': 1,
+    'Switches': 2,
+    'Miscellaneous': 3
+};
+
+const MISC_L2_ORDER: Record<string, number> = {
+    'Contactor': 1,
+    'General Control': 2,
+    'Power Metering': 3,
+    'Fuses': 4
 };
 
 const MCCB_ACCESSORY_ORDER: Record<string, number> = {
@@ -42,25 +55,36 @@ export function getSortParts(item: SortableItem): any[] {
         segments = item.categoryPathSegments;
     } else if (item.categoryBreadcrumbs && item.categoryBreadcrumbs.length > 0) {
         segments = item.categoryBreadcrumbs;
-    }
-    // Priority 2: Fallback to String Splitting
-    else if (item.subcategory) {
-        segments = item.subcategory.split(' > ').map(s => s.trim());
+    } else {
+        segments = normalizeSubcategory(item.subcategory, masterCat);
     }
 
     // Iterate segments and inject priority/numeric values
     let inMccbAccessories = false;
 
     for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
+        let seg = segments[i];
+
         let priority = 999999; // Default high (neutral)
         let val: string | number = seg;
 
         // Context checks
-        if (seg === 'MCCB Accessories') {
-            inMccbAccessories = true;
-            // The segment itself is neutral
-        } else if (inMccbAccessories) {
+        if (masterCat === 'Switchboard') {
+            // L1 Order
+            if (i === 0 && SWITCHGEAR_L1_ORDER[seg]) {
+                priority = SWITCHGEAR_L1_ORDER[seg];
+            } 
+            // L2 Order (if inside Miscellaneous)
+            else if (i === 1 && segments[0] === 'Miscellaneous' && MISC_L2_ORDER[seg]) {
+                priority = MISC_L2_ORDER[seg];
+            }
+
+            if (seg === 'MCCB Accessories') {
+                inMccbAccessories = true;
+            }
+        }
+
+        if (inMccbAccessories) {
             // Check for Priority Children
             if (seg.includes('Terminal Shield')) priority = 1;
             else if (seg.includes('Rotary Handle')) priority = 2;
@@ -70,8 +94,6 @@ export function getSortParts(item: SortableItem): any[] {
         // Fault Rating Check (e.g. "25kA") - Sort numerically
         const faultMatch = seg.match(/^(\d+)\s*kA$/i);
         if (faultMatch) {
-            // Is it a fault rating segment?
-            // "25kA" -> priority = 25.
             priority = parseInt(faultMatch[1]);
         }
 

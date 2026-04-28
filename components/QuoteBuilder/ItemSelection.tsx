@@ -8,6 +8,8 @@ import { useQuote } from '@/context/QuoteContext';
 import { cn, formatCurrency } from '@/lib/utils';
 import { compareItems } from '@/lib/sorting';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
+import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-utils';
+import { AlertCircle } from 'lucide-react';
 
 interface CatalogItem {
     id: string;
@@ -31,6 +33,7 @@ interface CatalogItem {
 interface ItemSelectionProps {
     onClose?: () => void;
     initialCategory?: 'Basics' | 'Switchboard' | 'Busbar';
+    initialL1?: string;
 }
 
 interface ItemRowProps {
@@ -115,9 +118,7 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
                     {item.subcategory && (
                         <span className="text-gray-400 truncate max-w-[200px]" title={item.subcategory}>
-                            {item.subcategory.startsWith('Miscellaneous') && item.subcategory.split(' > ').length > 1
-                                ? item.subcategory.split(' > ').slice(-2).join(' > ')
-                                : item.subcategory.split(' > ').pop()}
+                            {formatSubcategoryLabel(item.subcategory, item.category)}
                         </span>
                     )}
 
@@ -277,12 +278,9 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
     );
 }
 
-interface ItemSelectionProps {
-    onClose?: () => void;
-    initialCategory?: 'Basics' | 'Switchboard' | 'Busbar';
-}
 
-export default function ItemSelection({ onClose, initialCategory }: ItemSelectionProps) {
+
+export default function ItemSelection({ onClose, initialCategory, initialL1 }: ItemSelectionProps) {
     const { addItemToBoard, updateItem, removeItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     // Prioritize passed initialCategory, then default to Switchboard. 
     // State restoration (Lines 50+) will only run if initialCategory is NOT provided, to respect user context.
@@ -313,7 +311,12 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
     // Initial State Restoration - ONLY if no specific context was passed
     useEffect(() => {
         // If initialCategory was passed (e.g. from BoardContent), don't override it with last used tab.
-        if (initialCategory) return;
+        if (initialCategory) {
+            if (initialL1) {
+                setSelectedL1(initialL1);
+            }
+            return;
+        }
 
         try {
             const savedState = localStorage.getItem(`chadwick_ui_state_${quoteId}`);
@@ -354,16 +357,10 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
         const l3 = new Set<string>();
         let powerMeterActive = false;
 
-        // Standard Navigation Logic (unchanged)
+        // Standard Navigation Logic
         allSubcategories.forEach(sub => {
             if (!sub) return;
-            let parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
-
-            if (activeCategory === 'Busbar') {
-                if (parts.length > 0 && !parts[0].startsWith('Main Bars')) {
-                    parts = ['Miscellaneous', parts[0]];
-                }
-            }
+            const parts = normalizeSubcategory(sub, activeCategory);
 
             if (parts.length > 0) l1.add(parts[0]);
 
@@ -380,10 +377,27 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
             powerMeterActive = true;
         }
 
+        // Custom Sorting
+        const L1_ORDER = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
+        const MISC_ORDER = ['Contactor', 'General Control', 'Power Metering', 'Fuses'];
+
+        const sortOptions = (options: Set<string>, orderList?: string[]) => {
+            return Array.from(options).sort((a, b) => {
+                if (orderList) {
+                    const idxA = orderList.indexOf(a);
+                    const idxB = orderList.indexOf(b);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                }
+                return a.localeCompare(b);
+            });
+        };
+
         return {
-            l1Options: Array.from(l1).sort(),
-            l2Options: Array.from(l2).sort(),
-            l3Options: Array.from(l3).sort(),
+            l1Options: sortOptions(l1, activeCategory === 'Switchboard' ? L1_ORDER : undefined),
+            l2Options: sortOptions(l2, (activeCategory === 'Switchboard' && selectedL1 === 'Miscellaneous') ? MISC_ORDER : undefined),
+            l3Options: sortOptions(l3),
             isPowerMeterSelection: powerMeterActive
         };
     }, [allSubcategories, selectedL1, selectedL2, selectedL3]);
@@ -803,6 +817,14 @@ export default function ItemSelection({ onClose, initialCategory }: ItemSelectio
                             ))}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* Subtle Message for Busbars */}
+            {activeCategory === 'Busbar' && (
+                <div className="px-6 py-2 bg-amber-50 border-b border-amber-100 flex items-center gap-2 text-amber-700 animate-in fade-in slide-in-from-top duration-500">
+                    <AlertCircle size={14} />
+                    <span className="text-xs font-medium">Switchgear is typically completed first — results may be incomplete</span>
                 </div>
             )}
 
