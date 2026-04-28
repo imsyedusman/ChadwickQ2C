@@ -322,6 +322,63 @@ export async function PATCH(request: Request) {
         const { searchParams } = new URL(request.url);
         const action = searchParams.get('action');
 
+        if (action === 'standardize_categories') {
+            console.log("Starting full catalog category standardization...");
+            const items = await prisma.catalogItem.findMany({
+                where: {
+                    category: { in: ['Switchboard', 'Busbar'] }
+                }
+            });
+
+            let updatedCount = 0;
+            for (const item of items) {
+                const sub = item.subcategory || '';
+                if (!sub) continue;
+
+                let parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
+                const originalParts = [...parts];
+
+                // 1. Map Names
+                parts = parts.map(p => {
+                    if (p === 'Power Meters') return 'Power Metering';
+                    if (p === 'Control') return 'General Control';
+                    return p;
+                });
+
+                // 2. Switchboard Specifics
+                if (item.category === 'Switchboard') {
+                    const L1_TARGETS = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
+                    if (parts[0] === 'Switchgear') parts.shift();
+                    
+                    if (parts.length === 0) {
+                        parts = ['Miscellaneous', 'Others'];
+                    } else if (!L1_TARGETS.includes(parts[0])) {
+                        parts = ['Miscellaneous', ...parts];
+                    }
+                }
+
+                // 3. Busbar Specifics
+                if (item.category === 'Busbar') {
+                    if (parts.length > 0 && !parts[0].startsWith('Main Bars')) {
+                        if (parts[0] !== 'Miscellaneous') {
+                            parts = ['Miscellaneous', ...parts];
+                        }
+                    }
+                }
+
+                const newSub = parts.join(' > ');
+                if (newSub !== sub) {
+                    await prisma.catalogItem.update({
+                        where: { id: item.id },
+                        data: { subcategory: newSub }
+                    });
+                    updatedCount++;
+                }
+            }
+
+            return NextResponse.json({ message: `Standardized ${updatedCount} items.`, count: updatedCount });
+        }
+
         if (action === 'reclassify') {
             console.log("Starting full catalog re-classification...");
             // Fetch all items that might be Power Meters

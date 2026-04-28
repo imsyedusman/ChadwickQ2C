@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Search, Trash2, Filter, Database, RefreshCw, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2, Search, Trash2, Filter, Database, RefreshCw, ChevronDown, ChevronUp, AlertTriangle, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
@@ -386,6 +386,8 @@ export default function CatalogManager() {
         }
     };
 
+    const [standardizing, setStandardizing] = useState(false);
+
     const handleReclassify = async () => {
         setReclassifying(true);
         try {
@@ -405,6 +407,28 @@ export default function CatalogManager() {
         }
     };
 
+    const handleStandardize = async () => {
+        if (!confirm('This will update all catalog items to follow the new hierarchy (e.g. adding "Miscellaneous >" prefix). This is required for the new navigation to work correctly. Proceed?')) return;
+        
+        setStandardizing(true);
+        try {
+            const res = await fetch('/api/catalog?action=standardize_categories', { method: 'PATCH' });
+            if (res.ok) {
+                const data = await res.json();
+                alert(data.message);
+                fetchBrandStats(); // Refresh stats
+                fetchCatalog(); 
+            } else {
+                throw new Error('Failed to standardize categories');
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Failed to standardize catalog categories');
+        } finally {
+            setStandardizing(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             {/* Manage Pricelists Section */}
@@ -414,21 +438,31 @@ export default function CatalogManager() {
                         <Database className="text-blue-600" size={20} />
                         Manage Pricelists
                     </h2>
-                    <button
-                        onClick={handleReclassify}
-                        disabled={reclassifying}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors mr-2"
-                        title="Re-classify Metadata (Fixes Missing Tags)"
-                    >
-                        {reclassifying ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
-                    </button>
-                    <button
-                        onClick={fetchBrandStats}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                        title="Refresh List"
-                    >
-                        <RefreshCw size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={handleStandardize}
+                            disabled={standardizing}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-full transition-colors"
+                            title="Standardize Catalog Hierarchy (Required for new navigation)"
+                        >
+                            {standardizing ? <Loader2 className="animate-spin" size={16} /> : <Layers size={16} />}
+                        </button>
+                        <button
+                            onClick={handleReclassify}
+                            disabled={reclassifying}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                            title="Re-classify Metadata (Fixes Missing Tags)"
+                        >
+                            {reclassifying ? <Loader2 className="animate-spin" size={16} /> : <Database size={16} />}
+                        </button>
+                        <button
+                            onClick={fetchBrandStats}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                            title="Refresh List"
+                        >
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
