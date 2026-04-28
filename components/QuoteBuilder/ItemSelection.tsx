@@ -500,7 +500,9 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             }
         } else if (activeCategory === 'Basics') {
             // Basics: Strictly require L1 selection
-            if (selectedL1) {
+            // Safety: Ensure selectedL1 actually belongs to Basics
+            const basicsL1s = allSubcategories.map(s => normalizeSubcategory(s, 'Basics')[0]);
+            if (selectedL1 && basicsL1s.includes(selectedL1)) {
                 shouldFetch = true;
             }
         }
@@ -529,19 +531,10 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                         const fullPath = [selectedL1, selectedL2, selectedL3].join(' > ');
                         params.append('subcategory', fullPath);
                     } else if (selectedL2) {
-                        // 2-level hierarchy
-                        let fullPath = [selectedL1, selectedL2].join(' > ');
-                        if (activeCategory === 'Busbar' && selectedL1 === 'Miscellaneous') {
-                            fullPath = selectedL2; // The DB doesn't have "Miscellaneous >" prefix
-                        }
+                        const fullPath = [selectedL1, selectedL2].join(' > ');
                         params.append('subcategory', fullPath);
                     } else if (selectedL1 && l2Options.length === 0) {
-                        // 1-level hierarchy
-                        let fullPath = selectedL1;
-                        if (activeCategory === 'Busbar' && selectedL1 === 'Miscellaneous') {
-                            fullPath = selectedL1; // Just in case, though l2Options shouldn't be 0
-                        }
-                        params.append('subcategory', fullPath);
+                        params.append('subcategory', selectedL1);
                     }
                 } else if (activeCategory === 'Basics') {
                     // For Basics: filter by selected level

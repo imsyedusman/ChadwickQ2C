@@ -113,11 +113,22 @@ export function classifyCatalogItem(
 
     // Normalize Subcategory for Power Meters
     if (isPowerMeter) {
-        subcategory = 'Power Meters';
+        subcategory = 'Power Metering';
     }
     // Legacy mapping mapLegacyCategory logic could be moved here too
     else if (subcategory.includes('Miscellaneous > Metering > Power Meter Accessories')) {
         subcategory = 'Power Meter Accessories';
+    }
+
+    // Standardize Switchboard Hierarchy: Prepend "Miscellaneous > " if not a primary category
+    if (masterCategory === 'Switchboard') {
+        const L1_TARGETS = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
+        const firstSegment = subcategory.split(' > ')[0];
+        
+        if (firstSegment && !L1_TARGETS.includes(firstSegment)) {
+            // It belongs under Miscellaneous
+            subcategory = `Miscellaneous > ${subcategory}`;
+        }
     }
 
     // 4. Determine Pricing Metadata (Copper)

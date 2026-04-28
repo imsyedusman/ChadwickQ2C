@@ -4,23 +4,22 @@ export function normalizeSubcategory(subcategory: string | null | undefined, cat
     let parts = subcategory.split(' > ').map(s => s.trim()).filter(Boolean);
     
     if (category === 'Switchboard') {
-        // 1. Strip "Switchgear" root if present
+        // 1. Strip "Switchgear" root if present (legacy)
         if (parts[0] === 'Switchgear') {
             parts.shift();
         }
 
         if (parts.length === 0) return ['Miscellaneous', 'Others'];
 
-        // 2. Map everything to the 3-level root: Circuit Breakers, Switches, Miscellaneous
-        const topLevel = parts[0];
-        const L1_TARGETS = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
-        const MISC_TARGETS = ['Contactor', 'General Control', 'Power Metering', 'Fuses'];
+        // 2. Standardize naming
+        parts = parts.map(p => p === 'Power Meters' ? 'Power Metering' : p);
+        parts = parts.map(p => p === 'Control' ? 'General Control' : p);
 
-        if (!L1_TARGETS.includes(topLevel)) {
-            // It belongs under Miscellaneous
+        // 3. Ensure L1 is one of the standard roots
+        const L1_TARGETS = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
+        if (!L1_TARGETS.includes(parts[0])) {
+            // This shouldn't happen much after migration, but keep as failsafe
             parts = ['Miscellaneous', ...parts];
-        } else if (topLevel === 'Miscellaneous' && parts.length === 1) {
-            parts = ['Miscellaneous', 'Uncategorized'];
         }
     }
 
