@@ -109,8 +109,8 @@ export default function CatalogManager() {
      */
     const mapLegacyCategory = (subcategory: string): string => {
         const categoryMap: Record<string, string> = {
-            // Power Meters unification
-            'Miscellaneous > Metering > Power Meter': 'Power Meters',
+            // Power Metering unification
+            'Miscellaneous > Metering > Power Meter': 'Power Metering',
             'Miscellaneous > Metering > Power Meter Accessories': 'Power Meter Accessories',
 
             // Add more mappings here as needed in the future

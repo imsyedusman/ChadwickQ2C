@@ -381,7 +381,7 @@ export async function PATCH(request: Request) {
 
         if (action === 'reclassify') {
             console.log("Starting full catalog re-classification...");
-            // Fetch all items that might be Power Meters
+            // Fetch all items that might be Power Metering
             const potentialMeters = await prisma.catalogItem.findMany({
                 where: {
                     OR: [

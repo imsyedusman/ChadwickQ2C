@@ -373,7 +373,8 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             }
         });
 
-        if (selectedL1 === 'Power Meters' || selectedL2 === 'Power Meters' || selectedL3 === 'Power Meters') {
+        if (selectedL1 === 'Power Metering' || selectedL2 === 'Power Metering' || selectedL3 === 'Power Metering' || 
+            selectedL1 === 'Power Meters' || selectedL2 === 'Power Meters' || selectedL3 === 'Power Meters') {
             powerMeterActive = true;
         }
 
@@ -868,7 +869,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                         {/* Normal Navigation View (No Search) */}
                         {!searchQuery && (
                             <div className="grid grid-cols-1 gap-3">
-                                {/* Power Meters: Filter UI Header */}
+                                {/* Power Metering: Filter UI Header */}
                                 {isPowerMeterSelection && (
                                     <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm space-y-4">
                                         {/* Brand Tabs */}
