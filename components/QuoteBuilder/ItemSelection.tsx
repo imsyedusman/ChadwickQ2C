@@ -509,8 +509,8 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
     }, [items, isPowerMeterSelection, meterBrandFilter, meterTypeFilter]);
 
     // Derived MCCB Filters (Merged Breakers + Trip Units)
-    const { filteredMccbBreakers, filteredTripUnitComponents, totalMccbMatchingCount } = useMemo(() => {
-        if (!isMccbSelection) return { filteredMccbBreakers: [], filteredTripUnitComponents: [], totalMccbMatchingCount: 0 };
+    const { filteredMccbBreakers, filteredTripUnitComponents, totalMccbMatchingCount, totalMccbAvailableCount } = useMemo(() => {
+        if (!isMccbSelection) return { filteredMccbBreakers: [], filteredTripUnitComponents: [], totalMccbMatchingCount: 0, totalMccbAvailableCount: 0 };
 
         // Helper for tech detection
         const getTech = (item: CatalogItem) => {
@@ -562,10 +562,15 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
         // 4. Sort Trip Units
         const sortedUnits = [...units].sort((a, b) => a.description.localeCompare(b.description));
 
+        // 5. Calculate Refined Counts
+        const totalMatchingCount = sortedBreakers.length + sortedUnits.length;
+        const totalAvailableCount = items.length + (showTripUnits ? tripUnitItems.length : 0);
+
         return { 
-            filteredMccbBreakers: sortedBreakers.slice(0, 20), 
-            filteredTripUnitComponents: sortedUnits.slice(0, 50),
-            totalMccbMatchingCount: breakers.length + units.length 
+            filteredMccbBreakers: sortedBreakers, 
+            filteredTripUnitComponents: sortedUnits,
+            totalMccbMatchingCount: totalMatchingCount,
+            totalMccbAvailableCount: totalAvailableCount
         };
     }, [items, tripUnitItems, isMccbSelection, mccbCapacityFilter, mccbTypeFilter, showTripUnits]);
 
@@ -1181,7 +1186,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                                     No items match selected filters
                                                 </span>
                                             ) : (
-                                                <>Showing <span className="text-gray-900 font-bold">{filteredMccbBreakers.length + filteredTripUnitComponents.length}</span> of <span className="text-gray-900 font-bold">{totalMccbMatchingCount}</span> items</>
+                                                <>Showing <span className="text-gray-900 font-bold">{totalMccbMatchingCount}</span> of <span className="text-gray-900 font-bold">{totalMccbAvailableCount}</span> items</>
                                             )}
                                         </p>
                                         {totalMccbMatchingCount === 0 && (
