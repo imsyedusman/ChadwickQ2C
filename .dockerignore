@@ -20,10 +20,8 @@ node_modules
 !surges-out.json
 *.sql
 *.diff
-scripts/deploy.ts
 doc
 assets
-public
 scratch
 tmp
 verification_*.txt
