@@ -127,45 +127,47 @@ export default function SettingsPage() {
     return (
         <div className="min-h-screen bg-[#f8fafc] py-12">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-12">
-                    <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-3">Settings</h1>
-                    <p className="text-lg text-slate-600 max-w-2xl">
+                <div className="mb-8 sm:mb-12">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-2 sm:mb-3">Settings</h1>
+                    <p className="text-sm sm:text-lg text-slate-600 max-w-2xl">
                         Configure your quoting workflow and view available system data.
                     </p>
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-8">
-                    {/* Sidebar */}
-                    <aside className="w-full md:w-64 space-y-2">
-                        <button
-                            onClick={() => setActiveTab('catalogs')}
-                            className={cn(
-                                "w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-2xl transition-all",
-                                activeTab === 'catalogs'
-                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                                    : "text-slate-500 hover:bg-white hover:text-slate-900"
-                            )}
-                        >
-                            <Database size={18} />
-                            External Catalogs
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('costing')}
-                            className={cn(
-                                "w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-2xl transition-all",
-                                activeTab === 'costing'
-                                    ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                                    : "text-slate-500 hover:bg-white hover:text-slate-900"
-                            )}
-                        >
-                            <DollarSign size={18} />
-                            Costing Defaults
-                        </button>
+                <div className="flex flex-col lg:flex-row gap-8 lg:gap-12">
+                    {/* Sidebar / Tabs */}
+                    <aside className="lg:w-72 shrink-0">
+                        <div className="flex lg:flex-col bg-slate-100 p-1 rounded-2xl border border-slate-200/50 shadow-inner overflow-x-auto scrollbar-hide no-scrollbar">
+                            <button
+                                onClick={() => setActiveTab('catalogs')}
+                                className={cn(
+                                    "flex-1 whitespace-nowrap flex items-center justify-center lg:justify-start gap-3 px-6 py-3.5 text-[11px] font-extrabold uppercase tracking-widest rounded-xl transition-all",
+                                    activeTab === 'catalogs'
+                                        ? "bg-white text-blue-600 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-900"
+                                )}
+                            >
+                                <Database size={16} />
+                                External Catalogs
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('costing')}
+                                className={cn(
+                                    "flex-1 whitespace-nowrap flex items-center justify-center lg:justify-start gap-3 px-6 py-3.5 text-[11px] font-extrabold uppercase tracking-widest rounded-xl transition-all",
+                                    activeTab === 'costing'
+                                        ? "bg-white text-blue-600 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-900"
+                                )}
+                            >
+                                <DollarSign size={16} />
+                                Costing Defaults
+                            </button>
+                        </div>
                     </aside>
 
                     {/* Content */}
-                    <main className="flex-1">
-                        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm min-h-[500px]">
+                    <main className="flex-1 pb-24 lg:pb-0">
+                        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm min-h-[500px]">
                             {activeTab === 'catalogs' && (
                                 <div className="space-y-6">
                                     <div className="flex items-center justify-between">
@@ -351,16 +353,16 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="pt-6 border-t border-slate-100 flex justify-end">
+                                             <div className="md:static fixed bottom-0 left-0 right-0 p-4 md:p-0 md:pt-6 md:border-t md:border-slate-100 flex justify-end bg-white/80 backdrop-blur-md md:bg-transparent z-40 border-t border-slate-200 md:border-none">
                                                 <button
                                                     onClick={handleSaveSettings}
                                                     disabled={saving}
-                                                    className="flex items-center justify-center gap-2 px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98]"
+                                                    className="w-full md:w-auto flex items-center justify-center gap-2 px-10 py-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98]"
                                                 >
                                                     {saving ? (
                                                         <>
                                                             <Loader2 className="animate-spin" size={20} />
-                                                            Saving Changes...
+                                                            Saving...
                                                         </>
                                                     ) : (
                                                         <>

@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         console.log(`[API GET Projects] Total projects in DB baseline: ${baseCount}`);
 
         const page = parseInt(searchParams.get('page') || '1');
-        const limit = parseInt(searchParams.get('limit') || '25');
+        const limit = parseInt(searchParams.get('limit') || '27');
         const estimatorId = searchParams.get('estimatorId');
         const skip = (page - 1) * limit;
 

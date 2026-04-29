@@ -13,12 +13,14 @@ import {
     DropdownMenuSeparator, 
     DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Shield, ChevronDown, FileText, Briefcase, Settings } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, FileText, Briefcase, Settings, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export default function Navbar() {
     const pathname = usePathname();
     const { data: session } = useSession();
     const user = session?.user as any;
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const isQuotePage = pathname?.startsWith('/quote');
     const isSettings = pathname?.startsWith('/settings');
@@ -49,7 +51,7 @@ export default function Navbar() {
         )}>
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
                 <div className="flex justify-between items-center h-full">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <Link href="/" className="flex-shrink-0 flex items-center gap-2">
                             <Image
                                 src="/chadwick-logo.svg"
@@ -60,7 +62,7 @@ export default function Navbar() {
                                 priority
                                 suppressHydrationWarning
                             />
-                            {!isQuotePage && <span className="font-bold text-xl text-gray-900 tracking-tight">Q2C</span>}
+                            {!isQuotePage && <span className="font-bold text-lg sm:text-xl text-gray-900 tracking-tight">Q2C</span>}
                         </Link>
 
                         {/* Desktop Nav - Hidden on Quote Pages */}
@@ -119,9 +121,9 @@ export default function Navbar() {
                             </div>
                         )}
 
-                        {/* Compact Nav - Inline Links for Quote Pages */}
+                        {/* Compact Nav - Inline Links for Quote Pages (Desktop) */}
                         {isQuotePage && (
-                            <div className="flex items-center gap-4 ml-6 border-l border-gray-200 pl-6 h-4">
+                            <div className="hidden sm:flex items-center gap-4 ml-6 border-l border-gray-200 pl-6 h-4">
                                 <Link
                                     href="/"
                                     className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
@@ -156,7 +158,7 @@ export default function Navbar() {
                         )}
                     </div>
 
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                         <div className="flex-shrink-0">
                             {user && (
                                 <DropdownMenu>
@@ -164,7 +166,7 @@ export default function Navbar() {
                                         <div className="flex items-center gap-2 group cursor-pointer">
                                             <div className={cn(
                                                 "rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 transition-all border border-blue-200 ring-0 group-hover:ring-2 group-hover:ring-blue-100",
-                                                isQuotePage ? "h-7 w-7" : "h-9 w-9"
+                                                isQuotePage ? "h-6 w-6" : "h-9 w-9"
                                             )}>
                                                 {getInitials(user.name || user.email || 'User')}
                                             </div>
@@ -178,10 +180,10 @@ export default function Navbar() {
                                                     </span>
                                                 </div>
                                             )}
-                                            <ChevronDown className={cn("h-4 w-4 text-gray-400 transition-transform group-hover:text-gray-600", isQuotePage && "hidden")} />
+                                            {!isQuotePage && <ChevronDown className="h-4 w-4 text-gray-400 transition-transform group-hover:text-gray-600 hidden sm:block" />}
                                         </div>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-56 mt-2 shadow-xl border-gray-100">
+                                    <DropdownMenuContent align="end" className="w-56 mt-2 shadow-xl border-gray-100 rounded-2xl">
                                         <DropdownMenuLabel className="font-normal">
                                             <div className="flex flex-col space-y-1">
                                                 <p className="text-sm font-semibold leading-none">{user.name}</p>
@@ -190,14 +192,14 @@ export default function Navbar() {
                                         </DropdownMenuLabel>
                                         <DropdownMenuSeparator />
                                         <Link href="/profile">
-                                            <DropdownMenuItem className="cursor-pointer">
+                                            <DropdownMenuItem className="cursor-pointer rounded-lg py-2">
                                                 <User className="mr-2 h-4 w-4 text-gray-500" />
                                                 <span>Profile Settings</span>
                                             </DropdownMenuItem>
                                         </Link>
                                         {user.role === 'ADMIN' && (
                                             <Link href="/admin">
-                                                <DropdownMenuItem className="cursor-pointer">
+                                                <DropdownMenuItem className="cursor-pointer rounded-lg py-2">
                                                     <Shield className="mr-2 h-4 w-4 text-gray-500" />
                                                     <span>Admin Panel</span>
                                                 </DropdownMenuItem>
@@ -205,7 +207,7 @@ export default function Navbar() {
                                         )}
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem 
-                                            className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50"
+                                            className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 rounded-lg py-2"
                                             onClick={() => signOut({ callbackUrl: '/login' })}
                                         >
                                             <LogOut className="mr-2 h-4 w-4" />
@@ -215,9 +217,73 @@ export default function Navbar() {
                                 </DropdownMenu>
                             )}
                         </div>
+
+                        {/* Mobile Menu Button */}
+                        {!isQuotePage && (
+                            <button
+                                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                                className="sm:hidden p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors ml-1"
+                            >
+                                {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
+
+            {/* Mobile Navigation Drawer */}
+            {isMobileMenuOpen && !isQuotePage && (
+                <div className="sm:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-xl z-50 animate-in slide-in-from-top-4 duration-200">
+                    <div className="px-4 py-6 space-y-3">
+                        <Link
+                            href="/"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                                "flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all",
+                                isDashboard ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                            )}
+                        >
+                            <FileText size={20} />
+                            Quotes
+                        </Link>
+                        <Link
+                            href="/projects"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                                "flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all",
+                                isProjects ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                            )}
+                        >
+                            <Briefcase size={20} />
+                            Projects
+                        </Link>
+                        <Link
+                            href="/settings"
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={cn(
+                                "flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all",
+                                isSettings ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                            )}
+                        >
+                            <Settings size={20} />
+                            Settings
+                        </Link>
+                        {user?.role === 'ADMIN' && (
+                            <Link
+                                href="/admin"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className={cn(
+                                    "flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all",
+                                    isAdmin ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
+                                )}
+                            >
+                                <Shield size={20} />
+                                Admin Panel
+                            </Link>
+                        )}
+                    </div>
+                </div>
+            )}
         </nav>
     );
 }

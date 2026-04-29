@@ -2,6 +2,7 @@
 
 import { ChevronUp, ChevronDown } from 'lucide-react';
 import QuoteRow from '@/components/Project/QuoteRow';
+import MobileQuoteCard from '@/components/Dashboard/MobileQuoteCard';
 import { cn } from '@/lib/utils';
 
 interface ProjectQuotesTableProps {
@@ -100,66 +101,87 @@ export default function ProjectQuotesTable({
     })();
 
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-left">
-                <thead>
-                    <tr className="bg-gray-50/50">
-                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[80px]">Est.</th>
-                        <th 
-                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[160px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleSort('quoteNumber')}
-                        >
-                            <div className="flex items-center gap-2">
-                                Quote Number
-                                {renderSortIcon('quoteNumber')}
-                            </div>
-                        </th>
-                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[200px]">Project Name</th>
-                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Company</th>
-                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Client</th>
-                        <th 
-                            className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[110px] cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleSort('status')}
-                        >
-                            <div className="flex items-center gap-2">
-                                Status
-                                {renderSortIcon('status')}
-                            </div>
-                        </th>
-                        <th 
-                            className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[140px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => toggleSort('total')}
-                        >
-                            <div className="flex items-center justify-end gap-2">
-                                Total (ex GST)
-                                {renderSortIcon('total')}
-                            </div>
-                        </th>
-                        <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notes</th>
-                        <th className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[80px]"></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    {sortedQuotes.map((quote: any) => (
-                        <QuoteRow 
-                            key={quote.id} 
-                            quote={quote} 
-                            isChild={quote._isChild}
-                            onUpdate={onUpdate}
-                            onDuplicate={onDuplicate}
-                            onCreateRevision={onCreateRevision}
-                            onDelete={onDelete}
-                        />
-                    ))}
-                    {quotes.length === 0 && (
-                        <tr>
-                            <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium italic">
-                                No quotes found for this project.
-                            </td>
+        <div className="">
+            {/* Desktop View */}
+            <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-left">
+                    <thead>
+                        <tr className="bg-gray-50/50">
+                            <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[80px]">Est.</th>
+                            <th 
+                                className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[160px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => toggleSort('quoteNumber')}
+                            >
+                                <div className="flex items-center gap-2">
+                                    Quote Number
+                                    {renderSortIcon('quoteNumber')}
+                                </div>
+                            </th>
+                            <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[200px]">Project Name</th>
+                            <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Company</th>
+                            <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[120px]">Client</th>
+                            <th 
+                                className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 w-[110px] cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => toggleSort('status')}
+                            >
+                                <div className="flex items-center gap-2">
+                                    Status
+                                    {renderSortIcon('status')}
+                                </div>
+                            </th>
+                            <th 
+                                className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest border-r border-gray-100/50 min-w-[140px] whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => toggleSort('total')}
+                            >
+                                <div className="flex items-center justify-end gap-2">
+                                    Total (ex GST)
+                                    {renderSortIcon('total')}
+                                </div>
+                            </th>
+                            <th className="px-6 py-2.5 text-left text-[10px] font-bold text-gray-400 uppercase tracking-widest">Notes</th>
+                            <th className="px-6 py-2.5 text-right text-[10px] font-bold text-gray-400 uppercase tracking-widest w-[80px]"></th>
                         </tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {sortedQuotes.map((quote: any) => (
+                            <QuoteRow 
+                                key={quote.id} 
+                                quote={quote} 
+                                isChild={quote._isChild}
+                                onUpdate={onUpdate}
+                                onDuplicate={onDuplicate}
+                                onCreateRevision={onCreateRevision}
+                                onDelete={onDelete}
+                            />
+                        ))}
+                        {quotes.length === 0 && (
+                            <tr>
+                                <td colSpan={9} className="px-6 py-12 text-center text-gray-500 font-medium italic">
+                                    No quotes found for this project.
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Mobile View */}
+            <div className="lg:hidden p-4 space-y-3 bg-gray-50/30">
+                {sortedQuotes.map((quote: any) => (
+                    <MobileQuoteCard 
+                        key={quote.id} 
+                        quote={quote}
+                        onDelete={onDelete}
+                        onDuplicate={onDuplicate}
+                        onRevision={onCreateRevision}
+                    />
+                ))}
+                {quotes.length === 0 && (
+                    <div className="py-12 text-center text-gray-500 font-medium italic bg-white rounded-2xl border border-dashed border-gray-200">
+                        No quotes found for this project.
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

@@ -20,10 +20,13 @@ import {
     Settings2,
     Layers,
     Info,
-    ExternalLink
+    ExternalLink,
+    Table2,
+    LayoutGrid
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import MobileProjectCard, { MobileGroupedProjectCard } from '@/components/Project/MobileProjectCard';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -175,7 +178,7 @@ export default function ProjectsPage() {
 
     // URL-based state
     const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('limit') || '100');
+    const pageSize = parseInt(searchParams.get('limit') || '27');
     const search = searchParams.get('search') || '';
     const estimatorId = searchParams.get('estimatorId') || 'all';
 
@@ -188,6 +191,7 @@ export default function ProjectsPage() {
     const [loading, setLoading] = useState(true);
     const [isGrouped, setIsGrouped] = useState(true);
     const [searchInput, setSearchInput] = useState(search);
+    const [viewMode, setViewMode] = useState<'TABLE' | 'CARD'>('TABLE');
 
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -233,6 +237,19 @@ export default function ProjectsPage() {
             }
         }
     }, []);
+
+    // Load view mode from localStorage
+    useEffect(() => {
+        const saved = localStorage.getItem('projects_view_mode');
+        if (saved === 'TABLE' || saved === 'CARD') {
+            setViewMode(saved);
+        }
+    }, []);
+
+    const toggleViewMode = (mode: 'TABLE' | 'CARD') => {
+        setViewMode(mode);
+        localStorage.setItem('projects_view_mode', mode);
+    };
 
     // Save column visibility to localStorage
     const toggleColumn = (column: string) => {
@@ -392,6 +409,7 @@ export default function ProjectsPage() {
         const params = new URLSearchParams(searchParams.toString());
         if (updates.page !== undefined) params.set('page', updates.page.toString());
         if (updates.limit !== undefined) params.set('limit', updates.limit.toString());
+        else if (!searchParams.has('limit')) params.set('limit', '27');
         if (updates.search !== undefined) {
             if (updates.search) params.set('search', updates.search);
             else params.delete('search');
@@ -585,56 +603,62 @@ export default function ProjectsPage() {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto px-4 py-8">
-            <div className="flex justify-between items-end mb-8">
+        <div className="max-w-[1600px] mx-auto px-4 py-6 sm:py-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Project Management</h1>
-                    <p className="text-gray-500">Track opportunities, manage statuses, and view quote history.</p>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Project Management</h1>
+                    <p className="hidden sm:block text-sm text-gray-500">Track opportunities, manage statuses, and view quote history.</p>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="flex flex-col items-end mr-2">
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">View Mode</span>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Info size={12} className="text-gray-300 cursor-help hover:text-gray-400 transition-colors" />
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-[200px] text-[11px]">
-                                        Grouping is based on project name and applies to currently loaded results only.
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                        </div>
-                        <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
-                            <button
-                                onClick={() => setIsGrouped(true)}
-                                className={cn(
-                                    "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
-                                    isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                Grouped
-                            </button>
-                            <button
-                                onClick={() => setIsGrouped(false)}
-                                className={cn(
-                                    "px-3 py-1 text-[10px] font-bold rounded-lg transition-all",
-                                    !isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
-                                )}
-                            >
-                                List
-                            </button>
-                        </div>
+                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/50 shadow-sm">
+                        <button
+                            onClick={() => setIsGrouped(true)}
+                            className={cn(
+                                "px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-lg transition-all",
+                                isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                        >
+                            Grouped
+                        </button>
+                        <button
+                            onClick={() => setIsGrouped(false)}
+                            className={cn(
+                                "px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-lg transition-all",
+                                !isGrouped ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                        >
+                            List
+                        </button>
                     </div>
 
-                    {syncingPipedrive && syncProgress && (
-                        <div className="flex flex-col items-end mr-4 animate-pulse">
-                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest leading-none">Syncing deals...</span>
-                            <span className="text-[10px] font-medium text-gray-400 mt-1">{syncProgress.processed} processed</span>
-                        </div>
-                    )}
+                    <div className="hidden lg:flex bg-gray-100 p-1 rounded-xl border border-gray-200/50 shadow-sm">
+                        <button
+                            onClick={() => toggleViewMode('TABLE')}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-all",
+                                viewMode === 'TABLE' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Table View"
+                        >
+                            <Table2 size={18} />
+                        </button>
+                        <button
+                            onClick={() => toggleViewMode('CARD')}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-all",
+                                viewMode === 'CARD' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Card View"
+                        >
+                            <LayoutGrid size={18} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                <div className="flex flex-wrap items-center gap-2">
                     <TooltipProvider>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -643,7 +667,7 @@ export default function ProjectsPage() {
                                     onClick={() => handleSync('quick')}
                                     disabled={syncingPipedrive || !isPipedriveConfigured}
                                     className={cn(
-                                        "flex items-center gap-2 border-gray-200 rounded-xl h-11 px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600",
+                                        "flex-1 sm:flex-none flex items-center justify-center gap-2 border-gray-200 rounded-xl h-11 px-4 sm:px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600 text-xs sm:text-sm",
                                         !isPipedriveConfigured && "opacity-50 grayscale cursor-not-allowed"
                                     )}
                                 >
@@ -652,7 +676,8 @@ export default function ProjectsPage() {
                                     ) : (
                                         <RefreshCcw size={18} className={cn("text-emerald-500", !isPipedriveConfigured && "text-gray-400")} />
                                     )}
-                                    Sync Recent Deals (Fast)
+                                    <span className="hidden xs:inline">Sync Recent</span>
+                                    <span className="xs:hidden">Quick</span>
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -667,7 +692,7 @@ export default function ProjectsPage() {
                                     onClick={() => handleSync('full')}
                                     disabled={syncingPipedrive || !isPipedriveConfigured}
                                     className={cn(
-                                        "flex items-center gap-2 border-gray-200 rounded-xl h-11 px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600",
+                                        "flex-1 sm:flex-none flex items-center justify-center gap-2 border-gray-200 rounded-xl h-11 px-4 sm:px-5 shadow-sm hover:bg-slate-50 transition-all font-bold text-slate-600 text-xs sm:text-sm",
                                         !isPipedriveConfigured && "opacity-50 grayscale cursor-not-allowed"
                                     )}
                                 >
@@ -681,7 +706,8 @@ export default function ProjectsPage() {
                                             <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
                                         </div>
                                     )}
-                                    Sync All Deals (Full)
+                                    <span className="hidden xs:inline">Sync All</span>
+                                    <span className="xs:hidden">Full</span>
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -689,10 +715,19 @@ export default function ProjectsPage() {
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
+
+                    {syncingPipedrive && syncProgress && (
+                        <div className="flex items-center gap-2 animate-pulse bg-blue-50 px-3 py-2 rounded-xl border border-blue-100 shadow-sm">
+                            <Loader2 className="animate-spin text-blue-600 w-3.5 h-3.5" />
+                            <span className="text-[10px] font-bold text-blue-700 uppercase tracking-widest whitespace-nowrap">
+                                Syncing: {syncProgress.processed} processed
+                            </span>
+                        </div>
+                    )}
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mb-6">
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
                     <div className="flex flex-1 items-center gap-3 max-w-2xl w-full">
                         <div className="relative flex-1">
@@ -797,7 +832,10 @@ export default function ProjectsPage() {
                 <div
                     ref={tableContainerRef}
                     onScroll={handleTableScroll}
-                    className="overflow-x-auto min-h-[400px] relative"
+                    className={cn(
+                        "hidden overflow-x-auto min-h-[400px] relative",
+                        viewMode === 'TABLE' ? "lg:block" : "hidden"
+                    )}
                 >
                     <table className="w-full text-left table-fixed min-w-[2000px]">
                         <thead>
@@ -1219,8 +1257,44 @@ export default function ProjectsPage() {
                     <div style={{ width: `${tableScrollWidth}px`, height: '1px' }} />
                 </div>
 
+                {/* Card View (Desktop) */}
+                <div className={cn(
+                    "hidden px-4 py-6",
+                    viewMode === 'CARD' ? "lg:block" : "hidden"
+                )}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {isGrouped ? (
+                            groupedProjects.map(group => (
+                                <MobileGroupedProjectCard 
+                                    key={group.normalizedName} 
+                                    group={group as any}
+                                    onClick={() => router.push(`/projects/group/${encodeURIComponent(group.normalizedName)}`)}
+                                />
+                            ))
+                        ) : (
+                            projects.map(project => (
+                                <MobileProjectCard 
+                                    key={project.id} 
+                                    project={project as any}
+                                    onEdit={handleEditOpen}
+                                    onDelete={(p) => {
+                                        setSelectedProject(p as any);
+                                        setIsDeleteDialogOpen(true);
+                                    }}
+                                />
+                            ))
+                        )}
+                    </div>
+                    {projects.length === 0 && !loading && (
+                        <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                            <Briefcase className="mx-auto w-12 h-12 text-gray-300 mb-4" />
+                            <p className="text-gray-500 font-medium">No projects found.</p>
+                        </div>
+                    )}
+                </div>
+
                 {/* Pagination Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                <div className="hidden lg:flex px-6 py-4 border-t border-gray-100 bg-gray-50/30 items-center justify-between">
                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
                         {totalProjects > 0 ? (
                             <>
@@ -1259,6 +1333,78 @@ export default function ProjectsPage() {
                         </Button>
                     </div>
                 </div>
+            </div>
+
+            {/* Mobile View */}
+            <div className="lg:hidden">
+                {loading && projects.length === 0 ? (
+                    <div className="py-20 text-center bg-white rounded-2xl border border-gray-100">
+                        <Loader2 className="animate-spin w-8 h-8 text-blue-500 mx-auto mb-4" />
+                        <p className="text-gray-500 font-medium">Loading projects...</p>
+                    </div>
+                ) : (
+                    <>
+                        <div className="space-y-1">
+                            {isGrouped ? (
+                                groupedProjects.map(group => (
+                                    <MobileGroupedProjectCard 
+                                        key={group.normalizedName} 
+                                        group={group as any}
+                                        onClick={() => router.push(`/projects/group/${encodeURIComponent(group.normalizedName)}`)}
+                                    />
+                                ))
+                            ) : (
+                                projects.map(project => (
+                                    <MobileProjectCard 
+                                        key={project.id} 
+                                        project={project as any}
+                                        onEdit={handleEditOpen}
+                                        onDelete={(p) => {
+                                            setSelectedProject(p as any);
+                                            setIsDeleteDialogOpen(true);
+                                        }}
+                                    />
+                                ))
+                            )}
+                        </div>
+
+                        {projects.length === 0 && !loading && (
+                            <div className="py-20 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                                <Briefcase className="mx-auto w-12 h-12 text-gray-300 mb-4" />
+                                <p className="text-gray-500 font-medium">No projects found.</p>
+                            </div>
+                        )}
+
+                        {/* Mobile Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between pt-4 pb-8 px-1">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateUrl({ page: page - 1 })}
+                                    disabled={page === 1}
+                                    className="rounded-xl h-10 border-gray-200 font-bold text-gray-600 bg-white"
+                                >
+                                    <ChevronLeft size={16} />
+                                    Prev
+                                </Button>
+                                <span className="text-xs font-bold text-gray-500">
+                                    Page {page} of {totalPages}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateUrl({ page: page + 1 })}
+                                    disabled={page === totalPages}
+                                    className="rounded-xl h-10 border-gray-200 font-bold text-gray-600 bg-white"
+                                >
+                                    Next
+                                    <ChevronRight size={16} />
+                                </Button>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Edit Dialog */}

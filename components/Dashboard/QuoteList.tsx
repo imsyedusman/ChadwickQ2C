@@ -24,7 +24,8 @@ import {
     X,
     Shield,
     Briefcase,
-    Hash,
+    Table2,
+    LayoutGrid,
     User as UserIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,8 @@ import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
 import NewQuoteDialog from './NewQuoteDialog';
 import DuplicateQuoteDialog from './DuplicateQuoteDialog';
+import DashboardStats from './DashboardStats';
+import MobileQuoteCard from './MobileQuoteCard';
 import { toast } from 'sonner';
 import {
     DropdownMenu,
@@ -139,6 +142,7 @@ export default function QuoteList() {
     });
     const [editingCell, setEditingCell] = useState<{ id: string; field: string; value: string } | null>(null);
     const [savingId, setSavingId] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'TABLE' | 'CARD'>('TABLE');
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
@@ -211,9 +215,22 @@ export default function QuoteList() {
         localStorage.setItem('quotesGridColumnVisibility', JSON.stringify(newVisibility));
     };
 
+    // View Mode Persistence
+    useEffect(() => {
+        const savedMode = localStorage.getItem('quotesViewMode');
+        if (savedMode === 'TABLE' || savedMode === 'CARD') {
+            setViewMode(savedMode);
+        }
+    }, []);
+
+    const toggleViewMode = (mode: 'TABLE' | 'CARD') => {
+        setViewMode(mode);
+        localStorage.setItem('quotesViewMode', mode);
+    };
+
     // Pagination
     const [page, setPage] = useState(1);
-    const [limit, setLimit] = useState(25);
+    const [limit, setLimit] = useState(27);
     const [total, setTotal] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
 
@@ -552,17 +569,19 @@ export default function QuoteList() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Quotes</h1>
-                    <div className="flex bg-gray-100 p-1 rounded-lg self-end">
+            <DashboardStats />
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-2">
+                <div className="flex items-center justify-between sm:justify-start gap-6">
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Quotes</h1>
+                    <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200/50 shadow-inner">
                         <button
                             onClick={() => setView('ACTIVE')}
                             className={cn(
-                                "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                                "px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-lg transition-all",
                                 view === 'ACTIVE'
                                     ? "bg-white text-blue-600 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
+                                    : "text-gray-400 hover:text-gray-600"
                             )}
                         >
                             Active
@@ -570,46 +589,70 @@ export default function QuoteList() {
                         <button
                             onClick={() => setView('TRASH')}
                             className={cn(
-                                "px-4 py-1.5 text-sm font-medium rounded-md transition-all flex items-center gap-2",
+                                "px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-widest rounded-lg transition-all flex items-center gap-2",
                                 view === 'TRASH'
-                                    ? "bg-white text-red-600 shadow-sm"
-                                    : "text-gray-500 hover:text-gray-700"
+                                    ? "bg-white text-rose-600 shadow-sm"
+                                    : "text-gray-400 hover:text-rose-500"
                             )}
                         >
-                            <Trash2 size={16} />
-                            Trash
+                            <Trash2 size={12} className={view === 'TRASH' ? "text-rose-500" : "text-gray-400"} />
+                            Bin
                         </button>
                     </div>
                 </div>
-                {view === 'ACTIVE' && (
-                    <div className="flex items-center gap-3">
 
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                    {/* View Mode Toggle (Desktop only) */}
+                    <div className="hidden lg:flex bg-gray-100 p-1 rounded-xl border border-gray-200/50">
+                        <button
+                            onClick={() => toggleViewMode('TABLE')}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-all",
+                                viewMode === 'TABLE' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Table View"
+                        >
+                            <Table2 size={18} />
+                        </button>
+                        <button
+                            onClick={() => toggleViewMode('CARD')}
+                            className={cn(
+                                "p-1.5 rounded-lg transition-all",
+                                viewMode === 'CARD' ? "bg-white text-blue-600 shadow-sm" : "text-gray-400 hover:text-gray-600"
+                            )}
+                            title="Card View"
+                        >
+                            <LayoutGrid size={18} />
+                        </button>
+                    </div>
+
+                    {view === 'ACTIVE' && (
                         <button
                             onClick={handleCreate}
-                            className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 font-bold h-10"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 font-extrabold h-11"
                         >
                             <Plus size={20} />
                             New Quote
                         </button>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                         type="text"
                         placeholder="Search quotes, clients, or projects..."
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 placeholder:text-gray-400 bg-white shadow-sm hover:border-gray-300"
+                        className="w-full pl-10 pr-4 py-2.5 sm:py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm sm:text-base text-gray-900 placeholder:text-gray-400 bg-white shadow-sm hover:border-gray-300"
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Select value={projectStatusFilter} onValueChange={setProjectStatusFilter}>
-                        <SelectTrigger className="w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300">
+                        <SelectTrigger className="flex-1 sm:flex-none w-full sm:w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300 text-xs sm:text-sm">
                             <SelectValue placeholder="Project Status" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
@@ -621,7 +664,7 @@ export default function QuoteList() {
                     </Select>
 
                     <Select value={quoteStatusFilter} onValueChange={setQuoteStatusFilter}>
-                        <SelectTrigger className="w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300">
+                        <SelectTrigger className="flex-1 sm:flex-none w-full sm:w-[160px] bg-white border-gray-200 h-10 rounded-xl shadow-sm hover:border-gray-300 text-xs sm:text-sm">
                             <SelectValue placeholder="Quote Status" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
@@ -634,7 +677,7 @@ export default function QuoteList() {
                     </Select>
 
                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
+                        <DropdownMenuTrigger asChild className="hidden sm:flex">
                             <Button variant="outline" size="icon" className="h-10 w-10 border-gray-200 rounded-xl bg-white shadow-sm hover:bg-gray-50">
                                 <Settings2 className="h-4 w-4 text-gray-500" />
                             </Button>
@@ -703,7 +746,10 @@ export default function QuoteList() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className={cn(
+                "hidden bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex-col",
+                viewMode === 'TABLE' ? "lg:flex" : "hidden"
+            )}>
                 <div className="overflow-x-auto w-full">
                     <div className="min-w-[1200px] flex flex-col w-full h-full">
                         {/* Table Header */}
@@ -1428,7 +1474,7 @@ export default function QuoteList() {
                 </div>
 
                  {/* Pagination Footer */}
-                {(totalPages > 1 || limit !== 25) && (
+                {(totalPages > 1 || limit !== 27) && (
                     <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
                         <div className="flex items-center gap-8">
                             <div className="text-sm text-gray-500">
@@ -1448,9 +1494,9 @@ export default function QuoteList() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-xl">
-                                        <SelectItem value="25">25</SelectItem>
-                                        <SelectItem value="50">50</SelectItem>
-                                        <SelectItem value="100">100</SelectItem>
+                                        <SelectItem value="27">27</SelectItem>
+                                        <SelectItem value="54">54</SelectItem>
+                                        <SelectItem value="108">108</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -1505,6 +1551,63 @@ export default function QuoteList() {
                             </Button>
                         </div>
                     </div>
+                )}
+            </div>
+
+            {/* Mobile Cards & Desktop Card View */}
+            <div className={cn(
+                viewMode === 'CARD' ? "grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" : "space-y-4 lg:hidden"
+            )}>
+                {loading && quotes.length === 0 ? (
+                    <div className="py-10 text-center text-gray-500 italic">Loading quotes...</div>
+                ) : (
+                    <>
+                        {quotes.map(q => (
+                            <MobileQuoteCard 
+                                key={q.id} 
+                                quote={q} 
+                                onDelete={(id) => handleDelete({ stopPropagation: () => {} } as any, id)}
+                                onDuplicate={(quote) => handleDuplicateClick({ stopPropagation: () => {} } as any, quote)}
+                                onRevision={(id) => handleCreateRevision({ stopPropagation: () => {} } as any, id)}
+                            />
+                        ))}
+                        
+                        {quotes.length === 0 && !loading && (
+                            <div className="py-20 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                <FileText className="mx-auto w-12 h-12 text-gray-300 mb-4" />
+                                <p className="text-gray-500 font-medium">No quotes found.</p>
+                            </div>
+                        )}
+
+                        {/* Mobile Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between pt-4 pb-8">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                                    disabled={page === 1}
+                                    className="rounded-xl"
+                                >
+                                    <ChevronLeft size={16} />
+                                    Prev
+                                </Button>
+                                <span className="text-xs font-bold text-gray-500">
+                                    Page {page} of {totalPages}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={page === totalPages}
+                                    className="rounded-xl"
+                                >
+                                    Next
+                                    <ChevronRight size={16} />
+                                </Button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 

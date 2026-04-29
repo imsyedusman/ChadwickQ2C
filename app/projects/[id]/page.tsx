@@ -415,67 +415,65 @@ export default function ProjectDetail() {
                 )}
 
                 {/* Header & Back Button */}
-                <div className="mb-6">
+                <div className="mb-6 sm:mb-8">
                     <button 
                         onClick={() => router.push('/projects')}
-                        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-4 group"
+                        className="flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-blue-600 transition-colors mb-4 group"
                     >
                         <ChevronLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
                         Back to Projects
                     </button>
                     
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-3xl font-bold text-gray-900">{project.projectName}</h1>
-                                <Select value={project.projectStatus} onValueChange={handleProjectStatusChange}>
-                                    <SelectTrigger className={cn(
-                                        "px-3 py-1 h-8 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm w-[120px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
-                                        getProjectStatusDisplay(project.projectStatus).className
-                                    )}>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="Budget">Budget</SelectItem>
-                                        <SelectItem value="Tender">Tender</SelectItem>
-                                        <SelectItem value="Live">Live</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                {project.pipedrive_deal_id && (
-                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
-                                        <LinkIcon size={12} />
-                                        Linked Deal #{project.pipedrive_deal_id}
-                                    </div>
-                                )}
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-tight">
+                                    {project.projectName}
+                                </h1>
+                                <div className="flex items-center gap-2">
+                                    <Select value={project.projectStatus} onValueChange={handleProjectStatusChange}>
+                                        <SelectTrigger className={cn(
+                                            "px-3 py-1 h-8 text-[10px] font-bold rounded-full border uppercase tracking-widest shadow-sm w-[110px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
+                                            getProjectStatusDisplay(project.projectStatus).className
+                                        )}>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Budget">Budget</SelectItem>
+                                            <SelectItem value="Tender">Tender</SelectItem>
+                                            <SelectItem value="Live">Live</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {project.pipedrive_deal_id && (
+                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                                            <LinkIcon size={12} />
+                                            #{project.pipedrive_deal_id}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
                             {project.pipedriveDealUrl && (
                                 <Button 
                                     variant="outline"
                                     onClick={() => window.open(project.pipedriveDealUrl, '_blank')}
-                                    className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 h-11 px-5 rounded-xl transition-all font-bold"
+                                    className="w-full sm:w-auto border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 h-11 px-5 rounded-xl transition-all font-bold shadow-sm"
                                 >
                                     <div className="w-5 h-5 rounded overflow-hidden shrink-0">
                                         <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
                                     </div>
-                                    View in Pipedrive
+                                    <span className="hidden xs:inline">View in Pipedrive</span>
+                                    <span className="xs:hidden">Pipedrive</span>
                                 </Button>
                             )}
-                            {!project.pipedrive_deal_id && (
-                                <Button 
-                                    variant="outline"
-                                    onClick={() => setIsLinkModalOpen(true)}
-                                    className="border-slate-200 text-slate-600 hover:bg-slate-50 gap-2 h-11 px-5 rounded-xl transition-all font-bold"
-                                >
-                                    <LinkIcon size={18} />
-                                    Link Pipedrive Deal
-                                </Button>
-                            )}
-                            <Button onClick={handleCreateQuote} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.02] active:scale-[0.98] font-bold">
+                            <Button 
+                                onClick={handleCreateQuote} 
+                                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 px-6 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98] font-extrabold"
+                            >
                                 <Plus size={20} />
-                                New Project Quote
+                                New Quote
                             </Button>
                         </div>
                     </div>
@@ -483,26 +481,26 @@ export default function ProjectDetail() {
 
                 <div className="space-y-6">
                     {/* Metadata Cards Row */}
-                    <div className="flex flex-wrap items-stretch gap-4">
+                    <div className="grid grid-cols-1 md:flex md:flex-wrap items-stretch gap-4">
                         {/* Total Quotes Card */}
-                        <div className="bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                            <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
-                                <FileText size={14} className="text-blue-500" />
+                        <div className="bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                                <FileText size={18} className="text-blue-500" />
                             </div>
                             <div>
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Total Quotes</p>
-                                <p className="text-base font-bold text-gray-900 leading-none">{optimisticQuotes.length || 0}</p>
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Total Quotes</p>
+                                <p className="text-lg font-extrabold text-gray-900 leading-none">{optimisticQuotes.length || 0}</p>
                             </div>
                         </div>
                         
                         {/* Latest Activity Card */}
-                        <div className="bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
-                            <div className="p-1.5 bg-slate-50 rounded-lg shrink-0">
-                                <Clock size={14} className="text-slate-500" />
+                        <div className="bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center shrink-0">
+                                <Clock size={18} className="text-slate-500" />
                             </div>
                             <div className="min-w-0">
-                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Latest Activity</p>
-                                <p className="text-xs font-bold text-gray-800 leading-none truncate">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Latest Activity</p>
+                                <p className="text-sm font-extrabold text-gray-800 leading-none truncate">
                                     {optimisticQuotes.length > 0 
                                         ? format(new Date(optimisticQuotes[0].updatedAt), 'MMM d, h:mm a')
                                         : 'No activity yet'}
@@ -512,16 +510,16 @@ export default function ProjectDetail() {
 
                         {/* Consolidated Pipedrive Metadata Card */}
                         <div className={cn(
-                            "bg-white px-5 py-2.5 min-h-14 rounded-xl border border-gray-100 shadow-sm flex items-center gap-6",
+                            "bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center gap-6",
                             !project.pipedrive_deal_id && "opacity-60"
                         )}>
-                            <div className="flex items-center gap-3 pr-6 border-r border-gray-100">
-                                <div className="p-1.5 bg-blue-50 rounded-lg shrink-0">
-                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-3.5 h-3.5 rounded" />
+                            <div className="flex items-center gap-4 sm:pr-6 sm:border-r sm:border-gray-100">
+                                <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                                    <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-6 h-6 rounded-md" />
                                 </div>
-                                <div className="min-w-[100px]">
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Deal Value</p>
-                                    <p className="text-base font-bold text-gray-900 leading-none">
+                                <div className="min-w-[120px]">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Deal Value</p>
+                                    <p className="text-lg font-extrabold text-gray-900 leading-none">
                                         {(() => {
                                             const val = Number(project.dealValue);
                                             return (project.dealValue && !isNaN(val)) 
@@ -532,68 +530,67 @@ export default function ProjectDetail() {
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-6">
+                            <div className="grid grid-cols-2 gap-6 sm:flex sm:items-center sm:gap-8">
                                 <div>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Exp. Close</p>
-                                    <p className="text-[11px] font-bold text-gray-700 leading-none">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Exp. Close</p>
+                                    <p className="text-xs font-extrabold text-gray-700 leading-none">
                                         {project.expectedCloseDate ? format(new Date(project.expectedCloseDate), 'MMM d, yyyy') : '—'}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Created</p>
-                                    <p className="text-[11px] font-bold text-gray-700 leading-none">
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Created</p>
+                                    <p className="text-xs font-extrabold text-gray-700 leading-none">
                                         {project.dealCreatedAt ? format(new Date(project.dealCreatedAt), 'MMM d, yyyy') : '—'}
                                     </p>
                                 </div>
                             </div>
 
-                            {project.pipedrive_deal_id && (
-                                <div className="flex items-center gap-2 pl-4 border-l border-gray-100 ml-auto">
+                            {project.pipedrive_deal_id ? (
+                                <div className="flex items-center gap-3 pt-3 sm:pt-0 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 sm:ml-auto">
                                     {project.quoteFolder && (
                                         <a 
                                             href={project.quoteFolder}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all border border-gray-100 sm:border-transparent"
                                             title="Open Sharepoint Folder"
                                         >
-                                            <FileText size={16} />
+                                            <FileText size={18} />
                                         </a>
                                     )}
                                     <button 
                                         onClick={handleRefresh}
                                         disabled={refreshing}
-                                        className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all disabled:opacity-50"
+                                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all disabled:opacity-50 border border-gray-100 sm:border-transparent"
                                         title="Sync from Pipedrive"
                                     >
-                                        <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
+                                        <RefreshCw size={18} className={cn(refreshing && "animate-spin")} />
                                     </button>
                                     {project.pipedriveDealUrl && (
                                         <a 
                                             href={project.pipedriveDealUrl} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all border border-gray-100 sm:border-transparent"
                                             title="View in Pipedrive"
                                         >
-                                            <ArrowUpRight size={16} />
+                                            <ArrowUpRight size={18} />
                                         </a>
                                     )}
                                 </div>
-                            )}
-
-                            {!project.pipedrive_deal_id && (
+                            ) : (
                                 <Button 
-                                    variant="link" 
+                                    variant="outline" 
                                     size="sm" 
                                     onClick={() => setIsLinkModalOpen(true)}
-                                    className="text-blue-500 text-[10px] font-bold uppercase tracking-widest h-auto p-0 ml-4 hover:no-underline"
+                                    className="h-10 rounded-xl border-blue-100 bg-blue-50/50 text-blue-600 font-extrabold uppercase tracking-widest text-[10px] w-full sm:w-auto px-4"
                                 >
-                                    Link Deal
+                                    Link Pipedrive Deal
                                 </Button>
                             )}
                         </div>
                     </div>
+div>
 
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden w-full">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
