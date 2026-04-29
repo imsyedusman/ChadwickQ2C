@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Plus, Minus, Filter, Package, Zap, Layers, ChevronRight, ArrowLeft, Folder, Loader2, X, Trash2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { isAutoManaged, isPermanentManualCategory } from '@/lib/system-definitions';
@@ -348,10 +348,39 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
     const [meterBrandFilter, setMeterBrandFilter] = useState<string>('All');
     const [meterTypeFilter, setMeterTypeFilter] = useState<string>('All');
 
+    // MCCB Redesign State
+    const [mccbCapacityFilter, setMccbCapacityFilter] = useState<string>('All');
+    const [mccbTypeFilter, setMccbTypeFilter] = useState<string>('All');
+    const mccbCache = useRef<CatalogItem[] | null>(null);
+
+    // MCCB Parsing Helper
+    const parseMccbTokens = (subcategory: string) => {
+        if (!subcategory) return { capacity: null, type: null, kA: 0 };
+        const parts = subcategory.split(' > ');
+        const lastPart = parts[parts.length - 1].toUpperCase();
+        const tokens = lastPart.split(' ').map(t => t.trim()).filter(Boolean);
+
+        let capacity = null;
+        let type = null;
+        let kA = 0;
+
+        for (const token of tokens) {
+            const capMatch = token.match(/^(\d+)KA$/);
+            if (capMatch) {
+                capacity = token;
+                kA = parseInt(capMatch[1]);
+            }
+            if (['ELECT', 'TM', 'FRAME'].includes(token)) {
+                type = token;
+            }
+        }
+        return { capacity, type, kA };
+    };
+
     // Initial Load: Removed explicit redundant fetch since activeCategory change (or initial render) triggers the effect below.
 
     // Derive Options from `allSubcategories`
-    const { l1Options, l2Options, l3Options, isPowerMeterSelection } = useMemo(() => {
+    const { l1Options, l2Options, l3Options, isPowerMeterSelection, isMccbSelection } = useMemo(() => {
         const l1 = new Set<string>();
         const l2 = new Set<string>();
         const l3 = new Set<string>();
@@ -378,6 +407,8 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             powerMeterActive = true;
         }
 
+        const isMccbActive = activeCategory === 'Switchboard' && selectedL1 === 'Circuit Breakers' && selectedL2 === 'MCCB';
+
         // Custom Sorting
         const L1_ORDER = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
         const MISC_ORDER = ['Contactor', 'General Control', 'Power Metering', 'Fuses'];
@@ -399,9 +430,10 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             l1Options: sortOptions(l1, activeCategory === 'Switchboard' ? L1_ORDER : undefined),
             l2Options: sortOptions(l2, (activeCategory === 'Switchboard' && selectedL1 === 'Miscellaneous') ? MISC_ORDER : undefined),
             l3Options: sortOptions(l3),
-            isPowerMeterSelection: powerMeterActive
+            isPowerMeterSelection: powerMeterActive,
+            isMccbSelection: isMccbActive
         };
-    }, [allSubcategories, selectedL1, selectedL2, selectedL3]);
+    }, [allSubcategories, selectedL1, selectedL2, selectedL3, activeCategory]);
 
     // Separate Memo for Search Grouping (Depends on Items)
     const groupedItems = useMemo(() => {
@@ -473,6 +505,42 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
 
     }, [items, isPowerMeterSelection, meterBrandFilter, meterTypeFilter]);
 
+    // Derived MCCB Filters
+    const { filteredMccbItems, totalMccbMatchingCount } = useMemo(() => {
+        if (!isMccbSelection) return { filteredMccbItems: [], totalMccbMatchingCount: 0 };
+
+        // 1. Filter
+        const filtered = items.filter(item => {
+            const { capacity, type } = parseMccbTokens(item.subcategory);
+            
+            if (mccbCapacityFilter !== 'All' && capacity !== mccbCapacityFilter) return false;
+            if (mccbTypeFilter !== 'All' && type !== mccbTypeFilter) return false;
+            
+            return true;
+        });
+
+        const totalMatching = filtered.length;
+
+        // 2. Sort (Numeric kA -> Type)
+        const sorted = [...filtered].sort((a, b) => {
+            const tokensA = parseMccbTokens(a.subcategory);
+            const tokensB = parseMccbTokens(b.subcategory);
+
+            if (tokensA.kA !== tokensB.kA) return tokensA.kA - tokensB.kA;
+            
+            const typeOrder: Record<string, number> = { 'ELECT': 1, 'TM': 2, 'FRAME': 3 };
+            const orderA = tokensA.type ? (typeOrder[tokensA.type] || 99) : 99;
+            const orderB = tokensB.type ? (typeOrder[tokensB.type] || 99) : 99;
+            
+            if (orderA !== orderB) return orderA - orderB;
+
+            return a.description.localeCompare(b.description);
+        });
+
+        // 3. Slice
+        return { filteredMccbItems: sorted.slice(0, 20), totalMccbMatchingCount: totalMatching };
+    }, [items, isMccbSelection, mccbCapacityFilter, mccbTypeFilter]);
+
     // Fetch items when selection changes or search changes
     useEffect(() => {
         // If searching, fetch immediately
@@ -491,8 +559,8 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             if (selectedL3) {
                 shouldFetch = true;
             }
-            // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist OR it's Miscellaneous)
-            else if (selectedL2 && (l3Options.length === 0 || selectedL1 === 'Miscellaneous')) {
+            // Case 2: 2-level hierarchy (L2 selected, and no L3 options exist OR it's Miscellaneous OR it's MCCB)
+            else if (selectedL2 && (l3Options.length === 0 || selectedL1 === 'Miscellaneous' || selectedL2 === 'MCCB')) {
                 shouldFetch = true;
             }
             // Case 3: 1-level hierarchy (L1 selected, and no L2 options exist)
@@ -516,6 +584,13 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
     }, [activeCategory, selectedL1, selectedL2, selectedL3, searchQuery, l2Options, l3Options]);
 
     const fetchItems = async () => {
+        // Caching Logic for MCCB
+        const isMccbFetch = !searchQuery && activeCategory === 'Switchboard' && selectedL1 === 'Circuit Breakers' && selectedL2 === 'MCCB';
+        if (isMccbFetch && mccbCache.current) {
+            setItems(mccbCache.current);
+            return;
+        }
+
         setLoading(true);
         try {
             const params = new URLSearchParams();
@@ -546,7 +621,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
             }
 
             // Increase limit for specific views
-            params.append('take', '500');
+            params.append('take', isMccbFetch ? '1000' : '500');
 
             const queryString = params.toString();
             const res = await fetch(`/api/catalog?${queryString}`);
@@ -560,6 +635,9 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                 // Apply Deterministic Sorting
                 const sortedData = [...filteredData].sort(compareItems);
 
+                if (isMccbFetch) {
+                    mccbCache.current = sortedData;
+                }
                 setItems(sortedData);
             }
         } catch (error) {
@@ -576,6 +654,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
         setSelectedL3(null);
         setSearchQuery('');
         setItems([]);
+        mccbCache.current = null; // Clear cache on master tab change to be safe
         fetchCategoryTree(activeCategory);
     }, [activeCategory]);
 
@@ -780,7 +859,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                 </div>
                             )}
 
-                            {selectedL1 && selectedL2 && !selectedL3 && l3Options.length > 0 && (
+                            {selectedL1 && selectedL2 && !selectedL3 && l3Options.length > 0 && !isMccbSelection && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
                                     {l3Options.map(cat => (
                                         <button
@@ -901,31 +980,94 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                                 </button>
                                             ))}
                                         </div>
+                                    </div>
+                                )}
 
-                                        {/* Type Filters */}
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Type:</span>
-                                            {['All', 'Direct', 'CT', 'NMI', 'Special'].map(type => (
-                                                <button
-                                                    key={type}
-                                                    onClick={() => setMeterTypeFilter(type)}
-                                                    className={cn(
-                                                        "px-4 py-1.5 rounded-md text-xs font-semibold border transition-all",
-                                                        meterTypeFilter === type
-                                                            ? "bg-blue-50 border-blue-600 text-blue-700 ring-1 ring-blue-200"
-                                                            : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
-                                                    )}
-                                                >
-                                                    {type}
-                                                </button>
-                                            ))}
+                                {/* MCCB: Filter UI Header */}
+                                {isMccbSelection && (
+                                    <div className="mb-4 bg-white p-5 rounded-lg border border-blue-100 shadow-sm space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* Breaking Capacity Chips */}
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between px-1">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breaking Capacity</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {['All', '25kA', '36kA', '40kA', '50kA', '70kA'].map((cap) => (
+                                                        <button
+                                                            key={cap}
+                                                            onClick={() => setMccbCapacityFilter(prev => prev === (cap === 'All' ? 'All' : cap.toUpperCase()) ? 'All' : (cap === 'All' ? 'All' : cap.toUpperCase()))}
+                                                            className={cn(
+                                                                "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                (mccbCapacityFilter === (cap === 'All' ? 'All' : cap.toUpperCase()))
+                                                                    ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
+                                                            )}
+                                                        >
+                                                            {cap}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* Trip Type Chips */}
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between px-1">
+                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Trip Type</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {[
+                                                        { label: 'All', value: 'All' },
+                                                        { label: 'Electronic', value: 'ELECT' },
+                                                        { label: 'Thermal Magnetic', value: 'TM' },
+                                                        { label: 'Frame', value: 'FRAME' }
+                                                    ].map((type) => (
+                                                        <button
+                                                            key={type.value}
+                                                            onClick={() => setMccbTypeFilter(prev => prev === type.value ? 'All' : type.value)}
+                                                            className={cn(
+                                                                "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                mccbTypeFilter === type.value
+                                                                    ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
+                                                            )}
+                                                        >
+                                                            {type.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
 
-                                {(isPowerMeterSelection ? filteredItems : items).map((item) => (
+                                {(isPowerMeterSelection ? filteredItems : isMccbSelection ? filteredMccbItems : items).map((item) => (
                                     <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                 ))}
+
+                                {/* Result Count Indicator for MCCB */}
+                                {isMccbSelection && (
+                                    <div className="mt-4 flex flex-col items-center gap-3 py-4">
+                                        <p className="text-sm font-medium text-gray-500">
+                                            {totalMccbMatchingCount === 0 ? (
+                                                <span className="text-red-500 flex items-center gap-1.5">
+                                                    <AlertCircle size={16} />
+                                                    No items match selected filters
+                                                </span>
+                                            ) : (
+                                                <>Showing <span className="text-gray-900 font-bold">{Math.min(filteredMccbItems.length, 20)}</span> of <span className="text-gray-900 font-bold">{totalMccbMatchingCount}</span> items</>
+                                            )}
+                                        </p>
+                                        {totalMccbMatchingCount === 0 && (
+                                            <button 
+                                                onClick={() => { setMccbCapacityFilter('All'); setMccbTypeFilter('All'); }}
+                                                className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+                                            >
+                                                Reset all filters
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 
