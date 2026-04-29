@@ -169,8 +169,10 @@ export default function CatalogManager() {
             setExpandedSections({
                 highImpact: data.summary.highImpactChanges.length > 0, // Auto-expand if critical
                 priceChanges: false,
+                descriptionChanges: false,
                 newItems: false,
-                missingItems: false
+                missingItems: false,
+                conflicts: false
             });
         } catch (err: any) {
             console.error('Analysis failed:', err);
