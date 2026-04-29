@@ -1026,14 +1026,14 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
 
                                 {/* MCCB: Filter UI Header */}
                                 {isMccbSelection && (
-                                    <div className="mb-4 bg-white p-5 rounded-lg border border-blue-100 shadow-sm space-y-6">
-                                        <div className="flex flex-col md:flex-row items-start md:items-center gap-12">
-                                             {/* Item Type Chips */}
-                                             <div className="space-y-3">
+                                    <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm">
+                                        <div className="flex items-center gap-6 overflow-x-auto no-scrollbar pb-1 pr-10">
+                                             {/* Item Type */}
+                                             <div className="space-y-2 shrink-0">
                                                  <div className="flex items-center justify-between px-1">
                                                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Item Type</span>
                                                  </div>
-                                                 <div className="flex flex-wrap gap-2">
+                                                 <div className="flex gap-1.5">
                                                      {[
                                                          { label: 'All', value: 'All' },
                                                          { label: 'Breakers', value: 'Breakers' },
@@ -1043,9 +1043,9 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                                              key={type.value}
                                                              onClick={() => setMccbItemTypeFilter(prev => prev === type.value ? 'All' : type.value)}
                                                              className={cn(
-                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm",
                                                                  mccbItemTypeFilter === type.value
-                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100"
                                                                      : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
                                                              )}
                                                          >
@@ -1056,19 +1056,19 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                              </div>
 
                                              {/* Breaking Capacity Chips */}
-                                             <div className="space-y-3">
+                                             <div className="space-y-2 shrink-0">
                                                  <div className="flex items-center justify-between px-1">
                                                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breaking Capacity</span>
                                                  </div>
-                                                 <div className="flex flex-wrap gap-2">
+                                                 <div className="flex gap-1.5">
                                                      {['All', '25kA', '36kA', '40kA', '50kA', '70kA'].map((cap) => (
                                                          <button
                                                              key={cap}
                                                              onClick={() => setMccbCapacityFilter(prev => prev === (cap === 'All' ? 'All' : cap.toUpperCase()) ? 'All' : (cap === 'All' ? 'All' : cap.toUpperCase()))}
                                                              className={cn(
-                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm",
                                                                  (mccbCapacityFilter === (cap === 'All' ? 'All' : cap.toUpperCase()))
-                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100"
                                                                      : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
                                                              )}
                                                          >
@@ -1079,11 +1079,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                              </div>
 
                                              {/* Configuration Chips */}
-                                             <div className="space-y-3">
+                                             <div className="space-y-2 shrink-0">
                                                  <div className="flex items-center justify-between px-1">
                                                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configuration</span>
                                                  </div>
-                                                 <div className="flex flex-wrap gap-2">
+                                                 <div className="flex gap-1.5">
                                                      {[
                                                          { label: 'All', value: 'All' },
                                                          { label: 'Electronic', value: 'ELECT' },
@@ -1094,9 +1094,9 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                                              key={type.value}
                                                              onClick={() => setMccbTypeFilter(prev => prev === type.value ? 'All' : type.value)}
                                                              className={cn(
-                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border shadow-sm",
                                                                  mccbTypeFilter === type.value
-                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100"
                                                                      : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
                                                              )}
                                                          >
