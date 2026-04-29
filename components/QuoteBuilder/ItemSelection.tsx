@@ -349,12 +349,10 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
     const [meterTypeFilter, setMeterTypeFilter] = useState<string>('All');
 
     // MCCB Redesign State
+    const [mccbItemTypeFilter, setMccbItemTypeFilter] = useState<string>('All');
     const [mccbCapacityFilter, setMccbCapacityFilter] = useState<string>('All');
     const [mccbTypeFilter, setMccbTypeFilter] = useState<string>('All');
-    const [showTripUnits, setShowTripUnits] = useState<boolean>(false);
-    const [tripUnitItems, setTripUnitItems] = useState<CatalogItem[]>([]);
     const mccbCache = useRef<CatalogItem[] | null>(null);
-    const tripUnitCache = useRef<CatalogItem[] | null>(null);
 
     // MCCB Parsing Helper
     const parseMccbTokens = (subcategory: string) => {
@@ -508,71 +506,78 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
 
     }, [items, isPowerMeterSelection, meterBrandFilter, meterTypeFilter]);
 
-    // Derived MCCB Filters (Merged Breakers + Trip Units)
-    const { filteredMccbBreakers, filteredTripUnitComponents, totalMccbMatchingCount, totalMccbAvailableCount } = useMemo(() => {
-        if (!isMccbSelection) return { filteredMccbBreakers: [], filteredTripUnitComponents: [], totalMccbMatchingCount: 0, totalMccbAvailableCount: 0 };
+    // Derived MCCB Filters
+    const { filteredMccbItems, totalMccbMatchingCount, totalMccbAvailableCount } = useMemo(() => {
+        if (!isMccbSelection) return { filteredMccbItems: [], totalMccbMatchingCount: 0, totalMccbAvailableCount: 0 };
+
+        // Helper for strict Trip Unit detection
+        const isTripUnit = (item: CatalogItem) => {
+            const desc = (item.description || '').toUpperCase().trim();
+            return desc.includes('TRIP UNIT') || desc.includes('BASE TRIP UNIT');
+        };
 
         // Helper for tech detection
         const getTech = (item: CatalogItem) => {
             const { type } = parseMccbTokens(item.subcategory);
             const desc = (item.description || '').toUpperCase();
             
-            // Explicit Token > Inferred Name
             if (type === 'ELECT') return 'ELECT';
             if (type === 'TM') return 'TM';
             if (type === 'FRAME') return 'FRAME';
 
-            if (desc.includes('ELECT') || desc.includes('MICROLOGIC P') || desc.includes('MICROLOGIC H') || desc.includes('MICROLOGIC 2') || desc.includes('MICROLOGIC 5') || desc.includes('MICROLOGIC 6')) {
-                return 'ELECT';
-            }
-            if (desc.includes(' TM ')) return 'TM'; // Space padded to avoid partials
+            if (desc.includes('ELECT') || desc.includes('MICROLOGIC')) return 'ELECT';
+            if (desc.includes(' TM ')) return 'TM';
             
             return null;
         };
 
-        // 1. Process Breakers (Categorized) - Filtered by Capacity & Configuration
-        const breakers = items.filter(item => {
-            const { capacity } = parseMccbTokens(item.subcategory);
-            const tech = getTech(item);
+        // 1. Filter Items
+        const filtered = items.filter(item => {
+            const tripUnit = isTripUnit(item);
+            
+            // A. Item Type Filter
+            if (mccbItemTypeFilter === 'Breakers' && tripUnit) return false;
+            if (mccbItemTypeFilter === 'Trip Units' && !tripUnit) return false;
 
-            // Capacity Filter
-            if (mccbCapacityFilter !== 'All' && capacity !== mccbCapacityFilter) return false;
+            // B. Capacity Filter (Bypassed for Trip Units)
+            if (!tripUnit && mccbCapacityFilter !== 'All') {
+                const { capacity } = parseMccbTokens(item.subcategory);
+                if (capacity !== mccbCapacityFilter) return false;
+            }
 
-            // Configuration Filter
-            if (mccbTypeFilter !== 'All' && tech !== mccbTypeFilter) return false;
+            // C. Configuration Filter (Missing tags do not exclude)
+            if (mccbTypeFilter !== 'All') {
+                const tech = getTech(item);
+                if (tech && tech !== mccbTypeFilter) return false;
+            }
 
             return true;
         });
 
-        // 2. Process Trip Units (Components) - ONLY if toggle is ON, NOT affected by filters
-        const units = showTripUnits ? tripUnitItems : [];
-
-        // 3. Sort Breakers
-        const sortedBreakers = [...breakers].sort((a, b) => {
+        // 2. Sort Items
+        const sorted = [...filtered].sort((a, b) => {
             const tokensA = parseMccbTokens(a.subcategory);
             const tokensB = parseMccbTokens(b.subcategory);
+
+            // 1. Capacity (Numeric kA)
             if (tokensA.kA !== tokensB.kA) return tokensA.kA - tokensB.kA;
+
+            // 2. Type (ELECT -> TM -> FRAME)
             const typeOrder: Record<string, number> = { 'ELECT': 1, 'TM': 2, 'FRAME': 3 };
             const orderA = tokensA.type ? (typeOrder[tokensA.type] || 99) : 99;
             const orderB = tokensB.type ? (typeOrder[tokensB.type] || 99) : 99;
             if (orderA !== orderB) return orderA - orderB;
+
+            // 3. Description
             return a.description.localeCompare(b.description);
         });
 
-        // 4. Sort Trip Units
-        const sortedUnits = [...units].sort((a, b) => a.description.localeCompare(b.description));
-
-        // 5. Calculate Refined Counts
-        const totalMatchingCount = sortedBreakers.length + sortedUnits.length;
-        const totalAvailableCount = items.length + (showTripUnits ? tripUnitItems.length : 0);
-
         return { 
-            filteredMccbBreakers: sortedBreakers, 
-            filteredTripUnitComponents: sortedUnits,
-            totalMccbMatchingCount: totalMatchingCount,
-            totalMccbAvailableCount: totalAvailableCount
+            filteredMccbItems: sorted, 
+            totalMccbMatchingCount: filtered.length,
+            totalMccbAvailableCount: items.length
         };
-    }, [items, tripUnitItems, isMccbSelection, mccbCapacityFilter, mccbTypeFilter, showTripUnits]);
+    }, [items, isMccbSelection, mccbItemTypeFilter, mccbCapacityFilter, mccbTypeFilter]);
 
     // Fetch items when selection changes or search changes
     useEffect(() => {
@@ -670,43 +675,6 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
 
                 if (isMccbFetch) {
                     mccbCache.current = sortedData;
-                    
-                    // Fetch Trip Units if not cached
-                    if (!tripUnitCache.current) {
-                        try {
-                            // Search for both patterns
-                            const [res1, res2] = await Promise.all([
-                                fetch(`/api/catalog?search=TRIP UNIT&category=Switchboard&take=500`),
-                                fetch(`/api/catalog?search=BASE TRIP UNIT&category=Switchboard&take=500`)
-                            ]);
-                            
-                            if (res1.ok && res2.ok) {
-                                const data1: CatalogItem[] = await res1.json();
-                                const data2: CatalogItem[] = await res2.json();
-                                
-                                // Merge and Deduplicate by ID
-                                const merged = [...data1, ...data2];
-                                const uniqueMap = new Map<string, CatalogItem>();
-                                merged.forEach(item => {
-                                    // Strict name-based detection to avoid accidental search matches
-                                    const desc = (item.description || '').toUpperCase();
-                                    if (desc.includes('TRIP UNIT') || desc.includes('BASE TRIP UNIT')) {
-                                        uniqueMap.set(item.id, item);
-                                    }
-                                });
-                                
-                                // Remove items already in categorized list
-                                const categorizedIds = new Set(sortedData.map(i => i.id));
-                                const finalTripUnits = Array.from(uniqueMap.values())
-                                    .filter(item => !categorizedIds.has(item.id));
-                                
-                                tripUnitCache.current = finalTripUnits;
-                            }
-                        } catch (e) {
-                            console.error("Failed to fetch trip units", e);
-                        }
-                    }
-                    setTripUnitItems(tripUnitCache.current || []);
                 }
                 setItems(sortedData);
             }
@@ -723,10 +691,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
         setSelectedL2(null);
         setSelectedL3(null);
         setSearchQuery('');
+        setMccbItemTypeFilter('All');
+        setMccbCapacityFilter('All');
+        setMccbTypeFilter('All');
         setItems([]);
-        setTripUnitItems([]);
         mccbCache.current = null; // Clear cache on master tab change to be safe
-        tripUnitCache.current = null;
         fetchCategoryTree(activeCategory);
     }, [activeCategory]);
 
@@ -1059,116 +1028,96 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                 {isMccbSelection && (
                                     <div className="mb-4 bg-white p-5 rounded-lg border border-blue-100 shadow-sm space-y-6">
                                         <div className="flex flex-col md:flex-row items-start md:items-center gap-12">
-                                            {/* Breaking Capacity Chips */}
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between px-1">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breaking Capacity</span>
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {['All', '25kA', '36kA', '40kA', '50kA', '70kA'].map((cap) => (
-                                                        <button
-                                                            key={cap}
-                                                            onClick={() => setMccbCapacityFilter(prev => prev === (cap === 'All' ? 'All' : cap.toUpperCase()) ? 'All' : (cap === 'All' ? 'All' : cap.toUpperCase()))}
-                                                            className={cn(
-                                                                "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
-                                                                (mccbCapacityFilter === (cap === 'All' ? 'All' : cap.toUpperCase()))
-                                                                    ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
-                                                                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
-                                                            )}
-                                                        >
-                                                            {cap}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                             {/* Item Type Chips */}
+                                             <div className="space-y-3">
+                                                 <div className="flex items-center justify-between px-1">
+                                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Item Type</span>
+                                                 </div>
+                                                 <div className="flex flex-wrap gap-2">
+                                                     {[
+                                                         { label: 'All', value: 'All' },
+                                                         { label: 'Breakers', value: 'Breakers' },
+                                                         { label: 'Trip Units', value: 'Trip Units' }
+                                                     ].map((type) => (
+                                                         <button
+                                                             key={type.value}
+                                                             onClick={() => setMccbItemTypeFilter(prev => prev === type.value ? 'All' : type.value)}
+                                                             className={cn(
+                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 mccbItemTypeFilter === type.value
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
+                                                             )}
+                                                         >
+                                                             {type.label}
+                                                         </button>
+                                                     ))}
+                                                 </div>
+                                             </div>
 
-                                            {/* Configuration Chips */}
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between px-1">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configuration</span>
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {[
-                                                        { label: 'All', value: 'All' },
-                                                        { label: 'Electronic', value: 'ELECT' },
-                                                        { label: 'Thermal Magnetic', value: 'TM' },
-                                                        { label: 'Frame', value: 'FRAME' }
-                                                    ].map((type) => (
-                                                        <button
-                                                            key={type.value}
-                                                            onClick={() => setMccbTypeFilter(prev => prev === type.value ? 'All' : type.value)}
-                                                            className={cn(
-                                                                "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
-                                                                mccbTypeFilter === type.value
-                                                                    ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
-                                                                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
-                                                            )}
-                                                        >
-                                                            {type.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                             {/* Breaking Capacity Chips */}
+                                             <div className="space-y-3">
+                                                 <div className="flex items-center justify-between px-1">
+                                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breaking Capacity</span>
+                                                 </div>
+                                                 <div className="flex flex-wrap gap-2">
+                                                     {['All', '25kA', '36kA', '40kA', '50kA', '70kA'].map((cap) => (
+                                                         <button
+                                                             key={cap}
+                                                             onClick={() => setMccbCapacityFilter(prev => prev === (cap === 'All' ? 'All' : cap.toUpperCase()) ? 'All' : (cap === 'All' ? 'All' : cap.toUpperCase()))}
+                                                             className={cn(
+                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 (mccbCapacityFilter === (cap === 'All' ? 'All' : cap.toUpperCase()))
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
+                                                             )}
+                                                         >
+                                                             {cap}
+                                                         </button>
+                                                     ))}
+                                                 </div>
+                                             </div>
 
-                                            {/* Trip Units Segmented Control */}
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between px-1">
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Trip Units</span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    {[
-                                                        { label: 'Hide', value: false },
-                                                        { label: 'Show', value: true }
-                                                    ].map((opt) => (
-                                                        <button
-                                                            key={opt.label}
-                                                            onClick={() => setShowTripUnits(opt.value)}
-                                                            className={cn(
-                                                                "px-6 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
-                                                                showTripUnits === opt.value
-                                                                    ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
-                                                                    : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
-                                                            )}
-                                                        >
-                                                            {opt.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                             {/* Configuration Chips */}
+                                             <div className="space-y-3">
+                                                 <div className="flex items-center justify-between px-1">
+                                                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Configuration</span>
+                                                 </div>
+                                                 <div className="flex flex-wrap gap-2">
+                                                     {[
+                                                         { label: 'All', value: 'All' },
+                                                         { label: 'Electronic', value: 'ELECT' },
+                                                         { label: 'Thermal Magnetic', value: 'TM' },
+                                                         { label: 'Frame', value: 'FRAME' }
+                                                     ].map((type) => (
+                                                         <button
+                                                             key={type.value}
+                                                             onClick={() => setMccbTypeFilter(prev => prev === type.value ? 'All' : type.value)}
+                                                             className={cn(
+                                                                 "px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-sm",
+                                                                 mccbTypeFilter === type.value
+                                                                     ? "bg-blue-600 border-blue-600 text-white ring-2 ring-blue-100 scale-105"
+                                                                     : "bg-white border-gray-200 text-gray-600 hover:border-blue-300 hover:text-blue-600 active:scale-95"
+                                                             )}
+                                                         >
+                                                             {type.label}
+                                                         </button>
+                                                     ))}
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 )}
 
                                 {isPowerMeterSelection && filteredItems.map((item) => (
                                     <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                 ))}
 
                                 {isMccbSelection && (
-                                    <div className="space-y-8">
-                                        {/* Group 1: Breakers */}
-                                        {filteredMccbBreakers.length > 0 && (
-                                            <div className="space-y-3">
-                                                {filteredMccbBreakers.map((item) => (
-                                                    <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        {/* Group 2: Trip Units */}
-                                        {filteredTripUnitComponents.length > 0 && (
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-3 px-1">
-                                                    <div className="h-px flex-1 bg-gray-200"></div>
-                                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap">Trip Units (Components)</span>
-                                                    <div className="h-px flex-1 bg-gray-200"></div>
-                                                </div>
-                                                <div className="space-y-3">
-                                                    {filteredTripUnitComponents.map((item) => (
-                                                        <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
+                                    <div className="space-y-3">
+                                        {filteredMccbItems.map((item) => (
+                                            <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
+                                        ))}
                                     </div>
                                 )}
 
@@ -1186,12 +1135,12 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
                                                     No items match selected filters
                                                 </span>
                                             ) : (
-                                                <>Showing <span className="text-gray-900 font-bold">{totalMccbMatchingCount}</span> of <span className="text-gray-900 font-bold">{totalMccbAvailableCount}</span> items</>
+                                                <>Showing <span className="text-gray-900 font-bold">{filteredMccbItems.length}</span> of <span className="text-gray-900 font-bold">{totalMccbAvailableCount}</span> items</>
                                             )}
                                         </p>
                                         {totalMccbMatchingCount === 0 && (
                                             <button 
-                                                onClick={() => { setMccbCapacityFilter('All'); setMccbTypeFilter('All'); setShowTripUnits(false); }}
+                                                onClick={() => { setMccbItemTypeFilter('All'); setMccbCapacityFilter('All'); setMccbTypeFilter('All'); }}
                                                 className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
                                             >
                                                 Reset all filters
