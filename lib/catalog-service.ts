@@ -61,15 +61,23 @@ export function classifyCatalogItem(
     // 1. Determine Brand
     let brand = manualBrand || 'Unknown';
     if (!manualBrand) {
-        // Try to detect from data if not manually overridden
-        // For Schneider file, it's usually Schneider Electric if manualBrand isn't set.
-        // But if it's a generic vendor file, we might not have a reliable column unless we parse desc.
-        // The current generic import defaults to 'Schneider Electric' if manualBrand is empty in CatalogManager.
-        // We will respect that default in CatalogManager, but here we can refine if needed.
-        if (part.startsWith('A9') || part.startsWith('C10') || part.startsWith('LV4')) {
+        // Comprehensive Schneider Electric Prefix List
+        const schneiderPrefixes = [
+            'A9', 'C10', 'LV4', 'LV5', 'MGU', 'NSY', 'METSE', 
+            'XB4', 'XB5', 'GV2', 'GV3', 'LC1', 'LC2', 'ATS', 
+            'ATV', 'VCF', 'ZB4', 'ZB5', 'RSL', 'RXM', 'ZBE', 
+            'XAL', 'LU', 'VW3', 'CCT', 'M9', 'RM17', 'PBEL'
+        ];
+
+        if (schneiderPrefixes.some(p => part.startsWith(p)) || desc.includes('schneider electric')) {
             brand = 'Schneider Electric';
         }
-        // Add more brand detection rules here if needed
+        
+        // Fallback: If it's a known Schneider-only feature context, default to Schneider
+        // We only do this if it's still 'Unknown' after all checks.
+        if (brand === 'Unknown') {
+            brand = 'Schneider Electric';
+        }
     }
 
     // 2. Determine Meter Type (Direct, CT, NMI)

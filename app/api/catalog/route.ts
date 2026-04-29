@@ -266,7 +266,7 @@ export async function POST(request: Request) {
                 const existing = await tx.catalogItem.findFirst({
                     where: { 
                         partNumber: item.partNumber,
-                        brand: item.brand
+                        brand: { equals: item.brand, mode: 'insensitive' }
                     }
                 });
 
@@ -274,6 +274,7 @@ export async function POST(request: Request) {
                     await tx.catalogItem.update({
                         where: { id: existing.id },
                         data: {
+                            brand: item.brand, // Update brand casing if it changed
                             category: item.category,
                             subcategory: item.subcategory,
                             unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,

@@ -21,8 +21,10 @@ interface CatalogItem {
 
 interface ComparisonSummary {
     updatedItems: any[];
+    descriptionChanges: any[];
     newItems: any[];
     missingItems: any[];
+    duplicates: any[];
     unchangedCount: number;
     highImpactChanges: any[];
     totalUploaded: number;
@@ -47,8 +49,10 @@ export default function CatalogManager() {
     const [expandedSections, setExpandedSections] = useState({
         highImpact: false,
         priceChanges: false,
+        descriptionChanges: false,
         newItems: false,
-        missingItems: false
+        missingItems: false,
+        conflicts: false
     });
 
     const toggleSection = (section: keyof typeof expandedSections) => {
@@ -262,9 +266,23 @@ export default function CatalogManager() {
                 }
 
                 // Schneider strict validation
-                const brands = new Set(validItems.map(i => i.brand).filter(b => b.trim() !== ''));
+                const brands = new Set(validItems.map(i => {
+                    const b = i.brand.trim();
+                    return b.toLowerCase() === 'schneider electric' ? 'Schneider Electric' : b;
+                }).filter(b => b !== ''));
+                
                 if (brands.size > 1 || (brands.size === 1 && !brands.has('Schneider Electric'))) {
-                    throw new Error('This feature currently only supports Schneider Electric uploads. Please upload a Schneider Electric catalog.');
+                    console.error('Brand validation failed. Detected brands:', Array.from(brands));
+                    
+                    // Identify sample mismatched items for the user
+                    const mismatchedSamples = validItems
+                        .filter(i => i.brand !== 'Schneider Electric')
+                        .slice(0, 5)
+                        .map(i => `${i.partNumber} (${i.brand})`);
+                    
+                    console.error('Sample mismatched items:', mismatchedSamples);
+
+                    throw new Error(`This feature currently only supports Schneider Electric uploads. Detected brands: ${Array.from(brands).join(', ')}. Please ensure all items are Schneider Electric or specify the brand name in the input box above.`);
                 }
 
                 setFileMetadata({
@@ -600,7 +618,7 @@ export default function CatalogManager() {
                                 {/* Top Level Summary Card */}
                                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
                                     <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Summary</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
                                         <div className="p-4 bg-white rounded-lg border border-gray-200 text-center">
                                             <div className="text-2xl font-bold text-gray-700">{comparisonSummary.unchangedCount}</div>
                                             <div className="text-sm text-gray-500 font-medium">Unchanged</div>
@@ -609,6 +627,10 @@ export default function CatalogManager() {
                                             <div className="text-2xl font-bold text-blue-700">{comparisonSummary.updatedItems.length}</div>
                                             <div className="text-sm text-blue-600 font-medium">Price Changes</div>
                                         </div>
+                                        <div className="p-4 bg-white rounded-lg border border-purple-200 text-center">
+                                            <div className="text-2xl font-bold text-purple-700">{comparisonSummary.descriptionChanges?.length || 0}</div>
+                                            <div className="text-sm text-purple-600 font-medium">Desc. Changes</div>
+                                        </div>
                                         <div className="p-4 bg-white rounded-lg border border-green-200 text-center">
                                             <div className="text-2xl font-bold text-green-700">{comparisonSummary.newItems.length}</div>
                                             <div className="text-sm text-green-600 font-medium">New Items</div>
@@ -616,6 +638,10 @@ export default function CatalogManager() {
                                         <div className="p-4 bg-white rounded-lg border border-gray-200 text-center" title="These items currently exist in DB but were not in the upload file. They will not be modified or deleted.">
                                             <div className="text-2xl font-bold text-gray-600">{comparisonSummary.missingItems.length}</div>
                                             <div className="text-sm text-gray-500 font-medium">Not in Upload</div>
+                                        </div>
+                                        <div className={cn("p-4 bg-white rounded-lg border text-center", (comparisonSummary.duplicates?.length || 0) > 0 ? "border-amber-300 bg-amber-50/30" : "border-gray-200")}>
+                                            <div className={cn("text-2xl font-bold", (comparisonSummary.duplicates?.length || 0) > 0 ? "text-amber-700" : "text-gray-400")}>{comparisonSummary.duplicates?.length || 0}</div>
+                                            <div className={cn("text-sm font-medium", (comparisonSummary.duplicates?.length || 0) > 0 ? "text-amber-700" : "text-gray-500")}>Conflicts</div>
                                         </div>
                                         <div className={cn("p-4 bg-white rounded-lg border text-center", comparisonSummary.highImpactChanges.length > 0 ? "border-red-300" : "border-gray-200")}>
                                             <div className={cn("text-2xl font-bold", comparisonSummary.highImpactChanges.length > 0 ? "text-red-600" : "text-gray-400")}>{comparisonSummary.highImpactChanges.length}</div>
@@ -732,6 +758,98 @@ export default function CatalogManager() {
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Description Changes Section */}
+                                    {comparisonSummary.descriptionChanges?.length > 0 && (
+                                        <div className="border border-purple-200 rounded-lg overflow-hidden">
+                                            <button
+                                                onClick={() => toggleSection('descriptionChanges')}
+                                                className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 flex items-center justify-between transition-colors"
+                                            >
+                                                <div className="font-medium text-purple-800">
+                                                    Description Updates ({comparisonSummary.descriptionChanges.length})
+                                                </div>
+                                                {expandedSections.descriptionChanges ? <ChevronUp size={18} className="text-purple-500" /> : <ChevronDown size={18} className="text-purple-500" />}
+                                            </button>
+
+                                            {expandedSections.descriptionChanges && (
+                                                <div className="p-4 bg-white border-t border-purple-100 max-h-80 overflow-y-auto">
+                                                    <table className="w-full text-sm text-left">
+                                                        <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
+                                                            <tr>
+                                                                <th className="px-4 py-2">Part Number</th>
+                                                                <th className="px-4 py-2">Old Description</th>
+                                                                <th className="px-4 py-2">New Description</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-purple-50">
+                                                            {comparisonSummary.descriptionChanges.map((item: any, i: number) => (
+                                                                <tr key={i} className="hover:bg-purple-50/30">
+                                                                    <td className="px-4 py-2 font-mono text-xs text-gray-800">{item.partNumber}</td>
+                                                                    <td className="px-4 py-2 text-gray-400 italic line-through">{item.oldDescription}</td>
+                                                                    <td className="px-4 py-2 text-purple-700 font-medium">{item.newDescription}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* File Conflicts Section */}
+                                    {comparisonSummary.duplicates?.length > 0 && (
+                                        <div className="border border-amber-200 rounded-lg overflow-hidden">
+                                            <button
+                                                onClick={() => toggleSection('conflicts')}
+                                                className="w-full px-4 py-3 bg-amber-50 hover:bg-amber-100 flex items-center justify-between transition-colors"
+                                            >
+                                                <div className="font-medium text-amber-800 flex items-center gap-2">
+                                                    <AlertCircle size={18} />
+                                                    File Conflicts / Duplicates ({comparisonSummary.duplicates.length})
+                                                </div>
+                                                {expandedSections.conflicts ? <ChevronUp size={18} className="text-amber-500" /> : <ChevronDown size={18} className="text-amber-500" />}
+                                            </button>
+
+                                            {expandedSections.conflicts && (
+                                                <div className="p-4 bg-white border-t border-amber-100">
+                                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm mb-4">
+                                                        <p className="font-semibold mb-1">Warning: These part numbers appear multiple times in your file with different prices or descriptions.</p>
+                                                        <p>Only the <b>last occurrence</b> in the file will be saved. Please verify which value is correct.</p>
+                                                    </div>
+                                                    <div className="max-h-80 overflow-y-auto">
+                                                        <table className="w-full text-sm text-left">
+                                                            <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
+                                                                <tr>
+                                                                    <th className="px-4 py-2">Part Number</th>
+                                                                    <th className="px-4 py-2">Conflict Details</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-amber-100">
+                                                                {comparisonSummary.duplicates.map((item: any, i: number) => (
+                                                                    <tr key={i} className="hover:bg-amber-50/30">
+                                                                        <td className="px-4 py-2 font-mono text-xs text-gray-800 align-top">{item.partNumber}</td>
+                                                                        <td className="px-4 py-2 space-y-1">
+                                                                            <div className="flex items-center gap-4 text-xs">
+                                                                                <div className="flex-1">
+                                                                                    <span className="text-gray-400 uppercase">First:</span>
+                                                                                    <div className="font-medium text-gray-600">${item.firstValue.price.toFixed(2)} - {item.firstValue.desc}</div>
+                                                                                </div>
+                                                                                <div className="flex-1">
+                                                                                    <span className="text-amber-500 uppercase font-bold">Duplicate:</span>
+                                                                                    <div className="font-bold text-amber-700">${item.duplicateValue.price.toFixed(2)} - {item.duplicateValue.desc}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* New Items Section */}
                                     <div className="border border-gray-200 rounded-lg overflow-hidden">

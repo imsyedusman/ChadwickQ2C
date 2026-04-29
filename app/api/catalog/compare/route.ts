@@ -10,22 +10,23 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No items provided' }, { status: 400 });
         }
 
-        // 1. Strict Brand Isolation
-        // Extract unique brands from the upload to ensure brand-safe comparison
-        const uploadedBrands = Array.from(new Set(items.map(item => item.brand).filter(Boolean))) as string[];
+        // 1. Strict Brand Isolation (Case-Insensitive)
+        const uploadedBrands = Array.from(new Set(items.map(item => item.brand?.toLowerCase()).filter(Boolean))) as string[];
 
         if (uploadedBrands.length === 0) {
             return NextResponse.json({ error: 'No valid brands found in upload' }, { status: 400 });
         }
 
         // Fetch existing catalog items for ONLY these brands
+        // We fetch with insensitive OR just fetch all and filter in memory if the list is small.
+        // Given 28k items, we'll try to be specific.
         const existingItems = await prisma.catalogItem.findMany({
             where: {
-                brand: { in: uploadedBrands }
+                brand: { in: uploadedBrands, mode: 'insensitive' }
             }
         });
 
-        // 2. Fetch automation rules for deterministic high-impact flags
+        // 2. Fetch automation rules
         const [tripBaseRules, pairingRules] = await Promise.all([
             prisma.mccbTripBaseRule.findMany({ select: { tripPartNumber: true, basePartNumber: true } }),
             prisma.pairingRule.findMany({ select: { inputPartNumber: true, outputPartNumber: true } })
@@ -41,27 +42,48 @@ export async function POST(request: Request) {
             automationPartNumbers.add(r.outputPartNumber);
         });
 
-        // 3. Build O(1) lookup map for existing items by partNumber
+        // 3. Build O(1) lookup map (Normalize key to UpperPartNumber_LowerBrand)
         const existingMap = new Map<string, typeof existingItems[0]>();
         existingItems.forEach(item => {
             if (item.partNumber) {
-                existingMap.set(item.partNumber, item);
+                const key = `${item.partNumber.toUpperCase()}_${item.brand?.toLowerCase() || 'none'}`;
+                existingMap.set(key, item);
             }
         });
 
         const updatedItems: any[] = [];
+        const descriptionChanges: any[] = [];
         const newItems: any[] = [];
+        const duplicates: any[] = [];
         const highImpactChanges: any[] = [];
         let unchangedCount = 0;
 
-        // Keep track of which existing items were seen in the upload
-        const seenPartNumbers = new Set<string>();
+        // Keep track of seen part numbers in THIS upload to detect duplicates
+        const seenInUpload = new Map<string, any>();
 
         for (const uploadItem of items) {
             if (!uploadItem.partNumber) continue;
 
-            seenPartNumbers.add(uploadItem.partNumber);
-            const existingItem = existingMap.get(uploadItem.partNumber);
+            const partNoUpper = uploadItem.partNumber.toUpperCase();
+            const brandLower = uploadItem.brand?.toLowerCase() || 'none';
+            const lookupKey = `${partNoUpper}_${brandLower}`;
+
+            // Check for duplicates in the upload file itself
+            if (seenInUpload.has(lookupKey)) {
+                const firstSeen = seenInUpload.get(lookupKey);
+                if (firstSeen.unitPrice !== uploadItem.unitPrice || firstSeen.description !== uploadItem.description) {
+                    duplicates.push({
+                        partNumber: uploadItem.partNumber,
+                        brand: uploadItem.brand,
+                        firstValue: { price: firstSeen.unitPrice, desc: firstSeen.description },
+                        duplicateValue: { price: uploadItem.unitPrice, desc: uploadItem.description }
+                    });
+                }
+                continue; // Skip duplicate to avoid double counting
+            }
+            seenInUpload.set(lookupKey, uploadItem);
+
+            const existingItem = existingMap.get(lookupKey);
 
             if (!existingItem) {
                 newItems.push({
@@ -73,10 +95,10 @@ export async function POST(request: Request) {
                 continue;
             }
 
-            // 4. Numeric Strict Comparison
-            // (Round to 2 decimal places to avoid float precision issues)
+            // 4. Comparison
             const oldPrice = Math.round((existingItem.unitPrice || 0) * 100);
             const newPrice = Math.round((uploadItem.unitPrice || 0) * 100);
+            const isDescChanged = existingItem.description !== uploadItem.description;
 
             if (oldPrice !== newPrice) {
                 const oldPriceFloat = oldPrice / 100;
@@ -87,6 +109,8 @@ export async function POST(request: Request) {
                 const changeRecord = {
                     partNumber: uploadItem.partNumber,
                     description: uploadItem.description,
+                    oldDescription: existingItem.description,
+                    isDescChanged,
                     oldPrice: oldPriceFloat,
                     newPrice: newPriceFloat,
                     delta: delta,
@@ -117,16 +141,22 @@ export async function POST(request: Request) {
                         impactReason
                     });
                 }
+            } else if (isDescChanged) {
+                descriptionChanges.push({
+                    partNumber: uploadItem.partNumber,
+                    oldDescription: existingItem.description,
+                    newDescription: uploadItem.description,
+                    price: uploadItem.unitPrice
+                });
             } else {
                 unchangedCount++;
             }
         }
 
         // 6. Non-Destructive Missing Item Logic
-        // Find missing items (present in DB for these brands, but not in upload)
         const missingItems: any[] = [];
-        existingMap.forEach((existingItem, partNumber) => {
-            if (!seenPartNumbers.has(partNumber)) {
+        existingMap.forEach((existingItem, key) => {
+            if (!seenInUpload.has(key)) {
                 missingItems.push({
                     partNumber: existingItem.partNumber,
                     description: existingItem.description,
@@ -137,15 +167,20 @@ export async function POST(request: Request) {
         });
 
         // 7. Sort rules
-        // Updated and High Impact items: largest % change descending
+        updatedItems.sort((a, b) => b.percentChange - a.percentChange);
+        highImpactChanges.sort((a, b) => b.percentChange - a.percentChange);
+
+        // 7. Sort rules
         updatedItems.sort((a, b) => b.percentChange - a.percentChange);
         highImpactChanges.sort((a, b) => b.percentChange - a.percentChange);
 
         return NextResponse.json({
             summary: {
                 updatedItems,
+                descriptionChanges,
                 newItems,
                 missingItems,
+                duplicates,
                 unchangedCount,
                 highImpactChanges,
                 totalUploaded: items.length
