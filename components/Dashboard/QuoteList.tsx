@@ -1567,7 +1567,7 @@ export default function QuoteList() {
                                 key={q.id} 
                                 quote={q} 
                                 onDelete={(id) => handleDelete({ stopPropagation: () => {} } as any, id)}
-                                onDuplicate={(quote) => handleDuplicateClick({ stopPropagation: () => {} } as any, quote)}
+                                onDuplicate={(quote: any) => handleDuplicateClick({ stopPropagation: () => {} } as any, quote)}
                                 onRevision={(id) => handleCreateRevision({ stopPropagation: () => {} } as any, id)}
                             />
                         ))}

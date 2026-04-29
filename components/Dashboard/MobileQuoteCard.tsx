@@ -126,7 +126,7 @@ export default function MobileQuoteCard({
                         <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                             <span className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">By</span>
                             <div className="w-5 h-5 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[8px] font-bold text-blue-600">
-                                {getInitials(quote.modifier?.name || quote.creator?.name)}
+                                {getInitials(quote.modifier?.name || quote.creator?.name || null)}
                             </div>
                         </div>
                     )}

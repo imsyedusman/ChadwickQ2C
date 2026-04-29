@@ -589,8 +589,7 @@ export default function ProjectDetail() {
                                 </Button>
                             )}
                         </div>
-                    </div>
-div>
+
 
                     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden w-full">
                         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">

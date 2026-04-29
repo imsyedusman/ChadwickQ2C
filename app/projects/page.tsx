@@ -1276,11 +1276,11 @@ export default function ProjectsPage() {
                                 <MobileProjectCard 
                                     key={project.id} 
                                     project={project as any}
-                                    onEdit={handleEditOpen}
-                                    onDelete={(p) => {
+                                    onEdit={handleEditOpen as any}
+                                    onDelete={((p: any) => {
                                         setSelectedProject(p as any);
                                         setIsDeleteDialogOpen(true);
-                                    }}
+                                    }) as any}
                                 />
                             ))
                         )}
@@ -1358,11 +1358,11 @@ export default function ProjectsPage() {
                                     <MobileProjectCard 
                                         key={project.id} 
                                         project={project as any}
-                                        onEdit={handleEditOpen}
-                                        onDelete={(p) => {
+                                        onEdit={handleEditOpen as any}
+                                        onDelete={((p: any) => {
                                             setSelectedProject(p as any);
                                             setIsDeleteDialogOpen(true);
-                                        }}
+                                        }) as any}
                                     />
                                 ))
                             )}
