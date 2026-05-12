@@ -34,7 +34,7 @@ import { cn, formatQuoteNumber } from '@/lib/utils';
 import { calculateQuoteTotals, PricingSettings, PricingBoard } from '@/lib/pricing';
 import NewQuoteDialog from './NewQuoteDialog';
 import DuplicateQuoteDialog from './DuplicateQuoteDialog';
-import DashboardStats from './DashboardStats';
+
 import MobileQuoteCard from './MobileQuoteCard';
 import { toast } from 'sonner';
 import {
@@ -569,7 +569,7 @@ export default function QuoteList() {
 
     return (
         <div className="space-y-6">
-            <DashboardStats />
+
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-2">
                 <div className="flex items-center justify-between sm:justify-start gap-6">
