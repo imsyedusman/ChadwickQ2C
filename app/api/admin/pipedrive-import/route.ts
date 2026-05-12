@@ -33,7 +33,9 @@ const dealsMap = {
     currency: ['currency', 'deal_currency'],
     add_time: ['add_time', 'created_date', 'deal_created_date'],
     expected_close_date: ['expected_close_date', 'close_date', 'deal_expected_close_date'],
-    quote_folder: ['47359133abef167a5b3ec1276f449c3743ce970f', 'quote_folder']
+    quote_folder: ['47359133abef167a5b3ec1276f449c3743ce970f', 'quote_folder'],
+    pipedriveOwnerName: ['owner_name', 'deal_owner_name', 'owner'],
+    pipedriveOwnerId: ['owner_id', 'deal_owner_id']
 };
 
 function mapRow(row: any, mapping: Record<string, string[]>): any {

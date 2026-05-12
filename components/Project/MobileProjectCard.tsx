@@ -39,6 +39,7 @@ interface Project {
         updatedAt: string;
         creator: { id: string; name: string | null; email: string | null } | null 
     }[];
+    pipedriveOwnerName?: string | null;
     _count?: {
         quotes: number;
     };
@@ -122,11 +123,20 @@ export default function MobileProjectCard({
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Value</p>
                     <p className="text-xs font-bold text-gray-900">{formatCurrency(project.dealValue || 0, 0)}</p>
                 </div>
-                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50">
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 overflow-hidden">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Deal Owner</p>
+                    <p className={cn(
+                        "text-xs font-bold truncate",
+                        project.pipedriveOwnerName ? "text-emerald-600" : "text-gray-300 italic"
+                    )}>
+                        {project.pipedriveOwnerName || 'Unassigned'}
+                    </p>
+                </div>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Quotes</p>
                     <div className="flex items-center gap-1.5">
                         <Layers size={10} className="text-blue-500" />
-                        <p className="text-xs font-bold text-gray-900">{project._count?.quotes || 0}</p>
+                        <p className="text-xs font-bold text-gray-900">{project._count?.quotes || 0} Quotes linked to this project</p>
                     </div>
                 </div>
             </div>
@@ -199,9 +209,18 @@ export function MobileGroupedProjectCard({
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Aggregated Value</p>
                     <p className="text-xs font-bold text-blue-700">{formatCurrency(group.totalDealValue || 0, 0)}</p>
                 </div>
-                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50">
+                <div className="bg-emerald-50/30 p-2 rounded-xl border border-emerald-50/50 overflow-hidden">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Deal Owner</p>
+                    <p className={cn(
+                        "text-xs font-bold truncate",
+                        latestProject.pipedriveOwnerName ? "text-emerald-700" : "text-gray-300 italic"
+                    )}>
+                        {latestProject.pipedriveOwnerName || 'Unassigned'}
+                    </p>
+                </div>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Projects / Quotes</p>
-                    <p className="text-xs font-bold text-gray-900">{group.projects.length}P / {group.totalQuotes}Q</p>
+                    <p className="text-xs font-bold text-gray-900">{group.projects.length} Projects / {group.totalQuotes} Quotes</p>
                 </div>
             </div>
 

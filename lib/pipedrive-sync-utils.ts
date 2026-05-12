@@ -75,11 +75,27 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
     const pipedrive_org_id = dealData.org_id?.value || (typeof dealData.org_id === 'number' ? dealData.org_id : null);
     const pipedrive_person_id = dealData.person_id?.value || (typeof dealData.person_id === 'number' ? dealData.person_id : null);
 
-    // 3. Upsert Related Entities first
+    // 3. Extract Owner info (Standardized)
+    const pipedriveOwnerId = dealData.user_id?.id || (typeof dealData.user_id === 'number' ? dealData.user_id : null);
+    const pipedriveOwnerName = dealData.user_id?.name || dealData.owner_name || null;
+
+    // 4. Upsert Related Entities first
     const client = pipedrive_org_id ? await upsertPipedriveOrganization(pipedrive_org_id) : null;
     const contact = pipedrive_person_id ? await upsertPipedrivePerson(pipedrive_person_id, client?.id) : null;
 
-    // 4. Strict ID-based upsert for Project
+    // 5. Fetch existing project to check for owner changes (for audit logging)
+    const existingProject = await (prisma as any).project.findUnique({
+        where: { pipedrive_deal_id }
+    });
+
+    if (existingProject) {
+        // Log owner change if it happens
+        if (pipedriveOwnerId && existingProject.pipedriveOwnerId !== pipedriveOwnerId) {
+            console.log(`[Pipedrive Sync] Owner Changed for Project ${existingProject.id}: ${existingProject.pipedriveOwnerName || 'None'} -> ${pipedriveOwnerName}`);
+        }
+    }
+
+    // 6. Strict ID-based upsert for Project
     const project = await (prisma as any).project.upsert({
         where: { pipedrive_deal_id },
         update: { 
@@ -90,6 +106,9 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             contactId: contact?.id || undefined,
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
+            // Sync Safety: Only update owner if non-null
+            ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
+            ...(pipedriveOwnerName ? { pipedriveOwnerName } : {}),
             updatedAt: new Date()
         },
         create: {
@@ -101,6 +120,8 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             contactId: contact?.id || undefined,
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
+            pipedriveOwnerId,
+            pipedriveOwnerName,
             projectStatus: 'Budget',
             source: 'pipedrive'
         }

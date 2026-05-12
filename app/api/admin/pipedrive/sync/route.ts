@@ -210,6 +210,10 @@ export async function POST(request: Request) {
                     const quoteFolder = safeExtract(deal['47359133abef167a5b3ec1276f449c3743ce970f']);
                     const pipedriveDealUrl = `https://app.pipedrive.com/deal/${deal.id}`;
                     
+                    // Standardized Owner Extraction
+                    const pipedriveOwnerId = deal.user_id?.id || (typeof deal.user_id === 'number' ? deal.user_id : null);
+                    const pipedriveOwnerName = deal.user_id?.name || deal.owner_name || null;
+
                     const parseDate = (dateStr: any) => {
                         if (!dateStr) return null;
                         try {
@@ -261,7 +265,10 @@ export async function POST(request: Request) {
                             dealCreatedAt,
                             expectedCloseDate,
                             quoteFolder,
-                            pipedriveDealUrl
+                            pipedriveDealUrl,
+                            // Sync Safety: Only include owner if non-null
+                            ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
+                            ...(pipedriveOwnerName ? { pipedriveOwnerName } : {})
                         };
 
                         for (const [key, incomingVal] of Object.entries(metadataFields)) {
@@ -278,6 +285,11 @@ export async function POST(request: Request) {
                             }
 
                             if (isChanged) {
+                                // Audit Logging for Owner Change
+                                if (key === 'pipedriveOwnerId' && existingProject.pipedriveOwnerId !== incomingVal) {
+                                    console.log(`[Pipedrive Sync] Owner Changed for Project ${existingProject.id}: ${existingProject.pipedriveOwnerName || 'None'} -> ${pipedriveOwnerName}`);
+                                }
+
                                 updateData[key] = incomingVal;
                                 changed = true;
                             }
@@ -313,6 +325,8 @@ export async function POST(request: Request) {
                                 expectedCloseDate,
                                 quoteFolder,
                                 pipedriveDealUrl,
+                                pipedriveOwnerId,
+                                pipedriveOwnerName,
                                 projectStatus: 'Budget',
                                 source: 'pipedrive',
                                 importBatch: { connect: { id: batch.id } }

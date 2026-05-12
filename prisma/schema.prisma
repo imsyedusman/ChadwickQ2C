@@ -70,6 +70,8 @@ model Project {
   expectedCloseDate  DateTime?
   quoteFolder        String?
   pipedriveDealUrl   String?
+  pipedriveOwnerName String?
+  pipedriveOwnerId   Int?
   source             String?
   client             Client?       @relation(fields: [clientId], references: [id])
   contact            Contact?      @relation(fields: [contactId], references: [id])

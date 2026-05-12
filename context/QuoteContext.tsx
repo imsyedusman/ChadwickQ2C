@@ -123,6 +123,7 @@ interface QuoteContextType {
     clientName: string;
     clientCompany: string;
     projectRef: string;
+    pipedriveOwnerName: string | null;
     description: string;
     status: string;
     projectStatus: string | null;
@@ -204,6 +205,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         clientName: '',
         clientCompany: '',
         projectRef: '',
+        pipedriveOwnerName: null as string | null,
         description: '',
         status: 'DRAFT',
         projectStatus: null as string | null,
@@ -252,6 +254,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     clientName: data.clientName || '',
                     clientCompany: data.clientCompany || '',
                     projectRef: data.projectRef || '',
+                    pipedriveOwnerName: data.project?.pipedriveOwnerName || null,
                     description: data.description || '',
                     status: data.status || 'DRAFT',
                     projectStatus: data.project?.projectStatus || null,
@@ -743,6 +746,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 clientName: metadata.clientName,
                 clientCompany: metadata.clientCompany,
                 projectRef: metadata.projectRef,
+                pipedriveOwnerName: metadata.pipedriveOwnerName,
                 description: metadata.description,
                 status: metadata.status,
                 projectStatus: metadata.projectStatus,

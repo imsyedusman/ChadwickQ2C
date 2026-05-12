@@ -40,17 +40,19 @@ export async function GET(request: Request) {
         const page = parseInt(searchParams.get('page') || '1');
         const limit = parseInt(searchParams.get('limit') || '27');
         const estimatorId = searchParams.get('estimatorId');
+        const dealOwner = searchParams.get('dealOwner');
         const skip = (page - 1) * limit;
 
         // Build a robust OR condition using ONLY base fields for Phase 1
         const conditions: any[] = [];
         
         if (searchInput) {
-            // Case-sensitive/partial matching on primary strings
+            // Case-insensitive/partial matching on primary strings
             conditions.push({ projectName: { contains: searchInput, mode: 'insensitive' } });
             conditions.push({ clientName: { contains: searchInput, mode: 'insensitive' } });
             conditions.push({ companyName: { contains: searchInput, mode: 'insensitive' } });
             conditions.push({ projectReference: { contains: searchInput, mode: 'insensitive' } });
+            conditions.push({ pipedriveOwnerName: { contains: searchInput, mode: 'insensitive' } });
 
             // Safe integer search for Pipedrive Deal ID (avoids 500 on string "contains")
             const isNumeric = /^\d+$/.test(searchInput);
@@ -64,7 +66,7 @@ export async function GET(request: Request) {
         let where: any = conditions.length > 0 ? { OR: conditions } : {};
 
         // Add estimator filtering
-        if (estimatorId) {
+        if (estimatorId && estimatorId !== 'all') {
             where = {
                 ...where,
                 quotes: {
@@ -73,6 +75,21 @@ export async function GET(request: Request) {
                     }
                 }
             };
+        }
+
+        // Add deal owner filtering
+        if (dealOwner && dealOwner !== 'all') {
+            if (dealOwner === 'unassigned') {
+                where = {
+                    ...where,
+                    pipedriveOwnerName: null
+                };
+            } else {
+                where = {
+                    ...where,
+                    pipedriveOwnerName: dealOwner
+                };
+            }
         }
 
         console.log(`[API GET Projects] Search conditions generated:`, JSON.stringify(where, null, 2));
@@ -107,8 +124,6 @@ export async function GET(request: Request) {
         });
 
         // To populate the filter, we need a list of all users who have created quotes.
-        // We can either fetch this separately or include a unique list from all projects.
-        // For performance, let's just fetch users who have at least one quote.
         const estimators = await (prisma as any).user.findMany({
             where: {
                 createdQuotes: {
@@ -123,7 +138,22 @@ export async function GET(request: Request) {
             orderBy: { name: 'asc' }
         });
 
-        console.log(`[API GET Projects] Returning ${projects.length} projects and ${estimators.length} estimators`);
+        // Fetch unique Pipedrive owners for the filter
+        const ownersResults = await (prisma as any).project.findMany({
+            where: {
+                pipedriveOwnerName: { not: null }
+            },
+            distinct: ['pipedriveOwnerName'],
+            select: {
+                pipedriveOwnerName: true
+            },
+            orderBy: {
+                pipedriveOwnerName: 'asc'
+            }
+        });
+        const owners = ownersResults.map((r: any) => r.pipedriveOwnerName);
+
+        console.log(`[API GET Projects] Returning ${projects.length} projects, ${estimators.length} estimators, and ${owners.length} owners`);
 
         return NextResponse.json({
             projects,
@@ -131,7 +161,8 @@ export async function GET(request: Request) {
             page,
             limit,
             totalPages: Math.ceil(total / limit),
-            estimators
+            estimators,
+            owners
         });
     } catch (error: any) {
         console.error('[API GET Projects] CRITICAL ERROR:', error);

@@ -20,7 +20,7 @@ import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchable
 import StepRail from '@/components/QuoteBuilder/StepFlow';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, status, projectStatus, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
+    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, pipedriveOwnerName, status, projectStatus, creator, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -114,9 +114,25 @@ function QuoteBuilderContent() {
                         </div>
                         <div className="h-4 w-px bg-gray-200" />
 
-                        {/* Project */}
-                        <div className="text-gray-700 font-medium truncate max-w-[300px]" title={projectRef}>
-                            {projectRef || <span className="text-gray-400 italic">No Project Ref</span>}
+                        {/* Deal Owner */}
+                        <div className="text-gray-500 text-xs font-semibold truncate max-w-[150px]" title={`Deal Owner: ${pipedriveOwnerName || 'Unassigned'}`}>
+                            {pipedriveOwnerName ? (
+                                <span className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-tighter">Deal Owner:</span>
+                                    {pipedriveOwnerName}
+                                </span>
+                            ) : (
+                                <span className="text-gray-300 italic">Unassigned</span>
+                            )}
+                        </div>
+                        <div className="h-4 w-px bg-gray-200" />
+
+                        {/* Estimator */}
+                        <div className="text-gray-500 text-xs font-semibold truncate max-w-[150px]" title={`Estimator: ${creator?.name || 'Unassigned'}`}>
+                            <span className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter">Estimator:</span>
+                                {creator?.name || <span className="text-gray-300 italic">Unassigned</span>}
+                            </span>
                         </div>
 
                         <div className="flex-1" />
@@ -170,24 +186,17 @@ function QuoteBuilderContent() {
                                 <ChevronUp size={16} />
                             </button>
 
-                            <div className="group relative flex items-center gap-3 pr-4">
-                                <div className="relative">
-                                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
-                                        Quote No
-                                    </label>
-                                    <div className="flex items-baseline">
-                                        <input
-                                            type="text"
-                                            value={quoteNumber ?? ""}
-                                            onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
-                                            className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
-                                            placeholder="Q-..."
-                                        />
-                                        {formattedQuoteNumber && formattedQuoteNumber.includes('-') && (
-                                            <span className="text-xl font-bold text-gray-400">-{formattedQuoteNumber.split('-').pop()}</span>
-                                        )}
-                                    </div>
-                                </div>
+                             <div className="group relative flex-1 max-w-md">
+                                <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
+                                    Project
+                                </label>
+                                <PipedriveSearchableDropdown
+                                    type="deal"
+                                    value={projectRef ?? ""}
+                                    onSelect={(item) => { updateMetadata({ projectRef: item.name }); }}
+                                    placeholder="Project Reference"
+                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
+                                />
                             </div>
 
                             <div className="h-8 w-px bg-gray-200" />
@@ -207,32 +216,46 @@ function QuoteBuilderContent() {
 
                             <div className="h-8 w-px bg-gray-200" />
 
-                            <div className="group relative flex-1 max-w-xs">
+                            <div className="group relative flex-1 max-w-[200px]">
                                 <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
-                                    Company
+                                    Deal Owner
                                 </label>
-                                <PipedriveSearchableDropdown
-                                    type="organization"
-                                    value={clientCompany ?? ""}
-                                    onSelect={(item) => { updateMetadata({ clientCompany: item.name, pipedrive_org_id: item.pipedriveId }); }}
-                                    placeholder="Client Company"
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
-                                />
+                                <div className="text-lg font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={pipedriveOwnerName || ""}>
+                                    {pipedriveOwnerName || <span className="text-gray-300 italic text-xs">Unassigned</span>}
+                                </div>
                             </div>
 
                             <div className="h-8 w-px bg-gray-200" />
 
-                            <div className="group relative flex-1 max-w-md">
+                            <div className="group relative flex-1 max-w-[180px]">
                                 <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
-                                    Project
+                                    Estimator
                                 </label>
-                                <PipedriveSearchableDropdown
-                                    type="deal"
-                                    value={projectRef ?? ""}
-                                    onSelect={(item) => { updateMetadata({ projectRef: item.name }); }}
-                                    placeholder="Project Reference"
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
-                                />
+                                <div className="text-lg font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={creator?.name || ""}>
+                                    {creator?.name || <span className="text-gray-300 italic text-xs">Unassigned</span>}
+                                </div>
+                            </div>
+
+                            <div className="h-8 w-px bg-gray-200" />
+
+                            <div className="group relative flex items-center gap-3 pr-4">
+                                <div className="relative">
+                                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1">
+                                        Quote No
+                                    </label>
+                                    <div className="flex items-baseline">
+                                        <input
+                                            type="text"
+                                            value={quoteNumber ?? ""}
+                                            onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
+                                            className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
+                                            placeholder="Q-..."
+                                        />
+                                        {formattedQuoteNumber && formattedQuoteNumber.includes('-') && (
+                                            <span className="text-xl font-bold text-gray-400">-{formattedQuoteNumber.split('-').pop()}</span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

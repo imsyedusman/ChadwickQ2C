@@ -68,6 +68,7 @@ interface SimplifiedProject {
     pipedriveDealUrl?: string | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
+    pipedriveOwnerName?: string | null;
 }
 
 interface FullProject extends SimplifiedProject {
@@ -577,13 +578,40 @@ export default function GroupDetail() {
                             )}
                             onClick={() => toggleProject(project.id)}
                         >
-                            <div className="flex items-center gap-6 min-w-0">
-                                <div className="flex flex-col min-w-0">
-                                    <div className="flex items-center gap-4 mb-1">
-                                        <h3 className="text-2xl font-black text-gray-900 truncate tracking-tight">
-                                            {getProjectCompanyDisplay(project)}
-                                        </h3>
-                                        <div className="flex items-center gap-3">
+                            <div className="flex flex-col gap-2 min-w-0">
+                                <div className="flex items-center gap-8 py-1">
+                                        {/* Company Info */}
+                                        <div className="flex flex-col min-w-[200px]">
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 leading-none">Company</div>
+                                            <h3 className="text-xl font-black text-gray-900 truncate tracking-tight">
+                                                {getProjectCompanyDisplay(project)}
+                                            </h3>
+                                        </div>
+
+                                        <div className="w-[1px] h-10 bg-gray-100 shrink-0 hidden md:block" />
+
+                                        {/* Client Info */}
+                                        <div className="flex flex-col min-w-[180px]">
+                                            <div className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1 leading-none">Client Contact</div>
+                                            <div className="text-sm font-bold text-gray-600 truncate">
+                                                {getProjectClientDisplay(project)}
+                                            </div>
+                                        </div>
+
+                                        <div className="w-[1px] h-10 bg-gray-100 shrink-0 hidden lg:block" />
+
+                                        {/* Owner Info */}
+                                        <div className="flex flex-col min-w-[180px]">
+                                            <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mb-1 leading-none">Deal Owner</div>
+                                            <div className="flex items-center gap-2 text-emerald-700">
+                                                <div className="w-6 h-6 bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100 shrink-0">
+                                                    <User size={12} />
+                                                </div>
+                                                <span className="text-sm font-bold truncate">{project.pipedriveOwnerName || 'Unassigned'}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="ml-auto flex items-center gap-3 shrink-0">
                                             <Select 
                                                 value={project.projectStatus} 
                                                 onValueChange={(val) => handleProjectStatusChange(project.id, val)}
@@ -591,7 +619,7 @@ export default function GroupDetail() {
                                                 <SelectTrigger 
                                                     onClick={(e) => e.stopPropagation()}
                                                     className={cn(
-                                                        "px-3 py-1 h-8 text-xs font-bold rounded-full border uppercase tracking-widest shadow-sm w-[120px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
+                                                        "px-3 py-1 h-8 text-[10px] font-bold rounded-full border uppercase tracking-widest shadow-sm w-[110px] focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer transition-colors",
                                                         getProjectStatusDisplay(project.projectStatus).className
                                                     )}
                                                 >
@@ -605,16 +633,12 @@ export default function GroupDetail() {
                                             </Select>
                                             
                                             {project.pipedrive_deal_id && (
-                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider">
+                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider whitespace-nowrap">
                                                     <Link2 size={12} />
-                                                    Linked Deal #{project.pipedrive_deal_id}
+                                                    Deal #{project.pipedrive_deal_id}
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden md:block" />
-                                        <span className="text-lg font-bold text-gray-500 truncate">
-                                            {getProjectClientDisplay(project)}
-                                        </span>
                                     </div>
                                     <div className="flex items-center gap-4 text-xs font-semibold">
                                         <span className="flex items-center gap-1.5 text-gray-500">
@@ -634,7 +658,6 @@ export default function GroupDetail() {
                                         )}
                                     </div>
                                 </div>
-                            </div>
 
                             <div className="flex items-center gap-3">
                                 {project.pipedrive_deal_id && (
@@ -719,8 +742,6 @@ export default function GroupDetail() {
                                 </div>
                             </div>
                         </div>
-
-                        {/* Section Content */}
                         {expandedProjects.has(project.id) && (
                             <div className="p-6 space-y-6 animate-in slide-in-from-top-1 duration-200">
                                 <div className="flex items-center justify-between pb-2">

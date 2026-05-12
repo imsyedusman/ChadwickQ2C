@@ -46,6 +46,8 @@ export interface PipedriveDeal {
     add_time?: string | null;
     expected_close_date?: string | null;
     quote_folder?: string | null;
+    pipedriveOwnerName?: string | null;
+    pipedriveOwnerId?: string | number | null;
 }
 
 export interface ImportOptions {
@@ -252,18 +254,16 @@ export async function syncPipedriveData(
                 const quoteFolder = typeof deal.quote_folder === 'string' ? deal.quote_folder.trim() : null;
                 const pipedriveDealUrl = `https://app.pipedrive.com/deal/${dIdNum}`;
 
+                // Extract Owner Info (if provided in CSV mapping)
+                const pipedriveOwnerId = deal.pipedriveOwnerId ? parseInt(String(deal.pipedriveOwnerId)) : null;
+                const pipedriveOwnerName = deal.pipedriveOwnerName || null;
+
                 if (existingProject) {
                     const updateData: any = {};
                     let changed = false;
                     const ep = existingProject as any;
 
                     // 3.2 Stable Field Protection (Update ONLY if null/undefined)
-                    const stableFields = {
-                        projectName: deal.name,
-                        clientId: clientId, // Nested connect handled below
-                        contactId: contactId // Nested connect handled below
-                    };
-
                     if ((ep.projectName === null || ep.projectName === undefined) && deal.name) {
                         updateData.projectName = deal.name;
                         changed = true;
@@ -286,7 +286,10 @@ export async function syncPipedriveData(
                         dealCreatedAt,
                         expectedCloseDate,
                         quoteFolder,
-                        pipedriveDealUrl
+                        pipedriveDealUrl,
+                        // Sync Safety: Only update owner if non-null
+                        ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
+                        ...(pipedriveOwnerName ? { pipedriveOwnerName } : {})
                     };
 
                     for (const [key, incomingVal] of Object.entries(metadataFields)) {
@@ -303,6 +306,11 @@ export async function syncPipedriveData(
                         }
 
                         if (isChanged) {
+                            // Audit Logging for Owner Change
+                            if (key === 'pipedriveOwnerId' && ep.pipedriveOwnerId !== incomingVal) {
+                                console.log(`[Pipedrive Import] Owner Changed for Project ${ep.id}: ${ep.pipedriveOwnerName || 'None'} -> ${pipedriveOwnerName}`);
+                            }
+
                             updateData[key] = incomingVal;
                             changed = true;
                         }
@@ -331,6 +339,8 @@ export async function syncPipedriveData(
                             expectedCloseDate,
                             quoteFolder,
                             pipedriveDealUrl,
+                            pipedriveOwnerId,
+                            pipedriveOwnerName,
                             projectStatus: 'Budget',
                             importBatch: { connect: { id: batch.id } },
                             source

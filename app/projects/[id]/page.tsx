@@ -55,6 +55,7 @@ interface Project {
     pipedriveDealUrl?: string | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
+    pipedriveOwnerName?: string | null;
     quotes: {
         id: string;
         quoteNumber: string;
@@ -425,7 +426,7 @@ export default function ProjectDetail() {
                     </button>
                     
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                        <div className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-4">
                             <div className="flex flex-wrap items-center gap-3">
                                 <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight leading-tight">
                                     {project.projectName}
@@ -450,6 +451,26 @@ export default function ProjectDetail() {
                                             #{project.pipedrive_deal_id}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-6">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Company</span>
+                                    <span className="text-sm font-bold text-gray-700">{getProjectCompanyDisplay(project)}</span>
+                                </div>
+                                <div className="w-[1px] h-8 bg-gray-200" />
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Client Contact</span>
+                                    <span className="text-sm font-bold text-gray-700">{getProjectClientDisplay(project)}</span>
+                                </div>
+                                <div className="w-[1px] h-8 bg-gray-200" />
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest leading-none mb-1">Deal Owner</span>
+                                    <div className="flex items-center gap-1.5 text-emerald-700">
+                                        <User size={12} className="text-emerald-500" />
+                                        <span className="text-sm font-bold">{project.pipedriveOwnerName || 'Unassigned'}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -504,6 +525,22 @@ export default function ProjectDetail() {
                                     {optimisticQuotes.length > 0 
                                         ? format(new Date(optimisticQuotes[0].updatedAt), 'MMM d, h:mm a')
                                         : 'No activity yet'}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Deal Owner Card */}
+                        <div className="bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
+                            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                                <User size={18} className="text-emerald-500" />
+                            </div>
+                            <div className="min-w-0">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Deal Owner</p>
+                                <p className={cn(
+                                    "text-sm font-extrabold leading-none truncate",
+                                    project.pipedriveOwnerName ? "text-gray-900" : "text-gray-300 italic"
+                                )}>
+                                    {project.pipedriveOwnerName || 'Unassigned'}
                                 </p>
                             </div>
                         </div>

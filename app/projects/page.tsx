@@ -90,6 +90,8 @@ interface Project {
     expectedCloseDate: string | null;
     quoteFolder: string | null;
     pipedriveDealUrl: string | null;
+    pipedriveOwnerName: string | null;
+    pipedriveOwnerId: number | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
     quotes: { 
@@ -103,10 +105,52 @@ interface Project {
 
 function getInitials(name: string | null) {
     if (!name) return '?';
+    const upperName = name.trim().toUpperCase();
+    if (upperName.includes('CHRISF@') || upperName.includes('CHRIS F')) return 'CF';
+    
     const parts = name.trim().split(' ');
     if (parts.length === 0) return '?';
     if (parts.length === 1) return parts[0].substring(0, 1).toUpperCase();
     return (parts[0][0] + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
+}
+
+function OwnerBadge({ name }: { name: string | null }) {
+    if (!name) return <span className="text-gray-300 italic text-[10px]">Unassigned</span>;
+
+    const colors = [
+        'bg-emerald-50 text-emerald-700 border-emerald-100',
+        'bg-blue-50 text-blue-700 border-blue-100',
+        'bg-amber-50 text-amber-700 border-amber-100',
+        'bg-purple-50 text-purple-700 border-purple-100',
+        'bg-rose-50 text-rose-700 border-rose-100',
+        'bg-slate-50 text-slate-700 border-slate-100'
+    ];
+
+    const getColor = (name: string) => {
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        return colors[Math.abs(hash) % colors.length];
+    };
+
+    return (
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className={cn(
+                        "w-7 h-7 rounded-full border flex items-center justify-center text-[10px] font-black shadow-sm shrink-0 cursor-help",
+                        getColor(name)
+                    )}>
+                        {getInitials(name)}
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                    <p className="font-bold">{name}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
+    );
 }
 
 function EstimatorBadges({ quotes, limit = 2 }: { quotes: { creator: Estimator | null }[], limit?: number }) {
@@ -181,9 +225,11 @@ export default function ProjectsPage() {
     const pageSize = parseInt(searchParams.get('limit') || '27');
     const search = searchParams.get('search') || '';
     const estimatorId = searchParams.get('estimatorId') || 'all';
+    const dealOwner = searchParams.get('dealOwner') || 'all';
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [estimators, setEstimators] = useState<Estimator[]>([]);
+    const [owners, setOwners] = useState<string[]>([]);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
     const [totalProjects, setTotalProjects] = useState(0);
@@ -216,6 +262,7 @@ export default function ProjectsPage() {
     const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
         client: true,
         company: true,
+        dealOwner: true,
         dealValue: true,
         created: true,
     });
@@ -381,7 +428,7 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchProjects();
         checkPipedriveStatus();
-    }, [page, pageSize, search, estimatorId]);
+    }, [page, pageSize, search, estimatorId, dealOwner]);
 
     const checkPipedriveStatus = async () => {
         try {
@@ -405,7 +452,7 @@ export default function ProjectsPage() {
         return () => clearTimeout(timer);
     }, [searchInput]);
 
-    const updateUrl = (updates: { page?: number; limit?: number; search?: string; estimatorId?: string }) => {
+    const updateUrl = (updates: { page?: number; limit?: number; search?: string; estimatorId?: string; dealOwner?: string }) => {
         const params = new URLSearchParams(searchParams.toString());
         if (updates.page !== undefined) params.set('page', updates.page.toString());
         if (updates.limit !== undefined) params.set('limit', updates.limit.toString());
@@ -418,6 +465,10 @@ export default function ProjectsPage() {
             if (updates.estimatorId && updates.estimatorId !== 'all') params.set('estimatorId', updates.estimatorId);
             else params.delete('estimatorId');
         }
+        if (updates.dealOwner !== undefined) {
+            if (updates.dealOwner && updates.dealOwner !== 'all') params.set('dealOwner', updates.dealOwner);
+            else params.delete('dealOwner');
+        }
         router.push(`/projects?${params.toString()}`, { scroll: false });
     };
 
@@ -427,12 +478,14 @@ export default function ProjectsPage() {
             let url = `/api/projects?page=${page}&limit=${pageSize}`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (estimatorId && estimatorId !== 'all') url += `&estimatorId=${estimatorId}`;
+            if (dealOwner && dealOwner !== 'all') url += `&dealOwner=${dealOwner}`;
 
             const res = await fetch(url);
             const data = await res.json();
 
             setProjects(data.projects || []);
             setEstimators(data.estimators || []);
+            setOwners(data.owners || []);
             setTotalProjects(data.total || 0);
             setTotalPages(data.totalPages || 0);
 
@@ -741,7 +794,30 @@ export default function ProjectsPage() {
                             />
                         </div>
 
-                        <div className="w-[200px] shrink-0">
+                        <div className="w-[180px] shrink-0">
+                            <Select
+                                value={dealOwner}
+                                onValueChange={(val) => updateUrl({ dealOwner: val, page: 1 })}
+                            >
+                                <SelectTrigger className="w-full h-10 rounded-xl border-gray-200 bg-white font-bold text-slate-700 italic shadow-sm text-xs">
+                                    <div className="flex items-center gap-2">
+                                        <Briefcase size={14} className="text-emerald-500" />
+                                        <SelectValue placeholder="All Owners" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all" className="font-bold italic">All Deal Owners</SelectItem>
+                                    <SelectItem value="unassigned" className="font-medium text-gray-400 italic">Unassigned</SelectItem>
+                                    {owners.map(owner => (
+                                        <SelectItem key={owner} value={owner} className="font-medium">
+                                            {owner}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="w-[180px] shrink-0">
                             <Select
                                 value={estimatorId}
                                 onValueChange={(val) => updateUrl({ estimatorId: val, page: 1 })}
@@ -813,6 +889,12 @@ export default function ProjectsPage() {
                                     Company
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
+                                    checked={visibleColumns.dealOwner}
+                                    onCheckedChange={() => toggleColumn('dealOwner')}
+                                >
+                                    Deal Owner
+                                </DropdownMenuCheckboxItem>
+                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.dealValue}
                                     onCheckedChange={() => toggleColumn('dealValue')}
                                 >
@@ -848,6 +930,7 @@ export default function ProjectsPage() {
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
+                                {visibleColumns.dealOwner && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Owner</th>}
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 {/* ADJUST PROJECT COLUMN WIDTH HERE: change w-[...] value below */}
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[800px]">Project</th>
@@ -891,6 +974,13 @@ export default function ProjectsPage() {
                                         <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                             <div className="w-4 h-4 rounded border border-gray-200 bg-gray-50/50" />
                                         </td>
+                                        {visibleColumns.dealOwner && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-center">
+                                                    <OwnerBadge name={group.projects[0].pipedriveOwnerName} />
+                                                </div>
+                                            </td>
+                                        )}
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center">
                                                 {(() => {
@@ -1061,6 +1151,13 @@ export default function ProjectsPage() {
                                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                             />
                                         </td>
+                                        {visibleColumns.dealOwner && (
+                                            <td className="px-6 py-4">
+                                                <div className="flex justify-center">
+                                                    <OwnerBadge name={project.pipedriveOwnerName} />
+                                                </div>
+                                            </td>
+                                        )}
                                         <td className="px-6 py-4 text-center">
                                             <div className="flex justify-center">
                                                 <EstimatorBadges quotes={project.quotes} />
