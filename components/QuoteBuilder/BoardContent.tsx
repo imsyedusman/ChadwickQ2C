@@ -641,6 +641,129 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         )
     };
 
+    // --- Hierarchical Redesign ---
+
+    interface HierarchyNode {
+        name: string;
+        fullPath: string;
+        children: Record<string, HierarchyNode>;
+        items: Item[];
+    }
+
+    const buildHierarchy = (items: Item[], category: string): Record<string, HierarchyNode> => {
+        const root: Record<string, HierarchyNode> = {};
+
+        items.forEach(item => {
+            const parts = normalizeSubcategory(item.subcategory, item.category);
+            let currentLevel = root;
+            let pathParts: string[] = [];
+
+            parts.forEach((part, index) => {
+                pathParts.push(part);
+                const fullPath = pathParts.join(' > ');
+                
+                if (!currentLevel[part]) {
+                    currentLevel[part] = {
+                        name: part,
+                        fullPath: fullPath,
+                        children: {},
+                        items: []
+                    };
+                }
+
+                if (index === parts.length - 1) {
+                    currentLevel[part].items.push(item);
+                }
+
+                currentLevel = currentLevel[part].children;
+            });
+        });
+
+        return root;
+    };
+
+    const renderHierarchicalSubsections = (nodes: Record<string, HierarchyNode>, isBasics: boolean, depth: number = 0) => {
+        // Sort keys
+        const keys = Object.keys(nodes).sort((a, b) => {
+            if (isBasics) return 0; // Not used for Basics currently
+            
+            // Default sort for Switchboard
+            const itemA = { category: 'Switchboard', subcategory: nodes[a].fullPath };
+            const itemB = { category: 'Switchboard', subcategory: nodes[b].fullPath };
+            return compareItems(itemA as any, itemB as any);
+        });
+
+        return (
+            <div className={cn("divide-y divide-gray-50", depth > 0 && "ml-4 border-l border-gray-100")}>
+                {keys.map(key => {
+                    const node = nodes[key];
+                    const nodeKey = `${isBasics ? 'Basics' : 'Switchboard'}-${node.fullPath}`;
+                    const isNodeCollapsed = collapsedSections[nodeKey] === true;
+
+                    // Sort items in this node
+                    const sortedItems = [...node.items].sort(compareItems);
+
+                    return (
+                        <div key={node.fullPath} className="bg-white">
+                            <button
+                                onClick={() => toggleSection(nodeKey)}
+                                className={cn(
+                                    "w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors",
+                                    depth === 0 ? "bg-gray-50/50" : "bg-white"
+                                )}
+                            >
+                                <div className="flex items-center gap-2 font-medium text-xs text-gray-600">
+                                    {isNodeCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                    {node.name}
+                                    <span className="text-[10px] font-normal text-gray-400">
+                                        ({node.items.length + Object.keys(node.children).length})
+                                    </span>
+                                </div>
+                            </button>
+
+                            {!isNodeCollapsed && (
+                                <div className="bg-white">
+                                    {/* Render items in this node */}
+                                    {sortedItems.length > 0 && (
+                                        <div className="divide-y divide-gray-50">
+                                            {/* Ghost Row Check for MCCB Accessories */}
+                                            {node.name === 'MCCB Accessories' && (() => {
+                                                const nsx100Breakers = items.filter(i =>
+                                                    !i.isSystemManaged &&
+                                                    i.productFrame === 'NSX100-250' &&
+                                                    i.subcategory !== 'MCCB Accessories'
+                                                );
+                                                const hasRequirement = nsx100Breakers.length > 0;
+                                                const hasHandle = sortedItems.some(i => i.name === 'LV429338T');
+
+                                                if (hasRequirement && !hasHandle) {
+                                                    return (
+                                                        <>
+                                                            {sortedItems.map(item => renderItemRow(item, false))}
+                                                            {renderItemRow({} as any, true)}
+                                                        </>
+                                                    )
+                                                }
+                                                return sortedItems.map(item => renderItemRow(item, false));
+                                            })()}
+
+                                            {node.name !== 'MCCB Accessories' && sortedItems.map(item => renderItemRow(item, false))}
+                                        </div>
+                                    )}
+
+                                    {/* Render children nodes */}
+                                    {Object.keys(node.children).length > 0 && (
+                                        renderHierarchicalSubsections(node.children, isBasics, depth + 1)
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     const renderCategoryWithSubsections = (items: Item[], isBasics: boolean) => {
         // Group items by normalized subcategory
         const groupedBySubcat = items.reduce((acc, item) => {
@@ -1008,9 +1131,11 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                                 {!isMasterCollapsed && (
                                     <>
                                         {masterCat === 'Switchboard' || masterCat === 'Basics' ? (
-                                            // For Switchboard AND Basics, render sub-collapsibles by subcategory
-                                            // Also apply strict sorting ONLY to Basics
-                                            renderCategoryWithSubsections(categoryItems, masterCat === 'Basics')
+                                            masterCat === 'Switchboard' ? (
+                                                renderHierarchicalSubsections(buildHierarchy(categoryItems, masterCat), false)
+                                            ) : (
+                                                renderCategoryWithSubsections(categoryItems, true)
+                                            )
                                         ) : (
                                             // For Busbars and Other, render items directly (flat list)
                                             <div className="divide-y divide-gray-100">
