@@ -708,12 +708,23 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                             <button
                                 onClick={() => toggleSection(nodeKey)}
                                 className={cn(
-                                    "w-full px-4 py-2 flex items-center justify-between hover:bg-gray-50 transition-colors",
-                                    depth === 0 ? "bg-gray-50/50" : "bg-white"
+                                    "w-full px-4 flex items-center justify-between hover:bg-gray-50 transition-colors",
+                                    depth === 0 ? "bg-slate-100/50 border-y border-slate-200/40 py-2.5" : 
+                                    depth === 1 ? "bg-white py-2" :
+                                    "bg-white py-1.5"
                                 )}
                             >
-                                <div className="flex items-center gap-2 font-medium text-xs text-gray-600">
-                                    {isNodeCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                <div className={cn(
+                                    "flex items-center gap-2",
+                                    depth === 0 ? "font-bold text-[11px] text-gray-900 uppercase tracking-wider" :
+                                    depth === 1 ? "font-semibold text-xs text-gray-700" :
+                                    "font-medium text-[11px] text-gray-500"
+                                )}>
+                                    {isNodeCollapsed ? (
+                                        <ChevronRight size={depth === 0 ? 12 : 10} className={depth === 0 ? "text-gray-500" : "text-gray-400"} />
+                                    ) : (
+                                        <ChevronDown size={depth === 0 ? 12 : 10} className={depth === 0 ? "text-gray-500" : "text-gray-400"} />
+                                    )}
                                     {node.name}
                                     <span className="text-[10px] font-normal text-gray-400">
                                         ({node.items.length + Object.keys(node.children).length})
