@@ -41,6 +41,9 @@ export async function GET(request: Request) {
         const limit = parseInt(searchParams.get('limit') || '27');
         const estimatorId = searchParams.get('estimatorId');
         const dealOwner = searchParams.get('dealOwner');
+        const closeDateFilter = searchParams.get('closeDateFilter');
+        const sortBy = searchParams.get('sortBy') || 'createdAt';
+        const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
         const skip = (page - 1) * limit;
 
         // Build a robust OR condition using ONLY base fields for Phase 1
@@ -92,11 +95,43 @@ export async function GET(request: Request) {
             }
         }
 
-        console.log(`[API GET Projects] Search conditions generated:`, JSON.stringify(where, null, 2));
+        // Add Expected Close Date filtering
+        if (closeDateFilter && closeDateFilter !== 'all') {
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const tomorrow = new Date(today.getTime() + 86400000);
+            
+            if (closeDateFilter === 'overdue') {
+                where.expectedCloseDate = { lt: today };
+            } else if (closeDateFilter === 'today') {
+                where.expectedCloseDate = {
+                    gte: today,
+                    lt: tomorrow
+                };
+            } else if (closeDateFilter === 'this_week') {
+                // End of current week (Saturday night/Sunday morning)
+                const endOfWeek = new Date(today.getTime() + (7 - today.getDay()) * 86400000);
+                where.expectedCloseDate = { gte: today, lt: endOfWeek };
+            } else if (closeDateFilter === 'next_30_days') {
+                where.expectedCloseDate = { gte: today, lt: new Date(today.getTime() + 30 * 86400000) };
+            } else if (closeDateFilter === 'future') {
+                where.expectedCloseDate = { gte: tomorrow };
+            }
+        }
+
+        console.log(`[API GET Projects] FINAL WHERE:`, JSON.stringify(where, null, 2));
 
         // Get total count for filtered results
         const total = await (prisma as any).project.count({ where });
         console.log(`[API GET Projects] Filtered total count: ${total}`);
+
+        // Prepare ordering
+        let orderBy: any = {};
+        if (sortBy === 'expectedCloseDate') {
+            orderBy = { expectedCloseDate: { sort: sortOrder, nulls: 'last' } };
+        } else {
+            orderBy = { [sortBy]: sortOrder };
+        }
 
         const projects = await (prisma as any).project.findMany({
             where,
@@ -118,7 +153,7 @@ export async function GET(request: Request) {
                     select: { quotes: true }
                 }
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy,
             skip,
             take: limit,
         });

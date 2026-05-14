@@ -22,7 +22,10 @@ import {
     Info,
     ExternalLink,
     Table2,
-    LayoutGrid
+    LayoutGrid,
+    ChevronUp,
+    ChevronDown,
+    X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -226,6 +229,9 @@ export default function ProjectsPage() {
     const search = searchParams.get('search') || '';
     const estimatorId = searchParams.get('estimatorId') || 'all';
     const dealOwner = searchParams.get('dealOwner') || 'all';
+    const closeDateFilter = searchParams.get('closeDateFilter') || 'all';
+    const sortBy = searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [estimators, setEstimators] = useState<Estimator[]>([]);
@@ -452,23 +458,15 @@ export default function ProjectsPage() {
         return () => clearTimeout(timer);
     }, [searchInput]);
 
-    const updateUrl = (updates: { page?: number; limit?: number; search?: string; estimatorId?: string; dealOwner?: string }) => {
+    const updateUrl = (updates: Record<string, any>) => {
         const params = new URLSearchParams(searchParams.toString());
-        if (updates.page !== undefined) params.set('page', updates.page.toString());
-        if (updates.limit !== undefined) params.set('limit', updates.limit.toString());
-        else if (!searchParams.has('limit')) params.set('limit', '27');
-        if (updates.search !== undefined) {
-            if (updates.search) params.set('search', updates.search);
-            else params.delete('search');
-        }
-        if (updates.estimatorId !== undefined) {
-            if (updates.estimatorId && updates.estimatorId !== 'all') params.set('estimatorId', updates.estimatorId);
-            else params.delete('estimatorId');
-        }
-        if (updates.dealOwner !== undefined) {
-            if (updates.dealOwner && updates.dealOwner !== 'all') params.set('dealOwner', updates.dealOwner);
-            else params.delete('dealOwner');
-        }
+        Object.entries(updates).forEach(([key, value]) => {
+            if (value === null || value === undefined || value === 'all') {
+                params.delete(key);
+            } else {
+                params.set(key, String(value));
+            }
+        });
         router.push(`/projects?${params.toString()}`, { scroll: false });
     };
 
@@ -479,6 +477,9 @@ export default function ProjectsPage() {
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (estimatorId && estimatorId !== 'all') url += `&estimatorId=${estimatorId}`;
             if (dealOwner && dealOwner !== 'all') url += `&dealOwner=${dealOwner}`;
+            if (closeDateFilter && closeDateFilter !== 'all') url += `&closeDateFilter=${closeDateFilter}`;
+            if (sortBy) url += `&sortBy=${sortBy}`;
+            if (sortOrder) url += `&sortOrder=${sortOrder}`;
 
             const res = await fetch(url);
             const data = await res.json();
@@ -556,12 +557,27 @@ export default function ProjectsPage() {
         });
 
         return Array.from(groups.values()).sort((a, b) => {
-            if (!a.expectedCloseDate && !b.expectedCloseDate) return b.latestActivity.getTime() - a.latestActivity.getTime();
-            if (!a.expectedCloseDate) return 1;
-            if (!b.expectedCloseDate) return -1;
-            return b.expectedCloseDate.getTime() - a.expectedCloseDate.getTime();
+            if (sortBy === 'expectedCloseDate') {
+                if (!a.expectedCloseDate && !b.expectedCloseDate) return b.latestActivity.getTime() - a.latestActivity.getTime();
+                if (!a.expectedCloseDate) return 1;
+                if (!b.expectedCloseDate) return -1;
+                
+                const factor = sortOrder === 'asc' ? 1 : -1;
+                return factor * (a.expectedCloseDate.getTime() - b.expectedCloseDate.getTime());
+            }
+            
+            // Default Sort: Latest Activity (createdAt)
+            return b.latestActivity.getTime() - a.latestActivity.getTime();
         });
     }, [projects, isGrouped]);
+
+    const handleSort = (field: string) => {
+        if (sortBy === field) {
+            updateUrl({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' });
+        } else {
+            updateUrl({ sortBy: field, sortOrder: 'asc' });
+        }
+    };
 
     const handleEditOpen = (project: Project) => {
         setSelectedProject(project);
@@ -793,7 +809,7 @@ export default function ProjectsPage() {
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col mb-6">
                 <div className="p-4 border-b border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div className="flex flex-1 items-center gap-3 max-w-2xl w-full">
+                    <div className="flex flex-1 items-center gap-3 max-w-5xl w-full">
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                             <input
@@ -810,9 +826,12 @@ export default function ProjectsPage() {
                                 value={dealOwner}
                                 onValueChange={(val) => updateUrl({ dealOwner: val, page: 1 })}
                             >
-                                <SelectTrigger className="w-full h-10 rounded-xl border-gray-200 bg-white font-bold text-slate-700 italic shadow-sm text-xs">
+                                <SelectTrigger className={cn(
+                                    "w-full h-10 rounded-xl border-gray-200 bg-white font-bold italic shadow-sm text-xs transition-all",
+                                    dealOwner !== 'all' ? "border-emerald-500 bg-emerald-50/50 text-emerald-700 ring-1 ring-emerald-500/20" : "text-slate-700"
+                                )}>
                                     <div className="flex items-center gap-2">
-                                        <Briefcase size={14} className="text-emerald-500" />
+                                        <Briefcase size={14} className={dealOwner !== 'all' ? "text-emerald-600" : "text-emerald-500"} />
                                         <SelectValue placeholder="All Owners" />
                                     </div>
                                 </SelectTrigger>
@@ -833,9 +852,12 @@ export default function ProjectsPage() {
                                 value={estimatorId}
                                 onValueChange={(val) => updateUrl({ estimatorId: val, page: 1 })}
                             >
-                                <SelectTrigger className="w-full h-10 rounded-xl border-gray-200 bg-white font-bold text-slate-700 italic shadow-sm text-xs">
+                                <SelectTrigger className={cn(
+                                    "w-full h-10 rounded-xl border-gray-200 bg-white font-bold italic shadow-sm text-xs transition-all",
+                                    estimatorId !== 'all' ? "border-blue-500 bg-blue-50/50 text-blue-700 ring-1 ring-blue-500/20" : "text-slate-700"
+                                )}>
                                     <div className="flex items-center gap-2">
-                                        <User size={14} className="text-blue-500" />
+                                        <User size={14} className={estimatorId !== 'all' ? "text-blue-600" : "text-blue-500"} />
                                         <SelectValue placeholder="All Estimators" />
                                     </div>
                                 </SelectTrigger>
@@ -849,6 +871,51 @@ export default function ProjectsPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        <div className="w-[180px] shrink-0">
+                            <Select
+                                value={closeDateFilter}
+                                onValueChange={(val) => updateUrl({ closeDateFilter: val, page: 1 })}
+                            >
+                                <SelectTrigger className={cn(
+                                    "w-full h-10 rounded-xl border-gray-200 bg-white font-bold italic shadow-sm text-xs transition-all",
+                                    closeDateFilter !== 'all' ? "border-amber-500 bg-amber-50/50 text-amber-700 ring-1 ring-amber-500/20" : "text-slate-700"
+                                )}>
+                                    <div className="flex items-center gap-2">
+                                        <Calendar size={14} className={closeDateFilter !== 'all' ? "text-amber-600" : "text-amber-500"} />
+                                        <SelectValue placeholder="All Close Dates" />
+                                    </div>
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all" className="font-bold italic">All Close Dates</SelectItem>
+                                    <SelectItem value="overdue" className="text-rose-600 font-bold">Overdue</SelectItem>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="this_week">This Week</SelectItem>
+                                    <SelectItem value="next_30_days">Next 30 Days</SelectItem>
+                                    <SelectItem value="future">Future</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {(dealOwner !== 'all' || estimatorId !== 'all' || closeDateFilter !== 'all' || search) && (
+                            <Button
+                                variant="ghost"
+                                onClick={() => {
+                                    setSearchInput('');
+                                    updateUrl({ 
+                                        dealOwner: 'all', 
+                                        estimatorId: 'all', 
+                                        closeDateFilter: 'all', 
+                                        search: '', 
+                                        page: 1 
+                                    });
+                                }}
+                                className="h-10 px-3 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1.5"
+                            >
+                                <X size={14} />
+                                <span className="text-xs font-bold uppercase tracking-tight">Clear</span>
+                            </Button>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-3 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
@@ -927,7 +994,17 @@ export default function ProjectsPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[200px] text-right whitespace-nowrap">Expected Close Date</th>
+                                <th 
+                                    className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[200px] text-right whitespace-nowrap cursor-pointer hover:text-slate-600 transition-colors group"
+                                    onClick={() => handleSort('expectedCloseDate')}
+                                >
+                                    <div className="flex items-center justify-end gap-2">
+                                        {sortBy === 'expectedCloseDate' && (
+                                            sortOrder === 'asc' ? <ChevronUp size={14} className="text-blue-500" /> : <ChevronDown size={14} className="text-blue-500" />
+                                        )}
+                                        Expected Close Date
+                                    </div>
+                                </th>
                                 <th className="px-6 py-4 w-[70px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
                             </tr>
                         </thead>
