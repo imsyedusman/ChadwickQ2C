@@ -36,6 +36,7 @@ interface Project {
     updatedAt: string;
     dealValue: number | null;
     quotes: { 
+        id: string;
         updatedAt: string;
         creator: { id: string; name: string | null; email: string | null } | null 
     }[];
@@ -132,9 +133,15 @@ export default function MobileProjectCard({
     };
 
 
-    const latestEstimator = [...project.quotes]
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .find(q => q.creator)?.creator;
+    const latestEstimator = (() => {
+        if (!project.quotes || project.quotes.length === 0) return null;
+        const sorted = [...project.quotes].sort((a, b) => {
+            const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+            const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+            return dateB - dateA;
+        });
+        return sorted.find(q => q.creator)?.creator;
+    })();
 
     return (
         <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm mb-3">
@@ -361,9 +368,15 @@ export function MobileGroupedProjectCard({
                     </div>
                     {(() => {
                         const allQuotes = group.projects.flatMap(p => p.quotes || []);
-                        const latestEstimator = [...allQuotes]
-                            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-                            .find(q => q.creator)?.creator;
+                        const latestEstimator = (() => {
+                            if (allQuotes.length === 0) return null;
+                            const sorted = [...allQuotes].sort((a, b) => {
+                                const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+                                const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+                                return dateB - dateA;
+                            });
+                            return sorted.find(q => q.creator)?.creator;
+                        })();
                         
                         if (!latestEstimator) return null;
                         return (

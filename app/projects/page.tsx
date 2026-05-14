@@ -99,6 +99,7 @@ interface Project {
     client?: { name: string } | null;
     contact?: { name: string } | null;
     quotes: { 
+        id: string;
         updatedAt: string;
         creator: Estimator | null 
     }[];
@@ -537,7 +538,9 @@ export default function ProjectsPage() {
             const projectDate = new Date(project.createdAt);
             const expectedClose = project.expectedCloseDate ? new Date(project.expectedCloseDate) : null;
             const dealVal = Number(project.dealValue) || 0;
-            const quoteCount = project._count?.quotes || 0;
+            
+            // Robust quote count: prioritize _count, fallback to quotes array length
+            const quoteCount = project._count?.quotes ?? project.quotes?.length ?? 0;
             
             const client = getProjectClientDisplay(project);
             const company = getProjectCompanyDisplay(project);
@@ -1113,11 +1116,13 @@ export default function ProjectsPage() {
                                             <div className="flex justify-center">
                                                 {(() => {
                                                     // Flatten all quotes from all projects in this group
-                                                    const allQuotes = group.projects.flatMap(p => p.quotes);
-                                                    // Sort by updatedAt desc to ensure the "most recent" estimator is first
-                                                    const sortedQuotes = [...allQuotes].sort((a, b) => 
-                                                        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-                                                    );
+                                                    const allQuotes = group.projects.flatMap(p => p.quotes || []);
+                                                    // Sort by updatedAt desc with safe date parsing
+                                                    const sortedQuotes = [...allQuotes].sort((a, b) => {
+                                                        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+                                                        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+                                                        return dateB - dateA;
+                                                    });
                                                     return (
                                                         <EstimatorBadges quotes={sortedQuotes} limit={1} />
                                                     );

@@ -161,6 +161,8 @@ export async function GET(request: Request) {
                 },
                 quotes: {
                     select: {
+                        id: true,
+                        updatedAt: true,
                         creator: {
                             select: { id: true, name: true, email: true }
                         }
