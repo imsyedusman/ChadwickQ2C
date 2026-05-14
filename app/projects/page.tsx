@@ -434,7 +434,7 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchProjects();
         checkPipedriveStatus();
-    }, [page, pageSize, search, estimatorId, dealOwner]);
+    }, [page, pageSize, search, estimatorId, dealOwner, closeDateFilter, sortBy, sortOrder]);
 
     const checkPipedriveStatus = async () => {
         try {
