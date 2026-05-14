@@ -341,7 +341,7 @@ export async function syncPipedriveData(
                             pipedriveDealUrl,
                             pipedriveOwnerId,
                             pipedriveOwnerName,
-                            projectStatus: 'Budget',
+                            projectStatus: 'Tender',
                             importBatch: { connect: { id: batch.id } },
                             source
                         }

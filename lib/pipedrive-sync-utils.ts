@@ -134,7 +134,7 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             expectedCloseDate,
             pipedriveOwnerId,
             pipedriveOwnerName,
-            projectStatus: 'Budget',
+            projectStatus: 'Tender',
             source: 'pipedrive'
         }
     });

@@ -327,7 +327,7 @@ export async function POST(request: Request) {
                                 pipedriveDealUrl,
                                 pipedriveOwnerId,
                                 pipedriveOwnerName,
-                                projectStatus: 'Budget',
+                                projectStatus: 'Tender',
                                 source: 'pipedrive',
                                 importBatch: { connect: { id: batch.id } }
                             }
