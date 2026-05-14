@@ -877,34 +877,16 @@ export default function ProjectsPage() {
                                 <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuCheckboxItem
-                                    checked={visibleColumns.client}
-                                    onCheckedChange={() => toggleColumn('client')}
-                                >
-                                    Client
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
-                                    checked={visibleColumns.company}
-                                    onCheckedChange={() => toggleColumn('company')}
-                                >
-                                    Company
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.dealOwner}
                                     onCheckedChange={() => toggleColumn('dealOwner')}
                                 >
                                     Deal Owner
                                 </DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem
-                                    checked={visibleColumns.dealValue}
-                                    onCheckedChange={() => toggleColumn('dealValue')}
-                                >
-                                    Deal Value
-                                </DropdownMenuCheckboxItem>
-                                <DropdownMenuCheckboxItem
                                     checked={visibleColumns.created}
                                     onCheckedChange={() => toggleColumn('created')}
                                 >
-                                    Created Date
+                                    Latest Activity
                                 </DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -919,10 +901,10 @@ export default function ProjectsPage() {
                         viewMode === 'TABLE' ? "lg:block" : "hidden"
                     )}
                 >
-                    <table className="w-full text-left table-fixed min-w-[2000px]">
+                    <table className="w-full text-left table-fixed min-w-full">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 w-[60px]">
+                                <th className="px-6 py-4 w-[50px]">
                                     <input
                                         type="checkbox"
                                         checked={projects.length > 0 && selectedIds.length === projects.length}
@@ -930,23 +912,18 @@ export default function ProjectsPage() {
                                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                                     />
                                 </th>
-                                {visibleColumns.dealOwner && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Owner</th>}
+                                {visibleColumns.dealOwner && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[110px] text-center">Owner</th>}
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
-                                {/* ADJUST PROJECT COLUMN WIDTH HERE: change w-[...] value below */}
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[800px]">Project</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[120px] text-center">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[100px] text-center">Quotes</th>
-                                {visibleColumns.client && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[180px]">Client</th>}
-                                {visibleColumns.company && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest min-w-[180px]">Company</th>}
-                                {visibleColumns.dealValue && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[150px] text-right">Deal Value</th>}
-                                {visibleColumns.created && <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Created</th>}
-                                <th className="px-6 py-4 w-[80px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Latest Activity</th>
+                                <th className="px-6 py-4 w-[70px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {loading && projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={visibleColumns.client && visibleColumns.company && visibleColumns.dealValue && visibleColumns.created ? 9 : 5} className="px-6 py-20 text-center">
+                                    <td colSpan={visibleColumns.dealOwner ? 6 : 5} className="px-6 py-20 text-center">
                                         <Loader2 className="animate-spin inline-block text-blue-500 mb-2" size={32} />
                                         <p className="text-gray-400 font-medium">Loading projects...</p>
                                     </td>
@@ -1079,86 +1056,6 @@ export default function ProjectsPage() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm font-bold text-gray-900">{group.totalQuotes}</span>
-                                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter font-medium">Quotes</span>
-                                            </div>
-                                        </td>
-                                        {visibleColumns.client && (
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <User size={14} className="text-gray-400 shrink-0" />
-                                                    <span className="text-sm font-medium text-gray-700 truncate">
-                                                        {group.clients.size > 0 ? Array.from(group.clients)[0] : 'No Contact'}
-                                                    </span>
-                                                    {group.clients.size > 1 && (
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded cursor-help whitespace-nowrap">
-                                                                        +{group.clients.size - 1} more
-                                                                    </span>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
-                                                                    <div className="space-y-1.5">
-                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">Multiple Clients:</p>
-                                                                        {Array.from(group.clients).map((c, i) => (
-                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                                                                                <User size={10} className="text-gray-400" />
-                                                                                {c}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        )}
-                                        {visibleColumns.company && (
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Building2 size={14} className="text-gray-400 shrink-0" />
-                                                    <span className="text-sm font-medium text-gray-700 truncate">
-                                                        {group.companies.size > 0 ? Array.from(group.companies)[0] : 'No Company'}
-                                                    </span>
-                                                    {group.companies.size > 1 && (
-                                                        <TooltipProvider>
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[9px] font-bold rounded cursor-help whitespace-nowrap">
-                                                                        +{group.companies.size - 1} more
-                                                                    </span>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
-                                                                    <div className="space-y-1.5">
-                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">Multiple Companies:</p>
-                                                                        {Array.from(group.companies).map((c, i) => (
-                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
-                                                                                <Building2 size={10} className="text-gray-400" />
-                                                                                {c}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TooltipProvider>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        )}
-                                        {visibleColumns.dealValue && (
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-sm font-bold text-blue-600">
-                                                        ${group.totalDealValue.toLocaleString()}
-                                                    </span>
-                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Aggregated Total</span>
-                                                </div>
-                                            </td>
-                                        )}
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col items-end">
@@ -1308,52 +1205,6 @@ export default function ProjectsPage() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm font-bold text-gray-900">{project._count?.quotes || 0}</span>
-                                                <span className="text-[10px] text-gray-400 uppercase tracking-tighter font-medium">Quotes</span>
-                                            </div>
-                                        </td>
-                                        {visibleColumns.client && (
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <User size={14} className="text-gray-400 shrink-0" />
-                                                    <span className="text-sm font-medium text-gray-700 truncate" title={getProjectContactDisplay(project)}>
-                                                        {getProjectContactDisplay(project)}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        )}
-                                        {visibleColumns.company && (
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Building2 size={14} className="text-gray-400 shrink-0" />
-                                                    <span className="text-sm font-medium text-gray-700 truncate" title={getProjectCompanyDisplay(project)}>
-                                                        {getProjectCompanyDisplay(project)}
-                                                    </span>
-                                                </div>
-                                            </td>
-                                        )}
-                                        {visibleColumns.dealValue && (
-                                            <td className="px-6 py-4 text-right">
-                                                {(() => {
-                                                    const val = Number(project.dealValue);
-                                                    if (project.dealValue && !isNaN(val)) {
-                                                        return (
-                                                            <div className="flex flex-col items-end">
-                                                                  <span className="text-sm font-bold text-gray-900">
-                                                                    ${val.toLocaleString()}
-                                                                </span>
-                                                                {project.pipedrive_deal_id && (
-                                                                    <span className="text-[10px] text-blue-600 font-bold uppercase tracking-tighter">Pipedrive</span>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    }
-                                                    return <span className="text-xs text-gray-300 font-medium italic">—</span>;
-                                                })()}
-                                            </td>
-                                        )}
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
                                                 <div className="text-sm font-semibold text-gray-700">
