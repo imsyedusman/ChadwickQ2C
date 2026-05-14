@@ -592,7 +592,9 @@ export default function ProjectDetail() {
                                             className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all border border-gray-100 sm:border-transparent"
                                             title="Open Sharepoint Folder"
                                         >
-                                            <FileText size={18} />
+                                            <div className="w-4.5 h-4.5 rounded-sm overflow-hidden shrink-0">
+                                                <img src="/sharepoint.svg" alt="Sharepoint" className="w-full h-full object-contain" />
+                                            </div>
                                         </a>
                                     )}
                                     <button 
@@ -611,7 +613,9 @@ export default function ProjectDetail() {
                                             className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all border border-gray-100 sm:border-transparent"
                                             title="View in Pipedrive"
                                         >
-                                            <ArrowUpRight size={18} />
+                                            <div className="w-4.5 h-4.5 rounded-sm overflow-hidden shrink-0">
+                                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                            </div>
                                         </a>
                                     )}
                                 </div>

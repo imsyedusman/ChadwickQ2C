@@ -1243,7 +1243,9 @@ export default function ProjectsPage() {
                                                                         onClick={(e) => e.stopPropagation()}
                                                                         className="p-1 hover:bg-blue-100 text-slate-500 hover:text-blue-700 rounded-md transition-colors"
                                                                     >
-                                                                        <FileText size={14} />
+                                                                        <div className="w-3.5 h-3.5 rounded-sm overflow-hidden shrink-0">
+                                                                            <img src="/sharepoint.svg" alt="Sharepoint" className="w-full h-full object-contain" />
+                                                                        </div>
                                                                     </a>
                                                                 </TooltipTrigger>
                                                                 <TooltipContent>Open Quote Folder</TooltipContent>

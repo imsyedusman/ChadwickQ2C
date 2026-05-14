@@ -673,7 +673,9 @@ export default function GroupDetail() {
                                                             onClick={(e) => e.stopPropagation()}
                                                             className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group"
                                                         >
-                                                            <FileText size={14} className="group-hover:scale-110 transition-transform" />
+                                                            <div className="w-3.5 h-3.5 rounded-sm overflow-hidden shrink-0 group-hover:scale-110 transition-transform">
+                                                                <img src="/sharepoint.svg" alt="Sharepoint" className="w-full h-full object-contain" />
+                                                            </div>
                                                         </a>
                                                     </TooltipTrigger>
                                                     <TooltipContent>Open Sharepoint Folder</TooltipContent>
@@ -708,7 +710,9 @@ export default function GroupDetail() {
                                                             onClick={(e) => e.stopPropagation()}
                                                             className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm group"
                                                         >
-                                                            <ArrowUpRight size={14} className="group-hover:scale-110 transition-transform" />
+                                                            <div className="w-3.5 h-3.5 rounded-sm overflow-hidden shrink-0 group-hover:scale-110 transition-transform">
+                                                                <img src="/pipedrive.jpeg" alt="Pipedrive" className="w-full h-full object-cover" />
+                                                            </div>
                                                         </a>
                                                     </TooltipTrigger>
                                                     <TooltipContent>View in Pipedrive</TooltipContent>
