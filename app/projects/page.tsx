@@ -687,7 +687,7 @@ export default function ProjectsPage() {
         }
     };
 
-    const renderUrgencyDate = (date: Date | string | null) => {
+    const renderUrgencyDate = (date: Date | string | null | undefined) => {
         if (!date) return <span className="text-gray-300 italic">—</span>;
         
         const d = typeof date === 'string' ? parseISO(date) : date;
