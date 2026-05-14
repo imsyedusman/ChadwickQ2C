@@ -116,6 +116,23 @@ export async function GET(request: Request) {
                 where.expectedCloseDate = { gte: today, lt: new Date(today.getTime() + 30 * 86400000) };
             } else if (closeDateFilter === 'future') {
                 where.expectedCloseDate = { gte: tomorrow };
+            } else {
+                const startDateStr = searchParams.get('startDate');
+                const endDateStr = searchParams.get('endDate');
+                
+                if (startDateStr || endDateStr) {
+                    where.expectedCloseDate = {};
+                    if (startDateStr) {
+                        const startDate = new Date(startDateStr);
+                        startDate.setHours(0, 0, 0, 0);
+                        where.expectedCloseDate.gte = startDate;
+                    }
+                    if (endDateStr) {
+                        const endDate = new Date(endDateStr);
+                        endDate.setHours(23, 59, 59, 999);
+                        where.expectedCloseDate.lte = endDate;
+                    }
+                }
             }
         }
 

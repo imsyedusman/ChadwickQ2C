@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import Navbar from "@/components/Shared/Navbar";
 import "./globals.css";
+import "react-day-picker/style.css";
 import { Toaster } from 'sonner';
 
 const inter = Inter({

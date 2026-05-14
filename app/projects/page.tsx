@@ -27,8 +27,9 @@ import {
     ChevronDown,
     X
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import MobileProjectCard, { MobileGroupedProjectCard } from '@/components/Project/MobileProjectCard';
 import {
     DropdownMenu,
@@ -230,6 +231,8 @@ export default function ProjectsPage() {
     const estimatorId = searchParams.get('estimatorId') || 'all';
     const dealOwner = searchParams.get('dealOwner') || 'all';
     const closeDateFilter = searchParams.get('closeDateFilter') || 'all';
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
     const sortBy = searchParams.get('sortBy') || 'createdAt';
     const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
 
@@ -434,7 +437,7 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchProjects();
         checkPipedriveStatus();
-    }, [page, pageSize, search, estimatorId, dealOwner, closeDateFilter, sortBy, sortOrder]);
+    }, [page, pageSize, search, estimatorId, dealOwner, closeDateFilter, startDate, endDate, sortBy, sortOrder]);
 
     const checkPipedriveStatus = async () => {
         try {
@@ -467,6 +470,13 @@ export default function ProjectsPage() {
                 params.set(key, String(value));
             }
         });
+
+        // Only clear custom dates if moving back to "All Time"
+        if (updates.closeDateFilter === 'all') {
+            params.delete('startDate');
+            params.delete('endDate');
+        }
+
         router.push(`/projects?${params.toString()}`, { scroll: false });
     };
 
@@ -477,7 +487,11 @@ export default function ProjectsPage() {
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (estimatorId && estimatorId !== 'all') url += `&estimatorId=${estimatorId}`;
             if (dealOwner && dealOwner !== 'all') url += `&dealOwner=${dealOwner}`;
-            if (closeDateFilter && closeDateFilter !== 'all') url += `&closeDateFilter=${closeDateFilter}`;
+            if (closeDateFilter && closeDateFilter !== 'all') {
+                url += `&closeDateFilter=${closeDateFilter}`;
+            }
+            if (startDate) url += `&startDate=${startDate}`;
+            if (endDate) url += `&endDate=${endDate}`;
             if (sortBy) url += `&sortBy=${sortBy}`;
             if (sortOrder) url += `&sortOrder=${sortOrder}`;
 
@@ -872,29 +886,22 @@ export default function ProjectsPage() {
                             </Select>
                         </div>
 
-                        <div className="w-[180px] shrink-0">
-                            <Select
-                                value={closeDateFilter}
-                                onValueChange={(val) => updateUrl({ closeDateFilter: val, page: 1 })}
-                            >
-                                <SelectTrigger className={cn(
-                                    "w-full h-10 rounded-xl border-gray-200 bg-white font-bold italic shadow-sm text-xs transition-all",
-                                    closeDateFilter !== 'all' ? "border-amber-500 bg-amber-50/50 text-amber-700 ring-1 ring-amber-500/20" : "text-slate-700"
-                                )}>
-                                    <div className="flex items-center gap-2">
-                                        <Calendar size={14} className={closeDateFilter !== 'all' ? "text-amber-600" : "text-amber-500"} />
-                                        <SelectValue placeholder="All Close Dates" />
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all" className="font-bold italic">All Close Dates</SelectItem>
-                                    <SelectItem value="overdue" className="text-rose-600 font-bold">Overdue</SelectItem>
-                                    <SelectItem value="today">Today</SelectItem>
-                                    <SelectItem value="this_week">This Week</SelectItem>
-                                    <SelectItem value="next_30_days">Next 30 Days</SelectItem>
-                                    <SelectItem value="future">Future</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="min-w-[180px] max-w-[240px] shrink-0">
+                            <DateRangePicker
+                                value={{
+                                    from: startDate ? parseISO(startDate) : undefined,
+                                    to: endDate ? parseISO(endDate) : undefined,
+                                    preset: closeDateFilter,
+                                }}
+                                onChange={(val) => {
+                                    updateUrl({
+                                        closeDateFilter: val.preset,
+                                        startDate: val.from ? format(val.from, 'yyyy-MM-dd') : null,
+                                        endDate: val.to ? format(val.to, 'yyyy-MM-dd') : null,
+                                        page: 1
+                                    });
+                                }}
+                            />
                         </div>
 
                         {(dealOwner !== 'all' || estimatorId !== 'all' || closeDateFilter !== 'all' || search) && (
@@ -906,6 +913,8 @@ export default function ProjectsPage() {
                                         dealOwner: 'all', 
                                         estimatorId: 'all', 
                                         closeDateFilter: 'all', 
+                                        startDate: null,
+                                        endDate: null,
                                         search: '', 
                                         page: 1 
                                     });
