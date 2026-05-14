@@ -510,6 +510,7 @@ export default function ProjectsPage() {
             totalDealValue: number;
             totalQuotes: number;
             latestActivity: Date;
+            expectedCloseDate: Date | null;
             clients: Set<string>;
             companies: Set<string>;
         }>();
@@ -519,6 +520,7 @@ export default function ProjectsPage() {
             const existing = groups.get(normalized);
             
             const projectDate = new Date(project.createdAt);
+            const expectedClose = project.expectedCloseDate ? new Date(project.expectedCloseDate) : null;
             const dealVal = Number(project.dealValue) || 0;
             const quoteCount = project._count?.quotes || 0;
             
@@ -533,6 +535,9 @@ export default function ProjectsPage() {
                     existing.latestActivity = projectDate;
                     existing.name = project.projectName; // Use most recent name
                 }
+                if (expectedClose && (!existing.expectedCloseDate || expectedClose > existing.expectedCloseDate)) {
+                    existing.expectedCloseDate = expectedClose;
+                }
                 if (client && client !== 'No Contact') existing.clients.add(client);
                 if (company && company !== 'No Company') existing.companies.add(company);
             } else {
@@ -543,13 +548,19 @@ export default function ProjectsPage() {
                     totalDealValue: dealVal,
                     totalQuotes: quoteCount,
                     latestActivity: projectDate,
+                    expectedCloseDate: expectedClose,
                     clients: new Set(client && client !== 'No Contact' ? [client] : []),
                     companies: new Set(company && company !== 'No Company' ? [company] : [])
                 });
             }
         });
 
-        return Array.from(groups.values()).sort((a, b) => b.latestActivity.getTime() - a.latestActivity.getTime());
+        return Array.from(groups.values()).sort((a, b) => {
+            if (!a.expectedCloseDate && !b.expectedCloseDate) return b.latestActivity.getTime() - a.latestActivity.getTime();
+            if (!a.expectedCloseDate) return 1;
+            if (!b.expectedCloseDate) return -1;
+            return b.expectedCloseDate.getTime() - a.expectedCloseDate.getTime();
+        });
     }, [projects, isGrouped]);
 
     const handleEditOpen = (project: Project) => {
@@ -886,7 +897,7 @@ export default function ProjectsPage() {
                                     checked={visibleColumns.created}
                                     onCheckedChange={() => toggleColumn('created')}
                                 >
-                                    Latest Activity
+                                    Expected Close
                                 </DropdownMenuCheckboxItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -916,7 +927,7 @@ export default function ProjectsPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Latest Activity</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Expected Close</th>
                                 <th className="px-6 py-4 w-[70px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
                             </tr>
                         </thead>
@@ -1060,9 +1071,9 @@ export default function ProjectsPage() {
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-sm font-semibold text-gray-700">
-                                                        {format(group.latestActivity, 'dd MMM yyyy')}
+                                                        {group.expectedCloseDate ? format(group.expectedCloseDate, 'dd MMM yyyy') : '—'}
                                                     </span>
-                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Latest Activity</span>
+                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Expected Close</span>
                                                 </div>
                                             </td>
                                         )}
@@ -1208,7 +1219,7 @@ export default function ProjectsPage() {
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
                                                 <div className="text-sm font-semibold text-gray-700">
-                                                    {project.createdAt ? format(new Date(project.createdAt), 'dd MMM yyyy') : '—'}
+                                                    {project.expectedCloseDate ? format(new Date(project.expectedCloseDate), 'dd MMM yyyy') : '—'}
                                                 </div>
                                             </td>
                                         )}

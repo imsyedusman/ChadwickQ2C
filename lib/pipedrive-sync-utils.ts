@@ -95,7 +95,17 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
         }
     }
 
-    // 6. Strict ID-based upsert for Project
+    // 6. Parsing helper
+    const parsePipedriveDate = (d: any) => {
+        if (!d) return null;
+        try {
+            const date = new Date(d);
+            return isNaN(date.getTime()) ? null : date;
+        } catch { return null; }
+    };
+    const expectedCloseDate = parsePipedriveDate(dealData.expected_close_date);
+
+    // 7. Strict ID-based upsert for Project
     const project = await (prisma as any).project.upsert({
         where: { pipedrive_deal_id },
         update: { 
@@ -106,6 +116,7 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             contactId: contact?.id || undefined,
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
+            expectedCloseDate,
             // Sync Safety: Only update owner if non-null
             ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
             ...(pipedriveOwnerName ? { pipedriveOwnerName } : {}),
@@ -120,6 +131,7 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             contactId: contact?.id || undefined,
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
+            expectedCloseDate,
             pipedriveOwnerId,
             pipedriveOwnerName,
             projectStatus: 'Budget',
