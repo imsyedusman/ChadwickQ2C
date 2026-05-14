@@ -227,52 +227,56 @@ export function MobileGroupedProjectCard({
     group: GroupedProject;
     onClick: () => void;
 }) {
-    const renderUrgencyDate = (date: Date | string | null) => {
+    const renderUrgencyDate = (date: Date | string | null | undefined) => {
         if (!date) return <span className="text-gray-300 italic">—</span>;
         
         const d = typeof date === 'string' ? parseISO(date) : date;
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        const threeDaysFromNow = addDays(today, 3);
-        const fourteenDaysFromNow = addDays(today, 14);
-        const thirtyDaysFromNow = addDays(today, 30);
+        const diff = differenceInDays(d, today);
+        const absDiff = Math.abs(diff);
         
         let dotColor = "";
-        let textColor = "";
-        let label = "";
+        let urgencyText = "";
+        let urgencyColor = "";
 
-        if (isBefore(d, today)) {
+        if (diff < 0) {
             dotColor = "bg-rose-500";
-            textColor = "text-rose-600";
-            label = "Overdue";
-        } else if (isBefore(d, addDays(today, 1))) {
-            dotColor = "bg-amber-500";
-            textColor = "text-amber-600";
-            label = "Today";
-        } else if (isBefore(d, threeDaysFromNow)) {
+            urgencyText = absDiff === 1 ? "Overdue by 1 day" : `Overdue by ${absDiff} days`;
+            urgencyColor = "text-rose-800";
+        } else if (diff === 0) {
             dotColor = "bg-amber-500 animate-pulse";
-            textColor = "text-amber-600 font-bold";
-            label = "Soon";
-        } else if (isBefore(d, fourteenDaysFromNow)) {
+            urgencyText = "Due today";
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 3) {
+            dotColor = "bg-amber-500";
+            urgencyText = `Due in ${diff} days`;
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 14) {
             dotColor = "bg-blue-400";
-            textColor = "text-slate-600 font-medium";
-            label = "";
-        } else if (isBefore(d, thirtyDaysFromNow)) {
-            textColor = "text-slate-500";
-            label = "";
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-500";
+        } else if (diff <= 30) {
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-400";
         } else {
-            textColor = "text-slate-400 font-normal";
-            label = "";
+            urgencyText = "";
         }
 
         return (
-            <div className="inline-flex items-center gap-1">
-                {dotColor && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />}
-                <span className={cn("text-[10px] whitespace-nowrap", textColor)}>
-                    {format(d, 'MMM d, yyyy')}
-                    {label && <span className="ml-1 opacity-60 text-[8px] uppercase font-bold text-gray-500">({label})</span>}
-                </span>
+            <div className="flex flex-col items-end gap-0">
+                <div className="flex items-center gap-1.5">
+                    {dotColor && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />}
+                    <span className="text-[11px] font-bold text-gray-700 tracking-tight">
+                        {format(d, 'MMM d, yyyy')}
+                    </span>
+                </div>
+                {urgencyText && (
+                    <span className={cn("text-[9px] font-medium leading-none opacity-80", urgencyColor)}>
+                        {urgencyText}
+                    </span>
+                )}
             </div>
         );
     };
