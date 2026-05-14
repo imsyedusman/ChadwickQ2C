@@ -927,7 +927,7 @@ export default function ProjectsPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Status</th>
-                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[160px] text-right">Expected Close</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[200px] text-right whitespace-nowrap">Expected Close Date</th>
                                 <th className="px-6 py-4 w-[70px] sticky right-0 z-10 bg-gray-50/50 shadow-[-4px_0_8px_rgba(0,0,0,0.02)]"></th>
                             </tr>
                         </thead>
@@ -1073,7 +1073,6 @@ export default function ProjectsPage() {
                                                     <span className="text-sm font-semibold text-gray-700">
                                                         {group.expectedCloseDate ? format(group.expectedCloseDate, 'dd MMM yyyy') : '—'}
                                                     </span>
-                                                    <span className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Expected Close</span>
                                                 </div>
                                             </td>
                                         )}
