@@ -10,7 +10,7 @@ import {
     Layers
 } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parseISO, isBefore, addDays, differenceInDays } from 'date-fns';
 import { 
     DropdownMenu, 
     DropdownMenuContent, 
@@ -43,6 +43,7 @@ interface Project {
     _count?: {
         quotes: number;
     };
+    expectedCloseDate?: string | Date | null;
 }
 
 interface GroupedProject {
@@ -67,6 +68,60 @@ export default function MobileProjectCard({
     onEdit, 
     onDelete 
 }: MobileProjectCardProps) {
+    const renderUrgencyDate = (date: Date | string | null) => {
+        if (!date) return <span className="text-gray-300 italic">—</span>;
+        
+        const d = typeof date === 'string' ? parseISO(date) : date;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const diff = differenceInDays(d, today);
+        const absDiff = Math.abs(diff);
+        
+        let dotColor = "";
+        let urgencyText = "";
+        let urgencyColor = "";
+
+        if (diff < 0) {
+            dotColor = "bg-rose-500";
+            urgencyText = absDiff === 1 ? "Overdue by 1 day" : `Overdue by ${absDiff} days`;
+            urgencyColor = "text-rose-800";
+        } else if (diff === 0) {
+            dotColor = "bg-amber-500 animate-pulse";
+            urgencyText = "Due today";
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 3) {
+            dotColor = "bg-amber-500";
+            urgencyText = `Due in ${diff} days`;
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 14) {
+            dotColor = "bg-blue-400";
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-500";
+        } else if (diff <= 30) {
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-400";
+        } else {
+            urgencyText = "";
+        }
+
+        return (
+            <div className="flex flex-col items-end gap-0">
+                <div className="flex items-center gap-1.5">
+                    {dotColor && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />}
+                    <span className="text-[11px] font-bold text-gray-700 tracking-tight">
+                        {format(d, 'MMM d, yyyy')}
+                    </span>
+                </div>
+                {urgencyText && (
+                    <span className={cn("text-[9px] font-medium leading-none opacity-80", urgencyColor)}>
+                        {urgencyText}
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'Budget': return 'bg-purple-50 text-purple-700 border-purple-100';
@@ -132,12 +187,20 @@ export default function MobileProjectCard({
                         {project.pipedriveOwnerName || 'Unassigned'}
                     </p>
                 </div>
-                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Quotes</p>
-                    <div className="flex items-center gap-1.5">
-                        <Layers size={10} className="text-blue-500" />
-                        <p className="text-xs font-bold text-gray-900">{project._count?.quotes || 0} Quotes linked to this project</p>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2 flex items-center justify-between">
+                    <div className="flex flex-col">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Quotes</p>
+                        <div className="flex items-center gap-1.5">
+                            <Layers size={10} className="text-blue-500" />
+                            <p className="text-xs font-bold text-gray-900">{project._count?.quotes || 0} Quotes</p>
+                        </div>
                     </div>
+                    {project.expectedCloseDate && (
+                        <div className="flex flex-col items-end">
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5 text-right">Exp. Close</p>
+                            {renderUrgencyDate(project.expectedCloseDate)}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -164,6 +227,56 @@ export function MobileGroupedProjectCard({
     group: GroupedProject;
     onClick: () => void;
 }) {
+    const renderUrgencyDate = (date: Date | string | null) => {
+        if (!date) return <span className="text-gray-300 italic">—</span>;
+        
+        const d = typeof date === 'string' ? parseISO(date) : date;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const threeDaysFromNow = addDays(today, 3);
+        const fourteenDaysFromNow = addDays(today, 14);
+        const thirtyDaysFromNow = addDays(today, 30);
+        
+        let dotColor = "";
+        let textColor = "";
+        let label = "";
+
+        if (isBefore(d, today)) {
+            dotColor = "bg-rose-500";
+            textColor = "text-rose-600";
+            label = "Overdue";
+        } else if (isBefore(d, addDays(today, 1))) {
+            dotColor = "bg-amber-500";
+            textColor = "text-amber-600";
+            label = "Today";
+        } else if (isBefore(d, threeDaysFromNow)) {
+            dotColor = "bg-amber-500 animate-pulse";
+            textColor = "text-amber-600 font-bold";
+            label = "Soon";
+        } else if (isBefore(d, fourteenDaysFromNow)) {
+            dotColor = "bg-blue-400";
+            textColor = "text-slate-600 font-medium";
+            label = "";
+        } else if (isBefore(d, thirtyDaysFromNow)) {
+            textColor = "text-slate-500";
+            label = "";
+        } else {
+            textColor = "text-slate-400 font-normal";
+            label = "";
+        }
+
+        return (
+            <div className="inline-flex items-center gap-1">
+                {dotColor && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />}
+                <span className={cn("text-[10px] whitespace-nowrap", textColor)}>
+                    {format(d, 'MMM d, yyyy')}
+                    {label && <span className="ml-1 opacity-60 text-[8px] uppercase font-bold text-gray-500">({label})</span>}
+                </span>
+            </div>
+        );
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'Budget': return 'bg-purple-50 text-purple-700 border-purple-100';
@@ -218,11 +331,19 @@ export function MobileGroupedProjectCard({
                         {latestProject.pipedriveOwnerName || 'Unassigned'}
                     </p>
                 </div>
-                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Projects / Quotes</p>
-                    <p className="text-xs font-bold text-gray-900">
-                        {group.companies.size} {group.companies.size === 1 ? 'Company' : 'Companies'} / {group.clients.size} {group.clients.size === 1 ? 'Client' : 'Clients'} / {group.totalQuotes} Quotes
-                    </p>
+                <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2 flex items-center justify-between">
+                    <div className="flex flex-col">
+                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Projects / Quotes</p>
+                        <p className="text-xs font-bold text-gray-900">
+                            {group.companies.size} Co / {group.clients.size} Cl / {group.totalQuotes} Q
+                        </p>
+                    </div>
+                    {group.projects.some(p => p.expectedCloseDate) && (
+                        <div className="flex flex-col items-end">
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5 text-right">Exp. Close</p>
+                            {renderUrgencyDate(group.projects[0].expectedCloseDate)}
+                        </div>
+                    )}
                 </div>
             </div>
 

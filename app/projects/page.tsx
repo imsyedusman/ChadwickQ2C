@@ -27,7 +27,7 @@ import {
     ChevronDown,
     X
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isPast, isToday, addDays, isBefore, differenceInDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { DateRangePicker } from '@/components/ui/DateRangePicker';
 import MobileProjectCard, { MobileGroupedProjectCard } from '@/components/Project/MobileProjectCard';
@@ -687,6 +687,60 @@ export default function ProjectsPage() {
         }
     };
 
+    const renderUrgencyDate = (date: Date | string | null) => {
+        if (!date) return <span className="text-gray-300 italic">—</span>;
+        
+        const d = typeof date === 'string' ? parseISO(date) : date;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const diff = differenceInDays(d, today);
+        const absDiff = Math.abs(diff);
+        
+        let dotColor = "";
+        let urgencyText = "";
+        let urgencyColor = "";
+
+        if (diff < 0) {
+            dotColor = "bg-rose-500";
+            urgencyText = absDiff === 1 ? "Overdue by 1 day" : `Overdue by ${absDiff} days`;
+            urgencyColor = "text-rose-800";
+        } else if (diff === 0) {
+            dotColor = "bg-amber-500 animate-pulse";
+            urgencyText = "Due today";
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 3) {
+            dotColor = "bg-amber-500";
+            urgencyText = `Due in ${diff} days`;
+            urgencyColor = "text-amber-700";
+        } else if (diff <= 14) {
+            dotColor = "bg-blue-400";
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-500";
+        } else if (diff <= 30) {
+            urgencyText = `In ${diff} days`;
+            urgencyColor = "text-slate-400";
+        } else {
+            urgencyText = ""; // No sublabel for far future to keep it clean
+        }
+
+        return (
+            <div className="flex flex-col items-end gap-0.5 min-w-[100px]">
+                <div className="flex items-center gap-2">
+                    {dotColor && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotColor)} />}
+                    <span className="text-sm font-bold text-gray-700 tracking-tight">
+                        {format(d, 'dd MMM yyyy')}
+                    </span>
+                </div>
+                {urgencyText && (
+                    <span className={cn("text-[10px] font-medium leading-none opacity-80", urgencyColor)}>
+                        {urgencyText}
+                    </span>
+                )}
+            </div>
+        );
+    };
+
     const getStatusStyle = (status: string) => {
         switch (status) {
             case 'Budget': return 'bg-purple-50 text-purple-700 border-purple-200';
@@ -1156,9 +1210,7 @@ export default function ProjectsPage() {
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col items-end">
-                                                    <span className="text-sm font-semibold text-gray-700">
-                                                        {group.expectedCloseDate ? format(group.expectedCloseDate, 'dd MMM yyyy') : '—'}
-                                                    </span>
+                                                    {renderUrgencyDate(group.expectedCloseDate)}
                                                 </div>
                                             </td>
                                         )}
@@ -1303,9 +1355,7 @@ export default function ProjectsPage() {
                                         </td>
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                <div className="text-sm font-semibold text-gray-700">
-                                                    {project.expectedCloseDate ? format(new Date(project.expectedCloseDate), 'dd MMM yyyy') : '—'}
-                                                </div>
+                                                {renderUrgencyDate(project.expectedCloseDate)}
                                             </td>
                                         )}
                                         <td className="px-6 py-4 sticky right-0 z-10 bg-white group-hover:bg-[#f8faff] transition-colors shadow-[-4px_0_8px_rgba(0,0,0,0.02)]">
