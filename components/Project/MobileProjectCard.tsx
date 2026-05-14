@@ -220,7 +220,9 @@ export function MobileGroupedProjectCard({
                 </div>
                 <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-50 col-span-2">
                     <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Projects / Quotes</p>
-                    <p className="text-xs font-bold text-gray-900">{group.projects.length} Projects / {group.totalQuotes} Quotes</p>
+                    <p className="text-xs font-bold text-gray-900">
+                        {group.companies.size} {group.companies.size === 1 ? 'Company' : 'Companies'} / {group.clients.size} {group.clients.size === 1 ? 'Client' : 'Clients'} / {group.totalQuotes} Quotes
+                    </p>
                 </div>
             </div>
 

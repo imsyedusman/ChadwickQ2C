@@ -1013,10 +1013,53 @@ export default function ProjectsPage() {
                                                         )}
                                                     </div>
                                                     <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
-                                                            <Briefcase size={10} />
-                                                            {group.projects.length} Projects
-                                                        </span>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 cursor-help hover:text-blue-500 transition-colors">
+                                                                        <Building2 size={10} />
+                                                                        {group.companies.size} {group.companies.size === 1 ? 'Company' : 'Companies'}
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">
+                                                                            {group.companies.size === 1 ? 'Company Name:' : 'Company Names:'}
+                                                                        </p>
+                                                                        {Array.from(group.companies).map((c, i) => (
+                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                                                                                <Building2 size={10} className="text-gray-400" />
+                                                                                {c || 'No Company'}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                        <span className="text-[10px] text-gray-300">•</span>
+                                                        <TooltipProvider>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 cursor-help hover:text-blue-500 transition-colors">
+                                                                        <User size={10} />
+                                                                        {group.clients.size} {group.clients.size === 1 ? 'Client' : 'Clients'}
+                                                                    </span>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="p-3 max-w-[300px] bg-white border-blue-100 shadow-xl">
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="font-bold text-gray-900 border-b border-gray-100 pb-1 mb-1">
+                                                                            {group.clients.size === 1 ? 'Client Name:' : 'Client Names:'}
+                                                                        </p>
+                                                                        {Array.from(group.clients).map((c, i) => (
+                                                                            <div key={i} className="flex items-center gap-2 text-xs text-gray-600">
+                                                                                <User size={10} className="text-gray-400" />
+                                                                                {c || 'No Contact'}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
                                                         <span className="text-[10px] text-gray-300">•</span>
                                                         <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1">
                                                             <FileText size={10} />

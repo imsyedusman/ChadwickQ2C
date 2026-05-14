@@ -159,18 +159,29 @@ export default function GroupDetail() {
             let tQuotes = 0;
             let tValue = 0;
             let lActivity = new Date(0);
+            const clients = new Set<string>();
+            const companies = new Set<string>();
             
             fullProjects.forEach(p => {
                 tQuotes += p.quotes.length;
                 tValue += Number(p.dealValue) || 0;
                 const pDate = new Date(p.createdAt);
                 if (pDate > lActivity) lActivity = pDate;
+                
+                const clientName = p.client?.name || p.clientName;
+                if (clientName) clients.add(clientName);
+
+                const companyName = p.companyName || p.client?.name; // Fallback or direct
+                // Wait, let's use the actual field
+                if (p.companyName) companies.add(p.companyName);
             });
 
             setStats({
                 totalQuotes: tQuotes,
                 totalValue: tValue,
-                latestActivity: lActivity
+                latestActivity: lActivity,
+                totalClients: clients.size,
+                totalCompanies: companies.size
             });
 
         } catch (error) {
@@ -195,6 +206,8 @@ export default function GroupDetail() {
         totalQuotes: 0,
         totalValue: 0,
         latestActivity: new Date(0),
+        totalClients: 0,
+        totalCompanies: 0
     });
 
     useEffect(() => {
@@ -539,7 +552,9 @@ export default function GroupDetail() {
                                 {groupName}
                             </h1>
                             <div className="flex items-center gap-3 text-sm font-medium text-gray-500">
-                                <span className="flex items-center gap-1.5"><Briefcase size={14} className="text-gray-400" /> {projects.length} Projects</span>
+                                <span className="flex items-center gap-1.5"><Building2 size={14} className="text-gray-400" /> {stats.totalCompanies} {stats.totalCompanies === 1 ? 'Company' : 'Companies'}</span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1.5"><User size={14} className="text-gray-400" /> {stats.totalClients} {stats.totalClients === 1 ? 'Client' : 'Clients'}</span>
                                 <span>•</span>
                                 <span className="flex items-center gap-1.5"><FileText size={14} className="text-gray-400" /> {stats.totalQuotes} Quotes</span>
                                 <span>•</span>
