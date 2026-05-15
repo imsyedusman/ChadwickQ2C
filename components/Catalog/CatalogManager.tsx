@@ -782,9 +782,9 @@ export default function CatalogManager() {
                                                                     {comparisonSummary.highImpactChanges.map((item, i) => (
                                                                         <tr key={i}>
                                                                             <td className="py-2 font-mono">{item.partNumber}</td>
-                                                                            <td className="py-2 text-right text-red-400">${item.oldPrice.toFixed(2)}</td>
-                                                                            <td className="py-2 text-right font-bold text-red-700">${item.newPrice.toFixed(2)}</td>
-                                                                            <td className="py-2 text-right text-red-700">+{item.percentChange.toFixed(1)}%</td>
+                                                                            <td className="py-2 text-right text-red-400">${(item.oldPrice || 0).toFixed(2)}</td>
+                                                                            <td className="py-2 text-right font-bold text-red-700">${(item.newPrice || 0).toFixed(2)}</td>
+                                                                            <td className="py-2 text-right text-red-700">+{(item.percentChange || 0).toFixed(1)}%</td>
                                                                         </tr>
                                                                     ))}
                                                                 </tbody>
@@ -950,8 +950,8 @@ export default function CatalogManager() {
                                         <td className="px-4 py-3 font-mono text-xs text-gray-500">{item.partNumber}</td>
                                         <td className="px-4 py-3 text-gray-900">{item.description}</td>
                                         <td className="px-4 py-3 text-gray-500">{item.category}</td>
-                                        <td className="px-4 py-3 text-right font-medium">${item.unitPrice.toFixed(2)}</td>
-                                        <td className="px-4 py-3 text-right text-gray-500">{item.labourHours}h</td>
+                                        <td className="px-4 py-3 text-right font-medium">${(item.unitPrice || 0).toFixed(2)}</td>
+                                        <td className="px-4 py-3 text-right text-gray-500">{item.labourHours ?? 0}h</td>
                                     </tr>
                                 ))
                             )}
