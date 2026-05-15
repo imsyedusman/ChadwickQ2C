@@ -163,6 +163,7 @@ model User {
   sessions        Session[]
   role            Role?            @relation(fields: [roleId], references: [id])
   userPermissions UserPermission[]
+  catalogImports  CatalogImport[]
 }
 
 model Role {
@@ -385,6 +386,20 @@ model QuoteSequence {
   year       Int      @unique
   lastNumber Int
   updatedAt  DateTime @updatedAt
+}
+
+model CatalogImport {
+  id                 String    @id @default(uuid())
+  filename           String
+  brand              String?
+  timestamp          DateTime  @default(now())
+  userId             String?
+  itemsCreated       Int       @default(0)
+  itemsUpdated       Int       @default(0)
+  fieldsChangedCount Int       @default(0)
+  status             String    @default("SUCCESS")
+  errorLog           String?
+  user               User?     @relation(fields: [userId], references: [id])
 }
 
 enum ProjectStatus {

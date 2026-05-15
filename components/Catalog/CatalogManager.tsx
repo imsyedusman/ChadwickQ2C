@@ -183,17 +183,38 @@ export default function CatalogManager() {
         }
     };
 
+    // Import Flow State
+    type ImportStep = 'UPLOAD' | 'MAPPING' | 'PREVIEW' | 'SUCCESS';
+    const [importStep, setImportStep] = useState<ImportStep>('UPLOAD');
+    const [rawExcelData, setRawExcelData] = useState<any[]>([]);
+    const [excelHeaders, setExcelHeaders] = useState<string[]>([]);
+    const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
+    const [fieldStrategies, setFieldStrategies] = useState<Record<string, 'ALWAYS_UPDATE' | 'FILL_MISSING' | 'IGNORE' | 'PREFER_EXISTING'>>({
+        unitPrice: 'ALWAYS_UPDATE',
+        labourHours: 'ALWAYS_UPDATE',
+        description: 'PREFER_EXISTING',
+        subcategory: 'ALWAYS_UPDATE'
+    });
+
+
+    // Aliases for Smart Suggestion
+    const FIELD_ALIASES: Record<string, string[]> = {
+        partNumber: ['Material Reference', 'Part Number', 'Part No', 'Reference', 'Material Reference'],
+        description: ['Description', 'Product Description', 'Desc'],
+        unitPrice: ['Price Break 1', 'Unit Price', 'Price', 'Cost', 'Rate'],
+        labourHours: ['HOURS', 'Labour', 'Labour Hours', 'Hrs'],
+        category1: ['CATEGORY 1', 'Category', 'Cat'],
+        category2: ['CATEGORY 2', 'Subcategory', 'Sub'],
+        category3: ['CATEGORY 3', 'Detail', 'Type']
+    };
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         setIsAnalyzing(true);
-        setAnalysisStatus('Parsing file...');
-        setFileMetadata(null);
-        setComparisonSummary(null);
-        setPreviewItems([]);
+        setAnalysisStatus('Reading file headers...');
         setUploadError(null);
-        setUploadSuccess(false);
 
         const reader = new FileReader();
         reader.onload = (evt) => {
@@ -202,118 +223,90 @@ export default function CatalogManager() {
                 const wb = XLSX.read(bstr, { type: 'binary' });
                 const wsname = wb.SheetNames[0];
                 const ws = wb.Sheets[wsname];
-                const data = XLSX.utils.sheet_to_json(ws) as any[];
-
-                // Map and validate data
-                const mappedItems: CatalogItem[] = data.map((row) => {
-                    // Specific mapping for the user's Schneider file
-                    const partNo = findColumnValue(row, [
-                        'Schneider\nElectric\nMaterial\nReference',
-                        'Material Reference',
-                        'Part Number',
-                        'Part No',
-                        'Reference'
-                    ]);
-
-                    const desc = findColumnValue(row, [
-                        'Description',
-                        'Product Description'
-                    ]);
-
-                    const priceRaw = findColumnValue(row, [
-                        'Price Break 1 - CUSTOMER Cost (excl GST)',
-                        'Price Break 1',
-                        'Unit Price',
-                        'Price',
-                        'Cost'
-                    ]);
-
-                    const labourRaw = findColumnValue(row, [
-                        'HOURS',
-                        'Labour',
-                        'Labour Hours'
-                    ]);
-
-                    // Vendor Category (Metadata) - Maps to subcategory for filtering
-                    const vendorCat1 = findColumnValue(row, ['CATEGORY 1', 'Category', 'Cat']);
-                    const vendorCat2 = findColumnValue(row, ['CATEGORY 2', 'Subcategory', 'Sub']);
-                    const vendorCat3 = findColumnValue(row, ['CATEGORY 3', 'Detail', 'Type']);
-
-                    // Use centralized classification service
-                    const classification = classifyCatalogItem(
-                        desc ? String(desc) : '',
-                        partNo ? String(partNo) : '',
-                        vendorCat1 ? String(vendorCat1) : '',
-                        vendorCat2 ? String(vendorCat2) : '',
-                        vendorCat3 ? String(vendorCat3) : '',
-                        manualBrand
-                    );
-
-                    return {
-                        brand: classification.brand,
-                        category: classification.category,
-                        subcategory: classification.subcategory,
-                        partNumber: partNo ? String(partNo) : '',
-                        description: desc ? String(desc) : '',
-                        unitPrice: priceRaw ? parseFloat(String(priceRaw).replace(/[$,]/g, '')) : 0,
-                        labourHours: labourRaw ? parseFloat(String(labourRaw)) : 0,
-                        meterType: classification.meterType
-                    };
-                }); // Dont filter yet to check mapping length
-
-                const validItems = mappedItems.filter(item => item.description && item.partNumber);
-
-                if (validItems.length === 0) {
-                    throw new Error('No valid items found. Please check your column headers. We look for: Material Reference, Description, Price Break 1, HOURS.');
-                }
-
-                // Schneider strict validation
-                const brands = new Set(validItems.map(i => {
-                    const b = i.brand.trim();
-                    return b.toLowerCase() === 'schneider electric' ? 'Schneider Electric' : b;
-                }).filter(b => b !== ''));
                 
-                if (brands.size > 1 || (brands.size === 1 && !brands.has('Schneider Electric'))) {
-                    console.error('Brand validation failed. Detected brands:', Array.from(brands));
-                    
-                    // Identify sample mismatched items for the user
-                    const mismatchedSamples = validItems
-                        .filter(i => i.brand !== 'Schneider Electric')
-                        .slice(0, 5)
-                        .map(i => `${i.partNumber} (${i.brand})`);
-                    
-                    console.error('Sample mismatched items:', mismatchedSamples);
+                // Get all rows to detect headers correctly
+                const data = XLSX.utils.sheet_to_json(ws) as any[];
+                if (data.length === 0) throw new Error('Excel file appears to be empty.');
 
-                    throw new Error(`This feature currently only supports Schneider Electric uploads. Detected brands: ${Array.from(brands).join(', ')}. Please ensure all items are Schneider Electric or specify the brand name in the input box above.`);
-                }
-
+                const headers = Object.keys(data[0]);
+                setExcelHeaders(headers);
+                setRawExcelData(data);
+                
+                // Smart Mapping Suggestion
+                const initialMapping: Record<string, string> = {};
+                Object.entries(FIELD_ALIASES).forEach(([field, aliases]) => {
+                    const match = headers.find(h => 
+                        aliases.some(a => h.toLowerCase().includes(a.toLowerCase())) ||
+                        h.toLowerCase() === field.toLowerCase()
+                    );
+                    if (match) initialMapping[field] = match;
+                });
+                
+                setColumnMapping(initialMapping);
                 setFileMetadata({
                     name: file.name,
                     size: (file.size / 1024).toFixed(1) + ' KB',
-                    brand: 'Schneider Electric',
-                    rows: validItems.length
+                    rows: data.length,
+                    brand: manualBrand || 'Detecting...'
                 });
-
-                setPreviewItems(validItems);
-                setAnalysisStatus('Validating structure...');
-
-                // Small delay to let React render the Validating status before heavy fetch blocking
-                setTimeout(() => {
-                    handleAnalyze(validItems);
-                }, 50);
-
+                
+                setImportStep('MAPPING');
             } catch (err: any) {
-                setUploadError(err.message || 'Failed to parse Excel file. Please ensure it has the correct columns.');
+                setUploadError(err.message || 'Failed to parse Excel file.');
                 console.error(err);
+            } finally {
                 setIsAnalyzing(false);
                 setAnalysisStatus('');
             }
-
-            // Clear input so same file can be selected again
-            const inputElement = document.getElementById('catalog-upload') as HTMLInputElement;
-            if (inputElement) inputElement.value = '';
         };
         reader.readAsBinaryString(file);
+    };
+
+    const handleConfirmMapping = () => {
+        if (!columnMapping.partNumber) {
+            setUploadError('Part Number must be mapped to proceed.');
+            return;
+        }
+
+        setIsAnalyzing(true);
+        setAnalysisStatus('Reconciling data...');
+
+        // Map raw data to internal format
+        const mappedItems: CatalogItem[] = rawExcelData.map(row => {
+            const partNo = row[columnMapping.partNumber];
+            const desc = row[columnMapping.description];
+            const price = row[columnMapping.unitPrice];
+            const labour = row[columnMapping.labourHours];
+            
+            // Metadata for classification
+            const cat1 = row[columnMapping.category1];
+            const cat2 = row[columnMapping.category2];
+            const cat3 = row[columnMapping.category3];
+
+            const classification = classifyCatalogItem(
+                desc ? String(desc) : '',
+                partNo ? String(partNo) : '',
+                cat1 ? String(cat1) : '',
+                cat2 ? String(cat2) : '',
+                cat3 ? String(cat3) : '',
+                manualBrand
+            );
+
+            return {
+                brand: classification.brand,
+                category: classification.category,
+                subcategory: classification.subcategory,
+                partNumber: partNo ? String(partNo).trim() : '',
+                description: desc ? String(desc).trim() : (partNo ? String(partNo).trim() : ''), // Fallback to Part Number if description is missing
+                unitPrice: price ? parseFloat(String(price).replace(/[$,]/g, '')) : null,
+                labourHours: labour ? parseFloat(String(labour)) : null,
+                meterType: classification.meterType
+            };
+        }).filter(item => item.partNumber);
+
+        setPreviewItems(mappedItems);
+        handleAnalyze(mappedItems);
+        setImportStep('PREVIEW');
     };
 
     const handleImport = async () => {
@@ -330,10 +323,27 @@ export default function CatalogManager() {
             for (let i = 0; i < totalChunks; i++) {
                 const chunk = previewItems.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
 
+                // Ensure skipped fields are explicitly set to IGNORE
+                const finalStrategies = { ...fieldStrategies };
+                const possibleFields = ['description', 'unitPrice', 'labourHours', 'category1', 'category2', 'category3'];
+                possibleFields.forEach(field => {
+                    if (!columnMapping[field]) {
+                        finalStrategies[field] = 'IGNORE';
+                    }
+                });
+
                 const res = await fetch('/api/catalog', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items: chunk }),
+                    body: JSON.stringify({ 
+                        items: chunk,
+                        strategies: finalStrategies,
+                        metadata: {
+                            filename: fileMetadata?.name,
+                            brand: manualBrand || previewItems[0]?.brand,
+                            totalRows: fileMetadata?.rows
+                        }
+                    }),
                 });
 
                 if (!res.ok) {
@@ -353,6 +363,7 @@ export default function CatalogManager() {
             setManualBrand('');
             fetchCatalog(); // Refresh saved list
             fetchBrandStats(); // Refresh stats
+            setImportStep('SUCCESS');
         } catch (err: any) {
             console.error('Upload failed:', err);
             setUploadError(`Upload failed: ${err.message}`);
@@ -530,465 +541,356 @@ export default function CatalogManager() {
             {/* Upload Section */}
             {isAdmin && (
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <Upload className="text-blue-600" size={20} />
-                        Import Catalog
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                            <Upload className="text-blue-600" size={20} />
+                            Import Catalog
+                        </h2>
+                        
+                        {/* Step Indicator */}
+                        <div className="flex items-center gap-4">
+                            {[
+                                { step: 'UPLOAD', label: '1. Upload' },
+                                { step: 'MAPPING', label: '2. Map' },
+                                { step: 'PREVIEW', label: '3. Review' }
+                            ].map((s, idx) => (
+                                <div key={s.step} className="flex items-center gap-2">
+                                    <div className={cn(
+                                        "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border",
+                                        importStep === s.step ? "bg-blue-600 text-white border-blue-600 shadow-sm" : 
+                                        idx < ['UPLOAD', 'MAPPING', 'PREVIEW'].indexOf(importStep) ? "bg-green-100 text-green-700 border-green-200" :
+                                        "bg-gray-50 text-gray-400 border-gray-200"
+                                    )}>
+                                        {idx < ['UPLOAD', 'MAPPING', 'PREVIEW'].indexOf(importStep) ? <Check size={12} /> : idx + 1}
+                                    </div>
+                                    <span className={cn(
+                                        "text-xs font-medium",
+                                        importStep === s.step ? "text-blue-600" : "text-gray-400"
+                                    )}>{s.label}</span>
+                                    {idx < 2 && <div className="w-4 h-px bg-gray-200" />}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
 
                     <div className="space-y-6">
-                        {/* Brand Selection */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Brand / Supplier Name
-                            </label>
-                            <input
-                                type="text"
-                                placeholder="e.g. Schneider Electric (Optional - overrides file)"
-                                value={manualBrand}
-                                onChange={(e) => setManualBrand(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                                Enter a brand name here to apply it to all uploaded items if missing in the file.
-                            </p>
-                        </div>
+                        {importStep === 'UPLOAD' && (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Brand / Supplier Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Schneider Electric (Optional - overrides file)"
+                                        value={manualBrand}
+                                        onChange={(e) => setManualBrand(e.target.value)}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Enter a brand name here to apply it to all uploaded items.
+                                    </p>
+                                </div>
 
-                        <div className={cn("border-2 border-dashed rounded-lg p-8 text-center transition-colors", isAnalyzing ? "border-blue-300 bg-blue-50 cursor-not-allowed" : "border-gray-300 hover:bg-gray-50")}>
-                            <input
-                                type="file"
-                                accept=".xlsx, .xls"
-                                onChange={handleFileUpload}
-                                className="hidden"
-                                id="catalog-upload"
-                                disabled={isAnalyzing}
-                            />
-                            <label htmlFor="catalog-upload" className={cn("flex flex-col items-center gap-2", isAnalyzing ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
-                                <FileSpreadsheet className={isAnalyzing ? "text-blue-500" : "text-green-600"} size={32} />
-                                <span className="text-sm font-medium text-gray-700">{isAnalyzing ? 'Processing upload...' : 'Click to upload Excel Catalog'}</span>
-                                <span className="text-xs text-gray-500">
-                                    Supports: Material Reference, Description, Price Break 1, CATEGORY 1, HOURS
-                                </span>
-                            </label>
-                        </div>
-
-                        {/* Status Messages */}
-                        {uploadError && (
-                            <div className="p-3 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 text-sm">
-                                <AlertCircle size={16} /> {uploadError}
-                            </div>
+                                <div className={cn("border-2 border-dashed rounded-lg p-12 text-center transition-colors", isAnalyzing ? "border-blue-300 bg-blue-50 cursor-not-allowed" : "border-gray-300 hover:bg-gray-50")}>
+                                    <input
+                                        type="file"
+                                        accept=".xlsx, .xls"
+                                        onChange={handleFileUpload}
+                                        className="hidden"
+                                        id="catalog-upload"
+                                        disabled={isAnalyzing}
+                                    />
+                                    <label htmlFor="catalog-upload" className={cn("flex flex-col items-center gap-3", isAnalyzing ? "cursor-not-allowed opacity-70" : "cursor-pointer")}>
+                                        <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mb-2">
+                                            <Upload size={24} />
+                                        </div>
+                                        <span className="text-base font-semibold text-gray-900">{isAnalyzing ? 'Processing file...' : 'Choose your catalog file'}</span>
+                                        <p className="text-sm text-gray-500 max-w-xs mx-auto">
+                                            Select an Excel file to begin the reconciliation process. We support partial updates.
+                                        </p>
+                                        {isAnalyzing && (
+                                            <div className="flex items-center gap-2 text-blue-600 text-sm font-medium animate-pulse mt-2">
+                                                <Loader2 className="animate-spin" size={16} />
+                                                {analysisStatus}
+                                            </div>
+                                        )}
+                                    </label>
+                                </div>
+                            </>
                         )}
-                        {uploadSuccess && (
-                            <div className="p-3 bg-green-50 text-green-700 rounded-lg flex items-center gap-2 text-sm">
-                                <Check size={16} /> Catalog imported successfully!
-                            </div>
-                        )}
 
-                        {/* File Metadata & Analysis Status */}
-                        {fileMetadata && !comparisonSummary && !uploadSuccess && (
-                            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3 animate-in fade-in">
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                    <div>
-                                        <div className="text-gray-500 mb-1">File Name</div>
-                                        <div className="font-medium text-gray-900 truncate" title={fileMetadata.name}>{fileMetadata.name}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-gray-500 mb-1">Size</div>
-                                        <div className="font-medium text-gray-900">{fileMetadata.size}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-gray-500 mb-1">Detected Brand</div>
-                                        <div className="font-medium text-blue-600 truncate">{fileMetadata.brand}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-gray-500 mb-1">Parsed Rows</div>
-                                        <div className="font-medium text-gray-900">{fileMetadata.rows}</div>
+                        {importStep === 'MAPPING' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg flex items-start gap-3">
+                                    <AlertCircle className="text-blue-600 shrink-0 mt-0.5" size={18} />
+                                    <div className="text-sm text-blue-800">
+                                        <p className="font-semibold mb-1">Step 2: Map Your Columns</p>
+                                        <p>Map your spreadsheet columns to system fields. For fields like <b>Labour</b> or <b>Category</b>, you can choose whether to overwrite or preserve existing data if it's already in the system.</p>
                                     </div>
                                 </div>
 
-                                {isAnalyzing && analysisStatus && (
-                                    <div className="flex items-center gap-3 pt-3 border-t border-gray-200 text-blue-700">
-                                        <Loader2 className="animate-spin" size={18} />
-                                        <span className="font-medium text-sm">{analysisStatus}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Summary UI View */}
-                        {comparisonSummary && !uploadSuccess && (
-                            <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
-                                {/* Top Level Summary Card */}
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6">
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Summary</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-                                        <div className="p-4 bg-white rounded-lg border border-gray-200 text-center">
-                                            <div className="text-2xl font-bold text-gray-700">{comparisonSummary.unchangedCount}</div>
-                                            <div className="text-sm text-gray-500 font-medium">Unchanged</div>
-                                        </div>
-                                        <div className="p-4 bg-white rounded-lg border border-blue-200 text-center">
-                                            <div className="text-2xl font-bold text-blue-700">{comparisonSummary.updatedItems.length}</div>
-                                            <div className="text-sm text-blue-600 font-medium">Price Changes</div>
-                                        </div>
-                                        <div className="p-4 bg-white rounded-lg border border-purple-200 text-center">
-                                            <div className="text-2xl font-bold text-purple-700">{comparisonSummary.descriptionChanges?.length || 0}</div>
-                                            <div className="text-sm text-purple-600 font-medium">Desc. Changes</div>
-                                        </div>
-                                        <div className="p-4 bg-white rounded-lg border border-green-200 text-center">
-                                            <div className="text-2xl font-bold text-green-700">{comparisonSummary.newItems.length}</div>
-                                            <div className="text-sm text-green-600 font-medium">New Items</div>
-                                        </div>
-                                        <div className="p-4 bg-white rounded-lg border border-gray-200 text-center" title="These items currently exist in DB but were not in the upload file. They will not be modified or deleted.">
-                                            <div className="text-2xl font-bold text-gray-600">{comparisonSummary.missingItems.length}</div>
-                                            <div className="text-sm text-gray-500 font-medium">Not in Upload</div>
-                                        </div>
-                                        <div className={cn("p-4 bg-white rounded-lg border text-center", (comparisonSummary.duplicates?.length || 0) > 0 ? "border-amber-300 bg-amber-50/30" : "border-gray-200")}>
-                                            <div className={cn("text-2xl font-bold", (comparisonSummary.duplicates?.length || 0) > 0 ? "text-amber-700" : "text-gray-400")}>{comparisonSummary.duplicates?.length || 0}</div>
-                                            <div className={cn("text-sm font-medium", (comparisonSummary.duplicates?.length || 0) > 0 ? "text-amber-700" : "text-gray-500")}>Conflicts</div>
-                                        </div>
-                                        <div className={cn("p-4 bg-white rounded-lg border text-center", comparisonSummary.highImpactChanges.length > 0 ? "border-red-300" : "border-gray-200")}>
-                                            <div className={cn("text-2xl font-bold", comparisonSummary.highImpactChanges.length > 0 ? "text-red-600" : "text-gray-400")}>{comparisonSummary.highImpactChanges.length}</div>
-                                            <div className={cn("text-sm font-medium", comparisonSummary.highImpactChanges.length > 0 ? "text-red-600" : "text-gray-500")}>High-Impact</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Detailed Sections */}
-                                <div className="space-y-4">
-                                    {/* High Impact Section */}
-                                    {comparisonSummary.highImpactChanges.length > 0 && (
-                                        <div className="border border-red-200 rounded-lg overflow-hidden">
-                                            <button
-                                                onClick={() => toggleSection('highImpact')}
-                                                className="w-full px-4 py-3 bg-red-50 hover:bg-red-100 flex items-center justify-between transition-colors"
-                                            >
-                                                <div className="flex items-center gap-2 text-red-800 font-medium">
-                                                    <AlertTriangle size={18} />
-                                                    Important: High-Impact Price Changes ({comparisonSummary.highImpactChanges.length})
-                                                </div>
-                                                {expandedSections.highImpact ? <ChevronUp size={18} className="text-red-500" /> : <ChevronDown size={18} className="text-red-500" />}
-                                            </button>
-
-                                            {expandedSections.highImpact && (
-                                                <div className="p-4 bg-white border-t border-red-100 max-h-80 overflow-y-auto">
-                                                    <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white">
-                                                            <tr>
-                                                                <th className="px-4 py-2">Part Number</th>
-                                                                <th className="px-4 py-2">Description</th>
-                                                                <th className="px-4 py-2 text-right">Old Price</th>
-                                                                <th className="px-4 py-2 text-right">New Price</th>
-                                                                <th className="px-4 py-2 text-right">% Change</th>
-                                                                <th className="px-4 py-2">Explanation</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-red-100">
-                                                            {comparisonSummary.highImpactChanges.map((item, i) => (
-                                                                <tr key={i} className="hover:bg-red-50/50">
-                                                                    <td className="px-4 py-2 font-mono text-xs text-gray-800">{item.partNumber}</td>
-                                                                    <td className="px-4 py-2 text-gray-800">{item.description}</td>
-                                                                    <td className="px-4 py-2 text-right text-gray-500 font-mono">${item.oldPrice.toFixed(2)}</td>
-                                                                    <td className="px-4 py-2 text-right font-medium font-mono">${item.newPrice.toFixed(2)}</td>
-                                                                    <td className="px-4 py-2 text-right">
-                                                                        <span className={cn(
-                                                                            "inline-flex items-center justify-end font-medium w-full",
-                                                                            item.percentChange > 25 ? "text-red-700 bg-red-100 px-2 rounded font-bold" :
-                                                                                item.percentChange > 10 ? "text-amber-700 bg-amber-100 px-2 rounded" :
-                                                                                    "text-gray-600"
-                                                                        )}>
-                                                                            {item.isIncrease ? '▲' : '▼'} {item.percentChange.toFixed(1)}%
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="px-4 py-2 text-xs text-red-700 font-medium">{item.impactReason}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* Price Changes Section */}
-                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                        <button
-                                            onClick={() => toggleSection('priceChanges')}
-                                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                                        >
-                                            <div className="font-medium text-gray-800">
-                                                Price Changes ({comparisonSummary.updatedItems.length})
-                                            </div>
-                                            {expandedSections.priceChanges ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-                                        </button>
-
-                                        {expandedSections.priceChanges && (
-                                            <div className="p-4 bg-white border-t border-gray-200 max-h-80 overflow-y-auto">
-                                                {comparisonSummary.updatedItems.length === 0 ? (
-                                                    <div className="text-gray-500 text-sm text-center py-4">No price changes detected.</div>
-                                                ) : (
-                                                    <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
-                                                            <tr>
-                                                                <th className="px-4 py-2">Part Number</th>
-                                                                <th className="px-4 py-2">Description</th>
-                                                                <th className="px-4 py-2 text-right">Old Price</th>
-                                                                <th className="px-4 py-2 text-right">New Price</th>
-                                                                <th className="px-4 py-2 text-right">% Change</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-gray-100">
-                                                            {comparisonSummary.updatedItems.map((item, i) => (
-                                                                <tr key={i} className="hover:bg-gray-50 cursor-pointer">
-                                                                    <td className="px-4 py-2 font-mono text-xs">{item.partNumber}</td>
-                                                                    <td className="px-4 py-2 text-gray-700">{item.description}</td>
-                                                                    <td className="px-4 py-2 text-right text-gray-500 font-mono">${item.oldPrice.toFixed(2)}</td>
-                                                                    <td className="px-4 py-2 text-right font-medium font-mono">${item.newPrice.toFixed(2)}</td>
-                                                                    <td className="px-4 py-2 text-right">
-                                                                        <span className={cn(
-                                                                            "inline-flex justify-end items-center gap-1 font-medium w-full",
-                                                                            item.percentChange > 25 ? "text-red-700 bg-red-100 px-2 rounded font-bold" :
-                                                                                item.percentChange > 10 ? "text-amber-700 bg-amber-50 px-2 rounded" :
-                                                                                    "text-gray-600"
-                                                                        )}>
-                                                                            {item.isIncrease ? '▲' : '▼'} {item.percentChange.toFixed(1)}%
-                                                                        </span>
-                                                                    </td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Description Changes Section */}
-                                    {comparisonSummary.descriptionChanges?.length > 0 && (
-                                        <div className="border border-purple-200 rounded-lg overflow-hidden">
-                                            <button
-                                                onClick={() => toggleSection('descriptionChanges')}
-                                                className="w-full px-4 py-3 bg-purple-50 hover:bg-purple-100 flex items-center justify-between transition-colors"
-                                            >
-                                                <div className="font-medium text-purple-800">
-                                                    Description Updates ({comparisonSummary.descriptionChanges.length})
-                                                </div>
-                                                {expandedSections.descriptionChanges ? <ChevronUp size={18} className="text-purple-500" /> : <ChevronDown size={18} className="text-purple-500" />}
-                                            </button>
-
-                                            {expandedSections.descriptionChanges && (
-                                                <div className="p-4 bg-white border-t border-purple-100 max-h-80 overflow-y-auto">
-                                                    <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
-                                                            <tr>
-                                                                <th className="px-4 py-2">Part Number</th>
-                                                                <th className="px-4 py-2">Old Description</th>
-                                                                <th className="px-4 py-2">New Description</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-purple-50">
-                                                            {comparisonSummary.descriptionChanges.map((item: any, i: number) => (
-                                                                <tr key={i} className="hover:bg-purple-50/30">
-                                                                    <td className="px-4 py-2 font-mono text-xs text-gray-800">{item.partNumber}</td>
-                                                                    <td className="px-4 py-2 text-gray-400 italic line-through">{item.oldDescription}</td>
-                                                                    <td className="px-4 py-2 text-purple-700 font-medium">{item.newDescription}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* File Conflicts Section */}
-                                    {comparisonSummary.duplicates?.length > 0 && (
-                                        <div className="border border-amber-200 rounded-lg overflow-hidden">
-                                            <button
-                                                onClick={() => toggleSection('conflicts')}
-                                                className="w-full px-4 py-3 bg-amber-50 hover:bg-amber-100 flex items-center justify-between transition-colors"
-                                            >
-                                                <div className="font-medium text-amber-800 flex items-center gap-2">
-                                                    <AlertCircle size={18} />
-                                                    File Conflicts / Duplicates ({comparisonSummary.duplicates.length})
-                                                </div>
-                                                {expandedSections.conflicts ? <ChevronUp size={18} className="text-amber-500" /> : <ChevronDown size={18} className="text-amber-500" />}
-                                            </button>
-
-                                            {expandedSections.conflicts && (
-                                                <div className="p-4 bg-white border-t border-amber-100">
-                                                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm mb-4">
-                                                        <p className="font-semibold mb-1">Warning: These part numbers appear multiple times in your file with different prices or descriptions.</p>
-                                                        <p>Only the <b>last occurrence</b> in the file will be saved. Please verify which value is correct.</p>
-                                                    </div>
-                                                    <div className="max-h-80 overflow-y-auto">
-                                                        <table className="w-full text-sm text-left">
-                                                            <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
-                                                                <tr>
-                                                                    <th className="px-4 py-2">Part Number</th>
-                                                                    <th className="px-4 py-2">Conflict Details</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-amber-100">
-                                                                {comparisonSummary.duplicates.map((item: any, i: number) => (
-                                                                    <tr key={i} className="hover:bg-amber-50/30">
-                                                                        <td className="px-4 py-2 font-mono text-xs text-gray-800 align-top">{item.partNumber}</td>
-                                                                        <td className="px-4 py-2 space-y-1">
-                                                                            <div className="flex items-center gap-4 text-xs">
-                                                                                <div className="flex-1">
-                                                                                    <span className="text-gray-400 uppercase">First:</span>
-                                                                                    <div className="font-medium text-gray-600">${item.firstValue.price.toFixed(2)} - {item.firstValue.desc}</div>
-                                                                                </div>
-                                                                                <div className="flex-1">
-                                                                                    <span className="text-amber-500 uppercase font-bold">Duplicate:</span>
-                                                                                    <div className="font-bold text-amber-700">${item.duplicateValue.price.toFixed(2)} - {item.duplicateValue.desc}</div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* New Items Section */}
-                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                        <button
-                                            onClick={() => toggleSection('newItems')}
-                                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                                        >
-                                            <div className="font-medium text-gray-800">
-                                                New Items Added ({comparisonSummary.newItems.length})
-                                            </div>
-                                            {expandedSections.newItems ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-                                        </button>
-
-                                        {expandedSections.newItems && (
-                                            <div className="p-4 bg-white border-t border-gray-200 max-h-80 overflow-y-auto">
-                                                {comparisonSummary.newItems.length === 0 ? (
-                                                    <div className="text-gray-500 text-sm text-center py-4">No new items found.</div>
-                                                ) : (
-                                                    <table className="w-full text-sm text-left">
-                                                        <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
-                                                            <tr>
-                                                                <th className="px-4 py-2">Part Number</th>
-                                                                <th className="px-4 py-2">Description</th>
-                                                                <th className="px-4 py-2">Category</th>
-                                                                <th className="px-4 py-2 text-right">Price</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-gray-100">
-                                                            {comparisonSummary.newItems.map((item, i) => (
-                                                                <tr key={i} className="hover:bg-gray-50">
-                                                                    <td className="px-4 py-2 font-mono text-xs">{item.partNumber}</td>
-                                                                    <td className="px-4 py-2 text-gray-700">{item.description}</td>
-                                                                    <td className="px-4 py-2 text-gray-500 text-xs">{item.category}</td>
-                                                                    <td className="px-4 py-2 text-right font-medium font-mono">${item.unitPrice.toFixed(2)}</td>
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Missing Items Section */}
-                                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                        <button
-                                            onClick={() => toggleSection('missingItems')}
-                                            className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between transition-colors"
-                                        >
-                                            <div className="font-medium text-gray-800">
-                                                Items Not Found in Upload ({comparisonSummary.missingItems.length})
-                                            </div>
-                                            {expandedSections.missingItems ? <ChevronUp size={18} className="text-gray-500" /> : <ChevronDown size={18} className="text-gray-500" />}
-                                        </button>
-
-                                        {expandedSections.missingItems && (
-                                            <div className="p-4 bg-white border-t border-gray-200 max-h-80 overflow-y-auto">
-                                                {comparisonSummary.missingItems.length === 0 ? (
-                                                    <div className="text-gray-500 text-sm text-center py-4">No missing items detected. All matching DB items are present in upload.</div>
-                                                ) : (
-                                                    <div className="space-y-3">
-                                                        <div className="p-3 bg-blue-50 text-blue-800 text-sm rounded-lg flex items-center gap-2">
-                                                            <span>ℹ️ These items are in the system but missing from your upload file. <b>They will NOT be deleted or modified.</b></span>
+                                <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                                    <table className="w-full text-sm text-left border-collapse">
+                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                            <tr>
+                                                <th className="px-6 py-3 font-semibold text-gray-900 w-1/3">System Field</th>
+                                                <th className="px-6 py-3 font-semibold text-gray-900">Excel Column (from {fileMetadata?.name})</th>
+                                                <th className="px-6 py-3 font-semibold text-gray-900 text-right">Update Mode</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {[
+                                                { id: 'partNumber', label: 'Part Number', required: true, numeric: false },
+                                                { id: 'description', label: 'Description', required: false, numeric: false },
+                                                { id: 'unitPrice', label: 'Unit Price', required: false, numeric: true },
+                                                { id: 'labourHours', label: 'Labour Hours', required: false, numeric: true },
+                                                { id: 'category1', label: 'Category 1', required: false, numeric: false },
+                                                { id: 'category2', label: 'Category 2', required: false, numeric: false },
+                                                { id: 'category3', label: 'Category 3', required: false, numeric: false },
+                                            ].map((field) => (
+                                                <tr key={field.id} className="hover:bg-gray-50/50">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-gray-900">
+                                                                {field.label}
+                                                                {field.required && <span className="text-red-500 ml-1">*</span>}
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400 uppercase tracking-wider">{field.id}</span>
                                                         </div>
-                                                        <table className="w-full text-sm text-left">
-                                                            <thead className="text-xs text-gray-500 uppercase sticky top-0 bg-white shadow-sm">
-                                                                <tr>
-                                                                    <th className="px-4 py-2">Part Number</th>
-                                                                    <th className="px-4 py-2">Description</th>
-                                                                    <th className="px-4 py-2 text-right">Current Price</th>
-                                                                    <th className="px-4 py-2 text-right">Status</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-gray-100">
-                                                                {comparisonSummary.missingItems.map((item, i) => (
-                                                                    <tr key={i} className="hover:bg-gray-50">
-                                                                        <td className="px-4 py-2 font-mono text-xs">{item.partNumber}</td>
-                                                                        <td className="px-4 py-2 text-gray-700">{item.description}</td>
-                                                                        <td className="px-4 py-2 text-right text-gray-500 font-mono">${item.currentPrice.toFixed(2)}</td>
-                                                                        <td className="px-4 py-2 text-right text-gray-400 italic text-xs">{item.status}</td>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <select
+                                                            value={columnMapping[field.id] || ''}
+                                                            onChange={(e) => setColumnMapping(prev => ({ ...prev, [field.id]: e.target.value }))}
+                                                            className={cn(
+                                                                "w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all",
+                                                                columnMapping[field.id] ? "border-blue-200 bg-blue-50/30 text-blue-900" : "border-gray-200 text-gray-500"
+                                                            )}
+                                                        >
+                                                            <option value="">-- Skip Field --</option>
+                                                            {excelHeaders.map(h => (
+                                                                <option key={h} value={h}>{h}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        {!field.required && columnMapping[field.id] && (
+                                                            <select
+                                                                value={fieldStrategies[field.id] || 'ALWAYS_UPDATE'}
+                                                                onChange={(e) => setFieldStrategies(prev => ({ ...prev, [field.id]: e.target.value as any }))}
+                                                                className="text-xs bg-white border border-gray-200 rounded px-2 py-1 focus:ring-1 focus:ring-blue-500 outline-none"
+                                                            >
+                                                                <option value="ALWAYS_UPDATE">Always Update</option>
+                                                                <option value="FILL_MISSING">Fill Missing Values</option>
+                                                                <option value="PREFER_EXISTING">Prefer Existing</option>
+                                                                <option value="IGNORE">Ignore Incoming</option>
+                                                            </select>
+                                                        )}
+                                                        {field.required && <span className="text-[10px] text-gray-400 font-bold uppercase">Required</span>}
+                                                        {!columnMapping[field.id] && !field.required && <span className="text-[10px] text-gray-400 uppercase">Preserved</span>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-4">
+                                    <button
+                                        onClick={() => setImportStep('UPLOAD')}
+                                        className="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium"
+                                    >
+                                        Go Back
+                                    </button>
+                                    <div className="flex items-center gap-3">
+                                        {Object.keys(columnMapping).length < 1 && (
+                                            <span className="text-xs text-amber-600 font-medium italic">Map at least Part Number</span>
+                                        )}
+                                        <button
+                                            onClick={handleConfirmMapping}
+                                            disabled={!columnMapping.partNumber}
+                                            className="px-8 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold shadow-sm transition-all"
+                                        >
+                                            Confirm & Analyze Data
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {importStep === 'PREVIEW' && comparisonSummary && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+                                {/* Analysis Progress Indicator */}
+                                {isAnalyzing && (
+                                    <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                        <Loader2 className="animate-spin mx-auto text-blue-600 mb-3" size={32} />
+                                        <h3 className="font-semibold text-gray-900">{analysisStatus}</h3>
+                                        <p className="text-sm text-gray-500">This might take a moment depending on the file size.</p>
+                                    </div>
+                                )}
+
+                                {!isAnalyzing && (
+                                    <>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                            <div className="p-5 bg-white border border-gray-200 rounded-xl shadow-sm">
+                                                <div className="text-2xl font-bold text-gray-900">{comparisonSummary.totalUploaded}</div>
+                                                <div className="text-xs text-gray-500 font-medium uppercase tracking-wider">Items in File</div>
+                                            </div>
+                                            <div className="p-5 bg-white border border-blue-200 rounded-xl shadow-sm">
+                                                <div className="text-2xl font-bold text-blue-600">{comparisonSummary.updatedItems.length}</div>
+                                                <div className="text-xs text-blue-500 font-medium uppercase tracking-wider">Items to Update</div>
+                                            </div>
+                                            <div className="p-5 bg-white border border-green-200 rounded-xl shadow-sm">
+                                                <div className="text-2xl font-bold text-green-600">{comparisonSummary.newItems.length}</div>
+                                                <div className="text-xs text-green-500 font-medium uppercase tracking-wider">New Items to Create</div>
+                                            </div>
+                                            <div className="p-5 bg-white border border-gray-200 rounded-xl shadow-sm">
+                                                <div className="text-2xl font-bold text-gray-400">{comparisonSummary.unchangedCount}</div>
+                                                <div className="text-xs text-gray-500 font-medium uppercase tracking-wider">Unchanged Items</div>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {/* Detailed Reconciliation Sections */}
+                                            {comparisonSummary.highImpactChanges.length > 0 && (
+                                                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                                    <div className="flex items-center gap-2 text-red-800 font-bold mb-2">
+                                                        <AlertTriangle size={18} />
+                                                        CRITICAL: {comparisonSummary.highImpactChanges.length} High-Impact Price Changes
+                                                    </div>
+                                                    <p className="text-sm text-red-700 mb-3">These items are used in active calculations and automated rules. Changing their price affects the entire system.</p>
+                                                    <button 
+                                                        onClick={() => toggleSection('highImpact')}
+                                                        className="text-xs font-bold text-red-600 underline"
+                                                    >
+                                                        {expandedSections.highImpact ? 'Hide Details' : 'View Affected Items'}
+                                                    </button>
+                                                    
+                                                    {expandedSections.highImpact && (
+                                                        <div className="mt-4 max-h-60 overflow-y-auto border-t border-red-200 pt-3">
+                                                            <table className="w-full text-xs text-left">
+                                                                <thead>
+                                                                    <tr className="text-red-800 uppercase tracking-tighter">
+                                                                        <th className="py-2">Part No</th>
+                                                                        <th className="py-2 text-right">Old Price</th>
+                                                                        <th className="py-2 text-right">New Price</th>
+                                                                        <th className="py-2 text-right">Change</th>
                                                                     </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-red-100">
+                                                                    {comparisonSummary.highImpactChanges.map((item, i) => (
+                                                                        <tr key={i}>
+                                                                            <td className="py-2 font-mono">{item.partNumber}</td>
+                                                                            <td className="py-2 text-right text-red-400">${item.oldPrice.toFixed(2)}</td>
+                                                                            <td className="py-2 text-right font-bold text-red-700">${item.newPrice.toFixed(2)}</td>
+                                                                            <td className="py-2 text-right text-red-700">+{item.percentChange.toFixed(1)}%</td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                                                <button 
+                                                    onClick={() => toggleSection('priceChanges')}
+                                                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                                                >
+                                                    <div className="text-sm font-semibold flex items-center gap-2">
+                                                        <Database className="text-blue-500" size={16} />
+                                                        Field Change Summary
+                                                    </div>
+                                                    <ChevronDown size={16} />
+                                                </button>
+                                                {expandedSections.priceChanges && (
+                                                    <div className="p-4 border-t border-gray-100">
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            {[
+                                                                 { label: 'Prices Updated', count: comparisonSummary.updatedItems.filter(i => i.changedFields.includes('unitPrice')).length },
+                                                                { label: 'Labour Hours Updated', count: comparisonSummary.updatedItems.filter(i => i.changedFields.includes('labourHours')).length },
+                                                                { label: 'Descriptions Updated', count: comparisonSummary.updatedItems.filter(i => i.changedFields.includes('description')).length },
+                                                                { label: 'Incomplete Records (No Description)', count: comparisonSummary.newItems.filter(i => i.missingDescription).length },
+                                                            ].map(stat => (
+                                                                <div key={stat.label} className={cn(
+                                                                    "flex items-center justify-between text-sm p-2 rounded",
+                                                                    stat.label.includes('Incomplete') && stat.count > 0 ? "bg-amber-50 text-amber-700" : "bg-gray-50 text-gray-600"
+                                                                )}>
+                                                                    <span>{stat.label}</span>
+                                                                    <span className="font-bold">{stat.count}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
+                                        </div>
 
-                                {/* Confirmation & Apply Actions */}
-                                <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl mt-6 space-y-4">
-                                    {comparisonSummary.highImpactChanges.length > 0 && (
-                                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800">
-                                            <AlertTriangle size={20} className="shrink-0 mt-0.5" />
-                                            <div className="text-sm">
-                                                <p className="font-semibold mb-1">Some price changes affect automated board logic. Please review carefully.</p>
-                                                <p>These prices automatically cascade to existing active quotes and automations.</p>
+                                        <div className="p-6 bg-gray-900 text-white rounded-xl shadow-lg mt-8 flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-inner">
+                                                    <Check size={24} />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-bold">Ready to Commit</h3>
+                                                    <p className="text-gray-400 text-sm">System will perform an incremental reconciliation using the mapped strategies.</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setImportStep('MAPPING')}
+                                                    className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                                                >
+                                                    Edit Mapping
+                                                </button>
+                                                <button
+                                                    onClick={handleImport}
+                                                    disabled={uploading}
+                                                    className="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-all flex items-center gap-2 shadow-blue-900/20 shadow-xl"
+                                                >
+                                                    {uploading ? <Loader2 className="animate-spin" size={20} /> : <Database size={20} />}
+                                                    {uploading ? `Processing (${uploadProgress}%)...` : 'Confirm & Reconcile Catalog'}
+                                                </button>
                                             </div>
                                         </div>
-                                    )}
-
-                                    <div className="flex items-center justify-end gap-3 pt-4">
-                                        <button
-                                            onClick={() => {
-                                                setComparisonSummary(null);
-                                                setPreviewItems([]);
-                                                setFileMetadata(null);
-                                                const inputEl = document.getElementById('catalog-upload') as HTMLInputElement;
-                                                if (inputEl) inputEl.value = '';
-                                            }}
-                                            className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-                                        >
-                                            Cancel Upload
-                                        </button>
-                                        <button
-                                            onClick={handleImport}
-                                            disabled={uploading}
-                                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 font-medium transition-colors shadow-sm"
-                                        >
-                                            {uploading ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />}
-                                            {uploading ? 'Applying Updates...' : 'Confirm & Apply Changes'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Upload progress shown cleanly here during application */}
-                                {uploading && (
-                                    <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2 overflow-hidden">
-                                        <div
-                                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                                            style={{ width: `${uploadProgress}%` }}
-                                        ></div>
-                                        <p className="text-xs text-gray-500 mt-1 text-right">{uploadProgress}% Complete</p>
-                                    </div>
+                                    </>
                                 )}
+                            </div>
+                        )}
+
+                        {importStep === 'SUCCESS' && (
+                            <div className="text-center py-12 animate-in zoom-in-95">
+                                <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                    <Check size={40} />
+                                </div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Reconciliation Complete!</h2>
+                                <p className="text-gray-600 max-w-md mx-auto mb-8">
+                                    The catalog has been incrementally updated. Enriched fields were preserved where specified, and audit logs have been recorded.
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        setImportStep('UPLOAD');
+                                        setComparisonSummary(null);
+                                        setPreviewItems([]);
+                                        setFileMetadata(null);
+                                    }}
+                                    className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-colors"
+                                >
+                                    Finish & Close
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Error Messages */}
+                        {uploadError && (
+                            <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-xl flex items-start gap-3 animate-in shake">
+                                <AlertCircle className="shrink-0 mt-0.5" size={20} />
+                                <div className="text-sm">
+                                    <p className="font-bold mb-1">Upload Error</p>
+                                    <p>{uploadError}</p>
+                                </div>
                             </div>
                         )}
                     </div>

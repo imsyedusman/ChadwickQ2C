@@ -233,26 +233,28 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { items } = body;
+        const { items, metadata } = body;
 
         if (!Array.isArray(items)) {
             return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
         }
 
-        console.log(`Attempting to import ${items.length} items...`);
+        console.log(`[Catalog/Import] Starting import for ${items.length} items. Metadata:`, metadata);
 
         let createdCount = 0;
         let updatedCount = 0;
+        let fieldsChangedCount = 0;
 
         await prisma.$transaction(async (tx) => {
             for (const item of items) {
                 if (!item.partNumber) {
+                    // Create items without part number (unlikely but supported)
                     await tx.catalogItem.create({
                         data: {
                             brand: item.brand,
                             category: item.category,
                             subcategory: item.subcategory,
-                            description: item.description,
+                            description: item.description || 'No Description',
                             unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
                             labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
                             notes: item.notes,
@@ -271,26 +273,68 @@ export async function POST(request: Request) {
                 });
 
                 if (existing) {
-                    await tx.catalogItem.update({
-                        where: { id: existing.id },
-                        data: {
-                            brand: item.brand, // Update brand casing if it changed
-                            category: item.category,
-                            subcategory: item.subcategory,
-                            unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
-                            labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
-                            description: item.description, // Allow description updates
+                    // --- PARTIAL UPDATE LOGIC ---
+                    const updateData: any = {};
+                    let itemChanged = false;
+                    const strategies = body.strategies || {}; // { unitPrice: 'OVERWRITE', labourHours: 'PATCH', ... }
+
+                    // Helper to build partial update
+                    const applyUpdate = (field: string, incoming: any, existingVal: any, isNumeric = false) => {
+                        const strategy = strategies[field] || 'ALWAYS_UPDATE';
+                        if (strategy === 'IGNORE') return;
+                        
+                        // If strategy is FILL_MISSING or PREFER_EXISTING, only proceed if existing is "empty" (0 or blank)
+                        if (strategy === 'FILL_MISSING' || strategy === 'PREFER_EXISTING') {
+                            if (isNumeric && existingVal > 0) return;
+                            if (!isNumeric && String(existingVal || '').trim() !== '') return;
                         }
-                    });
-                    updatedCount++;
+
+                        if (incoming === undefined || incoming === null || incoming === '' || incoming === 'null' || incoming === 'undefined') {
+                            return;
+                        }
+                        
+                        if (isNumeric) {
+                            const val = typeof incoming === 'number' ? incoming : parseFloat(String(incoming));
+                            if (isNaN(val)) return;
+                            if (Math.round(val * 100) !== Math.round((existingVal || 0) * 100)) {
+                                updateData[field] = val;
+                                fieldsChangedCount++;
+                                itemChanged = true;
+                            }
+                        } else {
+                            const val = String(incoming).trim();
+                            if (val && val !== (existingVal || '').trim()) {
+                                updateData[field] = val;
+                                fieldsChangedCount++;
+                                itemChanged = true;
+                            }
+                        }
+                    };
+
+                    applyUpdate('unitPrice', item.unitPrice, existing.unitPrice, true);
+                    applyUpdate('labourHours', item.labourHours, existing.labourHours, true);
+                    applyUpdate('description', item.description, existing.description);
+                    applyUpdate('category', item.category, existing.category);
+                    applyUpdate('subcategory', item.subcategory, existing.subcategory);
+                    applyUpdate('meterType', item.meterType, existing.meterType);
+                    applyUpdate('notes', item.notes, existing.notes);
+
+                    if (itemChanged) {
+                        await tx.catalogItem.update({
+                            where: { id: existing.id },
+                            data: updateData
+                        });
+                        updatedCount++;
+                    }
                 } else {
+                    // New Item - Description is now optional, fallback to Part Number
                     await tx.catalogItem.create({
                         data: {
                             brand: item.brand,
                             category: item.category,
                             subcategory: item.subcategory,
                             partNumber: item.partNumber,
-                            description: item.description,
+                            description: (item.description || item.partNumber || 'Incomplete Record').trim(),
                             unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : 0,
                             labourHours: typeof item.labourHours === 'number' ? item.labourHours : 0,
                             notes: item.notes,
@@ -300,11 +344,24 @@ export async function POST(request: Request) {
                     createdCount++;
                 }
             }
+
+            // --- AUDIT LOGGING ---
+            await tx.catalogImport.create({
+                data: {
+                    filename: metadata?.filename || 'manual_upload',
+                    brand: metadata?.brand || 'Multiple',
+                    userId: session.user.id,
+                    itemsCreated: createdCount,
+                    itemsUpdated: updatedCount,
+                    fieldsChangedCount: fieldsChangedCount,
+                    status: 'SUCCESS'
+                }
+            });
         });
 
-        console.log(`Successfully imported. Created: ${createdCount}, Updated: ${updatedCount}.`);
+        console.log(`Successfully imported. Created: ${createdCount}, Updated: ${updatedCount}, Fields Changed: ${fieldsChangedCount}.`);
 
-        return NextResponse.json({ count: createdCount + updatedCount, created: createdCount, updated: updatedCount });
+        return NextResponse.json({ count: createdCount + updatedCount, created: createdCount, updated: updatedCount, fieldsChanged: fieldsChangedCount });
     } catch (error) {
         console.error('Catalog Import Error:', error);
         return NextResponse.json({ error: 'Failed to import catalog', details: String(error) }, { status: 500 });

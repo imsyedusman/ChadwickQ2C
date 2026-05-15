@@ -88,34 +88,68 @@ export async function POST(request: Request) {
             if (!existingItem) {
                 newItems.push({
                     partNumber: uploadItem.partNumber,
-                    description: uploadItem.description,
+                    description: uploadItem.description || '',
                     category: uploadItem.category,
-                    unitPrice: uploadItem.unitPrice
+                    unitPrice: uploadItem.unitPrice,
+                    missingDescription: !uploadItem.description || String(uploadItem.description).trim() === ''
                 });
                 continue;
             }
 
-            // 4. Comparison
-            const oldPrice = Math.round((existingItem.unitPrice || 0) * 100);
-            const newPrice = Math.round((uploadItem.unitPrice || 0) * 100);
-            const isDescChanged = existingItem.description !== uploadItem.description;
+            // 4. Detailed Field Comparison
+            const changes: string[] = [];
+            const preserved: string[] = [];
+            
+            // Numeric validation & comparison
+            const compareNumeric = (field: string, incoming: any, existing: any) => {
+                const newVal = typeof incoming === 'number' ? incoming : parseFloat(String(incoming || ''));
+                const oldVal = existing || 0;
+                
+                if (isNaN(newVal) || incoming === null || incoming === undefined || incoming === '') {
+                    preserved.push(field);
+                    return { changed: false, value: oldVal };
+                }
+                
+                if (Math.round(newVal * 100) !== Math.round(oldVal * 100)) {
+                    changes.push(field);
+                    return { changed: true, value: newVal, old: oldVal };
+                }
+                return { changed: false, value: oldVal };
+            };
 
-            if (oldPrice !== newPrice) {
-                const oldPriceFloat = oldPrice / 100;
-                const newPriceFloat = newPrice / 100;
-                const delta = Math.abs(newPriceFloat - oldPriceFloat);
-                const percentChange = oldPriceFloat > 0 ? (delta / oldPriceFloat) * 100 : (newPriceFloat > 0 ? 100 : 0);
+            // String validation & comparison
+            const compareString = (field: string, incoming: any, existing: any) => {
+                const newVal = String(incoming || '').trim();
+                const oldVal = String(existing || '').trim();
+                
+                if (!newVal) {
+                    preserved.push(field);
+                    return { changed: false, value: oldVal };
+                }
+                
+                if (newVal !== oldVal) {
+                    changes.push(field);
+                    return { changed: true, value: newVal, old: oldVal };
+                }
+                return { changed: false, value: oldVal };
+            };
 
+            const priceRes = compareNumeric('unitPrice', uploadItem.unitPrice, existingItem.unitPrice);
+            const labourRes = compareNumeric('labourHours', uploadItem.labourHours, existingItem.labourHours);
+            const descRes = compareString('description', uploadItem.description, existingItem.description);
+            const subcatRes = compareString('subcategory', uploadItem.subcategory, existingItem.subcategory);
+
+            if (changes.length > 0) {
                 const changeRecord = {
                     partNumber: uploadItem.partNumber,
                     description: uploadItem.description,
                     oldDescription: existingItem.description,
-                    isDescChanged,
-                    oldPrice: oldPriceFloat,
-                    newPrice: newPriceFloat,
-                    delta: delta,
-                    percentChange: percentChange,
-                    isIncrease: newPrice > oldPrice
+                    changedFields: changes,
+                    preservedFields: preserved,
+                    oldPrice: existingItem.unitPrice,
+                    newPrice: priceRes.value,
+                    percentChange: priceRes.changed ? (existingItem.unitPrice > 0 ? (Math.abs(priceRes.value - existingItem.unitPrice) / existingItem.unitPrice) * 100 : 100) : 0,
+                    isIncrease: priceRes.value > existingItem.unitPrice
                 };
 
                 updatedItems.push(changeRecord);
@@ -128,7 +162,7 @@ export async function POST(request: Request) {
                     automationPartNumbers.has(uploadItem.partNumber) ||
                     Boolean(existingItem.components && typeof existingItem.components === 'object' && Object.keys(existingItem.components).length > 0);
 
-                if (isHighImpact) {
+                if (isHighImpact && changes.includes('unitPrice')) {
                     let impactReason = "This item is used in automated board calculations.";
                     if (existingItem.isCopperPriced) {
                         impactReason = "This item's price affects dynamic copper calculations.";
@@ -141,13 +175,6 @@ export async function POST(request: Request) {
                         impactReason
                     });
                 }
-            } else if (isDescChanged) {
-                descriptionChanges.push({
-                    partNumber: uploadItem.partNumber,
-                    oldDescription: existingItem.description,
-                    newDescription: uploadItem.description,
-                    price: uploadItem.unitPrice
-                });
             } else {
                 unchangedCount++;
             }
@@ -167,17 +194,13 @@ export async function POST(request: Request) {
         });
 
         // 7. Sort rules
-        updatedItems.sort((a, b) => b.percentChange - a.percentChange);
-        highImpactChanges.sort((a, b) => b.percentChange - a.percentChange);
-
-        // 7. Sort rules
-        updatedItems.sort((a, b) => b.percentChange - a.percentChange);
-        highImpactChanges.sort((a, b) => b.percentChange - a.percentChange);
+        updatedItems.sort((a, b) => (b.percentChange || 0) - (a.percentChange || 0));
+        highImpactChanges.sort((a, b) => (b.percentChange || 0) - (a.percentChange || 0));
 
         return NextResponse.json({
             summary: {
                 updatedItems,
-                descriptionChanges,
+                descriptionChanges: updatedItems.filter(i => i.changedFields.includes('description')),
                 newItems,
                 missingItems,
                 duplicates,
