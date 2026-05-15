@@ -14,8 +14,8 @@ interface CatalogItem {
     subcategory: string;
     partNumber: string;
     description: string;
-    unitPrice: number;
-    labourHours: number;
+    unitPrice: number | null;
+    labourHours: number | null;
     meterType?: string | null;
 }
 

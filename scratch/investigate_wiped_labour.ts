@@ -28,7 +28,7 @@ async function main() {
         updatedAt: i.updatedAt.toISOString()
     })));
 
-    const recentImports = await prisma.catalogImport.findMany({
+    const recentImports = await (prisma as any).catalogImport.findMany({
         orderBy: { timestamp: 'desc' },
         take: 5
     });

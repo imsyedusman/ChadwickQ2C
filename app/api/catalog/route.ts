@@ -346,7 +346,7 @@ export async function POST(request: Request) {
             }
 
             // --- AUDIT LOGGING ---
-            await tx.catalogImport.create({
+            await (tx as any).catalogImport.create({
                 data: {
                     filename: metadata?.filename || 'manual_upload',
                     brand: metadata?.brand || 'Multiple',
