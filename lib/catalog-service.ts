@@ -131,12 +131,32 @@ export function classifyCatalogItem(
     // Standardize Switchboard Hierarchy: Prepend "Miscellaneous > " if not a primary category
     if (masterCategory === 'Switchboard') {
         const L1_TARGETS = ['Circuit Breakers', 'Switches', 'Miscellaneous'];
-        const firstSegment = subcategory.split(' > ')[0];
+        let parts = subcategory.split(' > ').map(s => s.trim()).filter(Boolean);
         
-        if (firstSegment && !L1_TARGETS.includes(firstSegment)) {
+        if (parts.length > 0 && !L1_TARGETS.includes(parts[0])) {
             // It belongs under Miscellaneous
-            subcategory = `Miscellaneous > ${subcategory}`;
+            parts = ['Miscellaneous', ...parts];
         }
+
+        // Nested Accessories for Circuit Breakers
+        if (parts[0] === 'Circuit Breakers') {
+            const cbAccessoryMappings: Record<string, string[]> = {
+                'ACB Accessories': ['ACB', 'ACB Accessories'],
+                'ATS Accessories': ['ATS', 'ATS Accessories'],
+                'MCB Accessories': ['MCB', 'MCB Accessories']
+            };
+
+            const l2 = parts[1];
+            if (cbAccessoryMappings[l2]) {
+                parts.splice(1, 1, ...cbAccessoryMappings[l2]);
+            } else if (l2 === 'ATS' && parts[2] === 'Accessories') {
+                parts[2] = 'ATS Accessories';
+            } else if (l2 === 'MCB' && parts[2] === 'Accessories') {
+                parts[2] = 'MCB Accessories';
+            }
+        }
+
+        subcategory = parts.join(' > ');
     }
 
     // 4. Determine Pricing Metadata (Copper)

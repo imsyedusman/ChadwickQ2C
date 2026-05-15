@@ -332,12 +332,28 @@ export async function PATCH(request: Request) {
             });
 
             let updatedCount = 0;
+            const stats = {
+                moved: 0,
+                skipped: 0,
+                malformed: 0,
+                details: {} as Record<string, number>
+            };
+
+            const cbAccessoryMappings: Record<string, string[]> = {
+                'ACB Accessories': ['ACB', 'ACB Accessories'],
+                'ATS Accessories': ['ATS', 'ATS Accessories'],
+                'MCB Accessories': ['MCB', 'MCB Accessories']
+            };
+
             for (const item of items) {
                 const sub = item.subcategory || '';
-                if (!sub) continue;
+                if (!sub) {
+                    stats.malformed++;
+                    continue;
+                }
 
                 let parts = sub.split(' > ').map(s => s.trim()).filter(Boolean);
-                const originalParts = [...parts];
+                const originalPath = parts.join(' > ');
 
                 // 1. Map Names
                 parts = parts.map(p => {
@@ -356,6 +372,31 @@ export async function PATCH(request: Request) {
                     } else if (!L1_TARGETS.includes(parts[0])) {
                         parts = ['Miscellaneous', ...parts];
                     }
+
+                    // --- CB Accessory Nesting Migration ---
+                    if (parts[0] === 'Circuit Breakers') {
+                        const l2 = parts[1];
+                        
+                        // Rule: L2 -> L2 > L3 (e.g. ACB Accessories -> ACB > ACB Accessories)
+                        if (cbAccessoryMappings[l2]) {
+                            const source = `Circuit Breakers > ${l2}`;
+                            parts.splice(1, 1, ...cbAccessoryMappings[l2]);
+                            const target = parts.join(' > ');
+                            stats.details[source] = (stats.details[source] || 0) + 1;
+                        } 
+                        // Rule: ATS > Accessories -> ATS > ATS Accessories
+                        else if (l2 === 'ATS' && parts[2] === 'Accessories') {
+                            const source = `Circuit Breakers > ATS > Accessories`;
+                            parts[2] = 'ATS Accessories';
+                            stats.details[source] = (stats.details[source] || 0) + 1;
+                        }
+                        // Rule: MCB > Accessories -> MCB > MCB Accessories
+                        else if (l2 === 'MCB' && parts[2] === 'Accessories') {
+                            const source = `Circuit Breakers > MCB > Accessories`;
+                            parts[2] = 'MCB Accessories';
+                            stats.details[source] = (stats.details[source] || 0) + 1;
+                        }
+                    }
                 }
 
                 // 3. Busbar Specifics
@@ -368,16 +409,27 @@ export async function PATCH(request: Request) {
                 }
 
                 const newSub = parts.join(' > ');
-                if (newSub !== sub) {
+                if (newSub !== originalPath) {
                     await prisma.catalogItem.update({
                         where: { id: item.id },
                         data: { subcategory: newSub }
                     });
                     updatedCount++;
+                    stats.moved++;
+                } else {
+                    stats.skipped++;
                 }
             }
 
-            return NextResponse.json({ message: `Standardized ${updatedCount} items.`, count: updatedCount });
+            const summary = Object.entries(stats.details)
+                .map(([src, count]) => `Moved ${count} items from "${src}" to its new nested location.`)
+                .join(' ');
+
+            return NextResponse.json({ 
+                message: `Standardization complete. ${updatedCount} items updated. ${summary}`, 
+                count: updatedCount,
+                stats: stats
+            });
         }
 
         if (action === 'reclassify') {
