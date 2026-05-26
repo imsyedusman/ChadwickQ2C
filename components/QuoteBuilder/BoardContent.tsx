@@ -158,7 +158,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         if (sectionToExpand) {
             setCollapsedSections(prev => ({
                 ...prev,
-                [sectionToExpand]: false
+                [sectionToExpand]: false // false means expanded
             }));
             
             // Optional: Scroll to section
@@ -231,7 +231,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
     const toggleSection = (key: string) => {
         setCollapsedSections(prev => ({
             ...prev,
-            [key]: !prev[key]
+            [key]: prev[key] !== false ? false : true
         }));
     };
 
@@ -698,7 +698,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                 {keys.map(key => {
                     const node = nodes[key];
                     const nodeKey = `${isBasics ? 'Basics' : 'Switchboard'}-${node.fullPath}`;
-                    const isNodeCollapsed = collapsedSections[nodeKey] === true;
+                    const isNodeCollapsed = collapsedSections[nodeKey] !== false;
 
                     // Sort items in this node
                     const sortedItems = [...node.items].sort(compareItems);
@@ -847,7 +847,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     const subcatItems = groupedBySubcat[subcat].sort(compareItems);
 
                     const subcatKey = `${isBasics ? 'Basics' : 'Switchboard'}-${subcat}`;
-                    const isSubcatCollapsed = collapsedSections[subcatKey];
+                    const isSubcatCollapsed = collapsedSections[subcatKey] !== false;
 
                     return (
                         <div key={subcat}>
@@ -938,10 +938,10 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                                 let likelyCategory: 'Basics' | 'Switchboard' | 'Busbar' | undefined = undefined;
 
                                 // Priority: Basics > Switchboard > Busbar
-                                // collapseSections[key] === false (or undefined) means Expanded
-                                if (!collapsedSections['Basics']) likelyCategory = 'Basics';
-                                else if (!collapsedSections['Switchboard']) likelyCategory = 'Switchboard';
-                                else if (!collapsedSections['Busbar']) likelyCategory = 'Busbar';
+                                // collapsedSections[key] === false means Expanded
+                                if (collapsedSections['Basics'] === false) likelyCategory = 'Basics';
+                                else if (collapsedSections['Switchboard'] === false) likelyCategory = 'Switchboard';
+                                else if (collapsedSections['Busbar'] === false) likelyCategory = 'Busbar';
 
                                 onAddItems?.(likelyCategory);
                             }}
@@ -1122,7 +1122,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         const categoryItems = groupedByMasterCategory[masterCat] || [];
                         if (categoryItems.length === 0 && masterCat !== 'Other') return null;
 
-                        const isMasterCollapsed = collapsedSections[masterCat];
+                        const isMasterCollapsed = collapsedSections[masterCat] !== false;
 
                         return (
                             <div key={masterCat} id={`section-${masterCat}`} className="border border-gray-200 rounded-lg overflow-hidden">
