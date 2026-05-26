@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Chadwick Quotes",
   description: "Modern quoting system for Chadwick Switchboards",
+  icons: {
+    icon: '/chadwick-favicon.png',
+  },
 };
 
 import { NextAuthProvider } from "@/components/Shared/NextAuthProvider";
