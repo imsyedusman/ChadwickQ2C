@@ -7,13 +7,13 @@ import { formatCurrency, formatQuantity } from '../utils';
 import { resolveCostCategory } from '../items/categorization';
 import path from 'path';
 
-// Define fonts with absolute paths for Node runtime consistency
+// Define standard fonts to avoid ENOENT errors on VPS deployments
 const fonts = {
-    Roboto: {
-        normal: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Regular.ttf'),
-        bold: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Medium.ttf'),
-        italics: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-Italic.ttf'),
-        bolditalics: path.join(process.cwd(), 'assets', 'fonts', 'Roboto-MediumItalic.ttf')
+    Helvetica: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique'
     }
 };
 
@@ -241,7 +241,7 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
             },
             defaultStyle: {
                 fontSize: 8,
-                font: 'Roboto'
+                font: 'Helvetica'
             }
         };
 
