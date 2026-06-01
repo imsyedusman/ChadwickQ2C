@@ -7,13 +7,14 @@ import { formatCurrency, formatQuantity } from '../utils';
 import { resolveCostCategory } from '../items/categorization';
 import path from 'path';
 
-// Define standard fonts to avoid ENOENT errors on VPS deployments
+// Define fonts with absolute paths pointing to the 'public' directory
+// The 'public' directory is copied over in Next.js standalone mode (unlike 'assets')
 const fonts = {
-    Helvetica: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique'
+    Roboto: {
+        normal: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Regular.ttf'),
+        bold: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Medium.ttf'),
+        italics: path.join(process.cwd(), 'public', 'fonts', 'Roboto-Italic.ttf'),
+        bolditalics: path.join(process.cwd(), 'public', 'fonts', 'Roboto-MediumItalic.ttf')
     }
 };
 
@@ -241,7 +242,7 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
             },
             defaultStyle: {
                 fontSize: 8,
-                font: 'Helvetica'
+                font: 'Roboto'
             }
         };
 
