@@ -127,6 +127,17 @@ export async function GET(
 
     } catch (error) {
         console.error('Failed to export BOM', error);
-        return new NextResponse('Failed to export BOM', { status: 500 });
+        
+        // Return detailed error response for debugging VPS issues
+        const errorDetails = {
+            error: 'Failed to export BOM',
+            message: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined
+        };
+        
+        return new NextResponse(JSON.stringify(errorDetails), { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 }
