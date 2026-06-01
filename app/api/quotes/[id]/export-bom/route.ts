@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { generateCanonicalBOM, QuoteBOM, CanonicalBOM } from '@/lib/bom-engine';
 import { generateCSV } from '@/lib/bom-exporters/csv';
 import { generatePDF } from '@/lib/bom-exporters/pdf';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export const runtime = 'nodejs';
 
@@ -63,9 +64,21 @@ export async function GET(
         });
 
         // 4. Generate CanonicalBOM for each board
-        const canonicalBoards: CanonicalBOM[] = quote.boards.map(board => 
-            generateCanonicalBOM(board.items as any, brandLookup, board.name)
-        );
+        const canonicalBoards: CanonicalBOM[] = quote.boards.map(board => {
+            let enclosureType = null;
+            if (board.config) {
+                try {
+                    const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                    enclosureType = config.enclosureType || null;
+                } catch (e) {
+                    // Ignore parsing errors
+                }
+            }
+            return generateCanonicalBOM(board.items as any, brandLookup, board.name, enclosureType);
+        });
+
+        // 4.5. Calculate Full Quote Pricing
+        const pricing = await calculateQuoteTotalsServerSide(quote);
 
         // 5. Calculate Grand Totals
         let totalMaterialCost = 0;
@@ -83,8 +96,10 @@ export async function GET(
             projectName: quote.projectRef || quote.project?.projectName || null,
             boards: canonicalBoards,
             grandTotals: {
-                totalMaterialCost,
-                totalLabourHours
+                totalMaterialCost: pricing.grandTotals.materialCost,
+                totalLabourHours: pricing.grandTotals.labourHours,
+                totalLabourCost: pricing.grandTotals.labourCost,
+                totalSellingPrice: pricing.grandTotals.finalSellPrice
             },
             timestamp: new Date().toISOString()
         };

@@ -20,6 +20,7 @@ export interface CanonicalBOM {
     };
     meta: {
         boardName: string;
+        boardType?: string | null;
         timestamp: string;
     };
 }
@@ -33,6 +34,8 @@ export interface QuoteBOM {
     grandTotals: {
         totalMaterialCost: number;
         totalLabourHours: number;
+        totalLabourCost?: number;
+        totalSellingPrice?: number;
     };
     timestamp: string;
 }
@@ -45,7 +48,8 @@ export interface QuoteBOM {
 export function generateCanonicalBOM(
     items: Item[],
     brandLookup: Record<string, string>,
-    boardName: string
+    boardName: string,
+    boardType?: string | null
 ): CanonicalBOM {
     const consolidated = consolidateItems(items).filter(i => i.subcategory !== 'Price Adjustment');
     
@@ -79,6 +83,7 @@ export function generateCanonicalBOM(
         },
         meta: {
             boardName,
+            boardType,
             timestamp: new Date().toISOString()
         }
     };

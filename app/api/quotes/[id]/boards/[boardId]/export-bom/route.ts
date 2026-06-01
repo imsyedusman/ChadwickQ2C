@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { generateCanonicalBOM, QuoteBOM } from '@/lib/bom-engine';
 import { generateCSV } from '@/lib/bom-exporters/csv';
 import { generatePDF } from '@/lib/bom-exporters/pdf';
+import { calculateQuoteTotalsServerSide } from '@/lib/pricing-service';
 
 export const runtime = 'nodejs'; // Required for pdfmake
 
@@ -23,7 +24,10 @@ export async function GET(
                 quote: {
                     include: {
                         project: true,
-                        client: true
+                        client: true,
+                        boards: {
+                            include: { items: true }
+                        }
                     }
                 }
             }
@@ -62,7 +66,18 @@ export async function GET(
         }
 
         // 5. Generate Canonical Model for this board
-        const canonicalModel = generateCanonicalBOM(board.items as any, brandLookup, board.name);
+        let enclosureType = null;
+        if (board.config) {
+            try {
+                const config = typeof board.config === 'string' ? JSON.parse(board.config) : board.config;
+                enclosureType = config.enclosureType || null;
+            } catch (e) { }
+        }
+        const canonicalModel = generateCanonicalBOM(board.items as any, brandLookup, board.name, enclosureType);
+
+        // 5.5 Fetch Pricing
+        const pricing = await calculateQuoteTotalsServerSide(quote);
+        const boardPricing = pricing.boardTotals[board.id];
 
         // 6. Wrap in QuoteBOM (Multi-board structure)
         const quoteBOM: QuoteBOM = {
@@ -72,8 +87,10 @@ export async function GET(
             projectName: quote.projectRef || quote.project?.projectName || null,
             boards: [canonicalModel],
             grandTotals: {
-                totalMaterialCost: canonicalModel.totals.totalMaterialCost,
-                totalLabourHours: canonicalModel.totals.totalLabourHours
+                totalMaterialCost: boardPricing?.materialCost || canonicalModel.totals.totalMaterialCost,
+                totalLabourHours: boardPricing?.labourHours || canonicalModel.totals.totalLabourHours,
+                totalLabourCost: boardPricing?.labourCost || 0,
+                totalSellingPrice: boardPricing?.sellPriceRounded || 0
             },
             timestamp: new Date().toISOString()
         };
