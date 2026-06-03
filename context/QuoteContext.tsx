@@ -165,6 +165,8 @@ interface QuoteContextType {
     updateBoardDetails: (boardId: string, updates: Partial<Board>) => Promise<void>;
     viewMode: 'raw' | 'consolidated';
     setViewMode: (mode: 'raw' | 'consolidated') => void;
+    presentationMode: 'standard' | 'estimator';
+    setPresentationMode: (mode: 'standard' | 'estimator') => void;
 }
 
 const QuoteContext = createContext<QuoteContextType | undefined>(undefined);
@@ -197,6 +199,13 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
     const setViewMode = (mode: 'raw' | 'consolidated') => {
         _setViewMode(mode);
         updateUiState('viewMode', mode);
+    };
+
+    const [presentationMode, _setPresentationMode] = useState<'standard' | 'estimator'>('standard');
+
+    const setPresentationMode = (mode: 'standard' | 'estimator') => {
+        _setPresentationMode(mode);
+        updateUiState('presentationMode', mode);
     };
     const [metadata, setMetadata] = useState({
         quoteNumber: '',
@@ -341,7 +350,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     setSelectedBoardId(boardToSelect);
                 }
 
-                // Restore viewMode
+                // Restore viewMode and presentationMode
                 try {
                     const storageKey = `chadwick_ui_state_${quoteId}`;
                     const savedState = localStorage.getItem(storageKey);
@@ -349,6 +358,9 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                         const parsed = JSON.parse(savedState);
                         if (parsed.viewMode) {
                             _setViewMode(parsed.viewMode);
+                        }
+                        if (parsed.presentationMode) {
+                            _setPresentationMode(parsed.presentationMode);
                         }
                     }
                 } catch (e) {}
@@ -780,6 +792,8 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateBoardDetails,
                 viewMode,
                 setViewMode,
+                presentationMode,
+                setPresentationMode,
             }}
         >
             {children}

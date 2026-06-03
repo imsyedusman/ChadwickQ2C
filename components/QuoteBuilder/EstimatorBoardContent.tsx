@@ -1,0 +1,661 @@
+import React, { useMemo, useState, useEffect } from 'react';
+import { Item, useQuote } from '@/context/QuoteContext';
+import { Search, ChevronUp, ChevronDown, ChevronRight, X, Info, Trash2, Minus, Plus, FileText, FileSpreadsheet, Clock } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
+import ManualItemForm from './ManualItemForm';
+import BoardSummary from './BoardSummary';
+import BoardComposition from './BoardComposition';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+interface EstimatorBoardContentProps {
+    items: Item[];
+    setPresentationMode?: (mode: 'standard' | 'estimator') => void;
+    onQuantityChange?: (itemId: string, newQty: number) => void;
+    onRemoveItem?: (itemId: string) => void;
+    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string) => void;
+    boardId?: string;
+    onOpenDocxDescription?: () => void;
+}
+
+type EstimatorGroup = 'Basic' | 'CBs' | 'Special CBs' | 'Switches' | 'Busbars' | 'Misc';
+
+const GROUP_ORDER: EstimatorGroup[] = ['Basic', 'CBs', 'Special CBs', 'Switches', 'Busbars', 'Misc'];
+
+function getEstimatorGroup(item: Item): EstimatorGroup {
+    if (item.category === 'Basics') return 'Basic';
+    if (item.category === 'Busbar') return 'Busbars';
+    if (item.category === 'Other') return 'Misc';
+
+    if (item.category === 'Switchboard') {
+        const sub = item.subcategory || '';
+        if (sub.includes('ACB') || sub.includes('ATS')) return 'Special CBs';
+        if (sub.includes('Circuit Breakers')) return 'CBs';
+        if (sub.includes('Switches')) return 'Switches';
+        return 'Misc';
+    }
+    
+    return 'Misc';
+}
+
+export default function EstimatorBoardContent({ items, setPresentationMode, onQuantityChange, onRemoveItem, onAddItems, boardId, onOpenDocxDescription }: EstimatorBoardContentProps) {
+    const { overrides, quoteSnapshot, globalSettings, addItemToBoard, quoteId, boards } = useQuote();
+    const copperPricePerKg = overrides?.overrideCopperPricePerKg ?? quoteSnapshot?.copperPricePerKg ?? globalSettings?.copperPricePerKg ?? 0;
+    const selectedBoard = boards.find(b => b.id === boardId);
+
+    const [showManualForm, setShowManualForm] = useState(false);
+    const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+
+    const toggleSection = (group: string) => {
+        setCollapsedSections(prev => ({ ...prev, [group]: !prev[group] }));
+    };
+
+    const expandAll = () => setCollapsedSections({});
+    const collapseAll = () => {
+        const all: Record<string, boolean> = {};
+        GROUP_ORDER.forEach(g => all[g] = true);
+        setCollapsedSections(all);
+    };
+
+    const getItemCost = (item: Item) => {
+        const qty = Number(item.quantity) || 0;
+        if (item.totalCopperWeightKgPerMeter && item.isCopperPriced) {
+            const copperResult = computeBusbarPrice({
+                copperWeightKgPerMeter: item.totalCopperWeightKgPerMeter,
+                isCopperPriced: true,
+                length: qty,
+                copperPricePerKg: copperPricePerKg
+            });
+            return copperResult.totalPrice;
+        }
+        return (Number(item.unitPrice) || 0) * qty;
+    };
+
+    // Group items and calculate costs
+    const { groupedItems, groupCosts, totalMaterialCost } = useMemo(() => {
+        const groups: Record<EstimatorGroup, Item[]> = {
+            'Basic': [], 'CBs': [], 'Special CBs': [], 'Switches': [], 'Busbars': [], 'Misc': []
+        };
+        const costs: Record<EstimatorGroup, number> = {
+            'Basic': 0, 'CBs': 0, 'Special CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+        };
+        let totalCost = 0;
+        
+        items.forEach(item => {
+            const group = getEstimatorGroup(item);
+            groups[group].push(item);
+            
+            const cost = getItemCost(item);
+            
+            // As per lib/pricing.ts, Price Adjustments are not part of Base Material Cost
+            if (item.subcategory !== 'Price Adjustment') {
+                costs[group] += cost;
+                totalCost += cost;
+            }
+        });
+        
+        return { groupedItems: groups, groupCosts: costs, totalMaterialCost: totalCost };
+    }, [items, copperPricePerKg]);
+
+    // --- SEARCH STATE ---
+    const [searchQuery, setSearchQuery] = useState('');
+    const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+
+    // Derived matches
+    const matches = useMemo(() => {
+        if (!searchQuery.trim()) return [];
+        const q = searchQuery.toLowerCase();
+        
+        const matchedIds: string[] = [];
+        
+        GROUP_ORDER.forEach(group => {
+            if (groupedItems[group]) {
+                groupedItems[group].forEach(item => {
+                    const nameMatch = item.name?.toLowerCase().includes(q);
+                    const descMatch = item.description?.toLowerCase().includes(q);
+                    const subcatMatch = item.subcategory?.toLowerCase().includes(q);
+                    const anyItem = item as any;
+                    const brandMatch = anyItem.brand?.toLowerCase().includes(q);
+                    
+                    if (nameMatch || descMatch || brandMatch || subcatMatch) {
+                        matchedIds.push(item.id);
+                    }
+                });
+            }
+        });
+        
+        return matchedIds;
+    }, [searchQuery, groupedItems]);
+
+    const jumpToMatch = (index: number) => {
+        if (matches.length === 0) return;
+        let newIndex = index;
+        if (newIndex < 0) newIndex = matches.length - 1;
+        if (newIndex >= matches.length) newIndex = 0;
+        
+        setActiveMatchIndex(newIndex);
+        
+        const matchId = matches[newIndex];
+        const el = document.getElementById(`estimator-item-${matchId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
+    useEffect(() => {
+        setActiveMatchIndex(0);
+        if (searchQuery.trim() && matches.length > 0) {
+            const timer = setTimeout(() => {
+                const el = document.getElementById(`estimator-item-${matches[0]}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [searchQuery]);
+
+    // Active groups
+    const activeGroups = GROUP_ORDER;
+
+    const scrollToSection = (group: string) => {
+        setCollapsedSections(prev => ({ ...prev, [group]: false }));
+        setTimeout(() => {
+            const el = document.getElementById(`estimator-section-${group}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth' });
+            }
+        }, 50);
+    };
+
+    const [activeTab, setActiveTab] = useState<string>(activeGroups[0] || '');
+
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        setActiveTab(entry.target.id.replace('estimator-section-', ''));
+                    }
+                });
+            },
+            { rootMargin: '-100px 0px -60% 0px' }
+        );
+
+        activeGroups.forEach(group => {
+            const el = document.getElementById(`estimator-section-${group}`);
+            if (el) observer.observe(el);
+        });
+
+        return () => observer.disconnect();
+    }, [activeGroups]);
+
+    const handleAddClick = (group: EstimatorGroup) => {
+        if (!onAddItems) return;
+        switch(group) {
+            case 'Basic': onAddItems('Basics'); break;
+            case 'CBs': onAddItems('Switchboard', 'Circuit Breakers'); break;
+            case 'Special CBs': onAddItems('Switchboard', 'Circuit Breakers'); break;
+            case 'Switches': onAddItems('Switchboard', 'Switches'); break;
+            case 'Busbars': onAddItems('Busbar'); break;
+            case 'Misc': onAddItems('Switchboard', 'Miscellaneous'); break;
+        }
+    };
+
+    return (
+        <div className="flex flex-col h-full bg-gray-50/30 overflow-hidden relative">
+            {/* Header */}
+            <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center z-20 gap-4">
+                <div className="flex items-center gap-3 shrink-0">
+                    <h3 className="text-sm font-bold text-gray-900">Estimator View</h3>
+                    <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{items.length} Total Items</span>
+                </div>
+
+                {/* Search Bar */}
+                <div className="flex-1 max-w-xl mx-auto flex items-center gap-2">
+                    <div className="relative flex-1">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Search size={14} className="text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Search part number, description..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') jumpToMatch(activeMatchIndex + 1);
+                            }}
+                            className="w-full pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute inset-y-0 right-0 pr-2 flex items-center text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                    
+                    {searchQuery && (
+                        <div className="flex items-center gap-2 shrink-0 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+                            <span className="text-xs font-medium text-gray-600 min-w-[70px] text-center">
+                                {matches.length > 0 ? `${activeMatchIndex + 1} of ${matches.length}` : '0 matches'}
+                            </span>
+                            <div className="flex items-center border-l border-gray-200 pl-2 gap-1">
+                                <button 
+                                    onClick={() => jumpToMatch(activeMatchIndex - 1)}
+                                    disabled={matches.length === 0}
+                                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 transition-colors"
+                                >
+                                    <ChevronUp size={14} />
+                                </button>
+                                <button 
+                                    onClick={() => jumpToMatch(activeMatchIndex + 1)}
+                                    disabled={matches.length === 0}
+                                    className="p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded disabled:opacity-50 transition-colors"
+                                >
+                                    <ChevronDown size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Expand / Collapse All Controls */}
+                <div className="flex items-center gap-2 border-l border-gray-200 pl-4 ml-2 shrink-0">
+                    <button onClick={expandAll} className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">Expand All</button>
+                    <span className="text-gray-300">|</span>
+                    <button onClick={collapseAll} className="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors">Collapse All</button>
+                </div>
+
+                <div className="flex items-center gap-4 shrink-0 pl-2">
+                    {/* Export BOM */}
+                    {selectedBoard && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button
+                                    className="text-[10px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1 outline-none ring-0 focus:ring-2 focus:ring-blue-100"
+                                    title="Download Engineering BOM"
+                                >
+                                    <FileText size={10} />
+                                    Export BOM
+                                    <ChevronDown size={10} className="text-gray-400 group-hover:text-blue-500" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-64 bg-white shadow-lg border border-gray-100 p-1">
+                                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Current Board BOM</DropdownMenuLabel>
+                                
+                                <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
+                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                                >
+                                    <FileText size={14} className="text-red-600" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700">Export PDF</span>
+                                        <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
+                                    </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=human`, '_blank')}
+                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                                >
+                                    <FileSpreadsheet size={14} className="text-blue-600" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700">Export CSV</span>
+                                        <span className="text-[10px] text-gray-400">Detailed list (Excel ready)</span>
+                                    </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+                                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Full Quote BOM (All Boards)</DropdownMenuLabel>
+
+                                <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=pdf`, '_blank')}
+                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                                >
+                                    <FileText size={14} className="text-red-600" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700">Export Full PDF</span>
+                                        <span className="text-[10px] text-gray-400">All boards as individual sections</span>
+                                    </div>
+                                </DropdownMenuItem>
+
+                                <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=human`, '_blank')}
+                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                                >
+                                    <FileSpreadsheet size={14} className="text-blue-600" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700">Export Full CSV</span>
+                                        <span className="text-[10px] text-gray-400">Flat table with 'Board' column</span>
+                                    </div>
+                                </DropdownMenuItem>
+                                
+                                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
+                                <DropdownMenuItem
+                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
+                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none opacity-50 hover:opacity-100"
+                                >
+                                    <FileSpreadsheet size={14} className="text-green-600" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-gray-700">ERP Export (CSV)</span>
+                                        <span className="text-[10px] text-gray-400">Strict machine format</span>
+                                    </div>
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    )}
+
+                    {setPresentationMode && (
+                        <button
+                            onClick={() => setPresentationMode('standard')}
+                            className="text-xs font-medium bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2 shrink-0"
+                        >
+                            Standard View
+                        </button>
+                    )}
+                </div>
+            </div>
+            
+            {/* Electrical Identity Strip */}
+            {selectedBoard && (
+            <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center text-xs text-gray-500 font-mono tracking-tight z-10 relative">
+                {[
+                    // IP Rating
+                    (selectedBoard.config as any)?.ipRating
+                        ? (selectedBoard.config as any).ipRating.startsWith('IP')
+                            ? (selectedBoard.config as any).ipRating
+                            : `IP${(selectedBoard.config as any).ipRating}`
+                        : 'IP—',
+
+                    // Fault Rating
+                    (selectedBoard.config as any)?.faultRating
+                        ? (selectedBoard.config as any).faultRating.toLowerCase().endsWith('ka')
+                            ? (selectedBoard.config as any).faultRating
+                            : `${(selectedBoard.config as any).faultRating}kA`
+                        : '—kA',
+
+                    // In / Out (Form)
+                    (selectedBoard.config as any)?.form
+                        ? (selectedBoard.config as any).form.replace(/^Form\s*/i, '') // Remove 'Form ' prefix if present
+                        : '—',
+
+                    // Current Rating
+                    (selectedBoard.config as any)?.currentRating
+                        ? (selectedBoard.config as any).currentRating.endsWith('A')
+                            ? (selectedBoard.config as any).currentRating
+                            : `${(selectedBoard.config as any).currentRating}A`
+                        : '—A',
+
+                ].map((val, i) => (
+                    <span key={i} className="flex items-center">
+                        {i > 0 && <span className="mx-2 text-gray-300">·</span>}
+                        {val}
+                    </span>
+                ))}
+
+                <div className="ml-auto flex items-center gap-3">
+                    <button
+                        onClick={() => onOpenDocxDescription && onOpenDocxDescription()}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-[11px] font-semibold border border-blue-100 shadow-sm"
+                    >
+                        <FileText size={14} />
+                        DOCX Description
+                    </button>
+                </div>
+            </div>
+            )}
+
+            {/* Board Composition Indicators */}
+            <BoardComposition items={items} />
+
+            {/* Sticky Navigation Bar */}
+            {activeGroups.length > 0 && (
+                <div className="sticky top-0 z-10 bg-white border-b shadow-sm flex overflow-x-auto px-4 hide-scrollbar">
+                    {activeGroups.map(group => (
+                        <button
+                            key={group}
+                            onClick={() => scrollToSection(group)}
+                            className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 flex gap-1 items-center ${
+                                activeTab === group
+                                    ? 'text-blue-600 border-blue-600 bg-blue-50/50'
+                                    : 'text-gray-600 border-transparent hover:text-blue-600 hover:bg-blue-50 hover:border-blue-300'
+                            }`}
+                        >
+                            {group} 
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                activeTab === group ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
+                            }`}>{groupedItems[group].length}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* Scrollable Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
+                <div className="space-y-6 pb-12 max-w-5xl mx-auto">
+                    
+                    {/* Cubic / Custom Summary Strip */}
+                    <BoardSummary />
+
+                    {/* Estimator Summary Table */}
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-8">
+                        <div className="bg-slate-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+                            <h4 className="font-bold text-slate-800">Material Cost Breakdown</h4>
+                            <div className="flex items-center text-xs text-slate-500 gap-1.5 bg-white px-2 py-1 rounded border shadow-sm">
+                                <Info size={14} className="text-blue-500" />
+                                <span>Labour, Engineering, Overheads, and Margins are calculated globally at the quote level.</span>
+                            </div>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                            <div className="grid grid-cols-4 px-6 py-2.5 bg-gray-50 text-xs font-semibold text-gray-500">
+                                <div>Section</div>
+                                <div className="text-center">Items</div>
+                                <div className="text-right">Material Cost</div>
+                                <div className="text-right">% of Material Total</div>
+                            </div>
+                            {activeGroups.map(group => {
+                                const cost = groupCosts[group];
+                                const pct = totalMaterialCost > 0 ? (cost / totalMaterialCost) * 100 : 0;
+                                return (
+                                    <div key={`summary-${group}`} className="grid grid-cols-4 px-6 py-2.5 text-sm items-center hover:bg-gray-50/50">
+                                        <div className="font-medium text-gray-900">{group}</div>
+                                        <div className="text-center text-gray-600">{groupedItems[group].length}</div>
+                                        <div className="text-right font-medium text-slate-700">{formatCurrency(cost)}</div>
+                                        <div className="text-right text-slate-500">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span>{pct.toFixed(1)}%</span>
+                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="grid grid-cols-4 px-6 py-3 bg-slate-50 font-bold text-sm border-t border-gray-200">
+                                <div className="text-slate-900">Total Material Cost</div>
+                                <div className="text-center text-slate-700">{items.length}</div>
+                                <div className="text-right text-slate-900">{formatCurrency(totalMaterialCost)}</div>
+                                <div className="text-right text-slate-500">100%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Grouped Sections */}
+                    {activeGroups.map(group => {
+                        const groupHasSearchMatch = matches.some(matchId => groupedItems[group].some(item => item.id === matchId));
+                        const isCollapsed = collapsedSections[group] && (!searchQuery.trim() || !groupHasSearchMatch);
+
+                        return (
+                        <div 
+                            key={group} 
+                            id={`estimator-section-${group}`}
+                            className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden scroll-mt-24 flex flex-col"
+                        >
+                            <div 
+                                className="bg-gray-50 px-6 py-3 border-b border-gray-200 font-bold text-gray-800 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors"
+                                onClick={() => toggleSection(group)}
+                            >
+                                <div className="flex items-center gap-3">
+                                    {isCollapsed ? <ChevronRight size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+                                    <span>{group}</span>
+                                    <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-100">{groupedItems[group].length} Items</span>
+                                </div>
+                                <span className="text-sm text-slate-700">{formatCurrency(groupCosts[group])}</span>
+                            </div>
+                            
+                            {!isCollapsed && (
+                                <>
+                                {groupedItems[group].length > 0 ? (
+                                <div className="divide-y divide-gray-100">
+                                    {groupedItems[group].map(item => {
+                                        const isMatch = matches.includes(item.id);
+                                        const isActiveMatch = matches.length > 0 && matches[activeMatchIndex] === item.id;
+                                        const cost = getItemCost(item);
+                                        
+                                        return (
+                                            <div 
+                                                key={item.id} 
+                                                id={`estimator-item-${item.id}`}
+                                                className={`group px-6 py-3 flex justify-between items-center text-sm transition-all duration-200 border-l-4 ${
+                                                    isActiveMatch ? 'bg-yellow-100/70 border-yellow-500 shadow-sm z-10 relative' : 
+                                                    isMatch ? 'bg-yellow-50/40 border-yellow-300' : 
+                                                    'border-transparent hover:bg-gray-50/50'
+                                                }`}
+                                            >
+                                                <div className="flex-1">
+                                                    <p className="font-semibold text-gray-900">{item.name}</p>
+                                                    {item.description && (
+                                                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1" title={item.description}>{item.description}</p>
+                                                    )}
+                                                    {item.subcategory && (
+                                                        <p className="text-[10px] text-gray-400 mt-0.5">{item.subcategory}</p>
+                                                    )}
+                                                </div>
+                                                <div className={`w-28 flex items-center justify-between rounded mx-4 border transition-colors ${
+                                                    isMatch ? 'bg-white border-yellow-200' : 'bg-white border-gray-200'
+                                                } overflow-hidden shadow-sm`}>
+                                                    <button 
+                                                        onClick={() => onQuantityChange && onQuantityChange(item.id, Math.max(0, Number(item.quantity) - 1))}
+                                                        disabled={!onQuantityChange || Number(item.quantity) === 0}
+                                                        className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                                    >
+                                                        <Minus size={12} />
+                                                    </button>
+                                                    <input 
+                                                        type="number"
+                                                        value={Number(item.quantity)}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value);
+                                                            if (!isNaN(val) && onQuantityChange) {
+                                                                onQuantityChange(item.id, val);
+                                                            }
+                                                        }}
+                                                        className={`w-10 text-center text-xs font-semibold bg-transparent focus:outline-none appearance-none hide-number-spinners ${
+                                                            isMatch ? 'text-yellow-800' : 'text-gray-700'
+                                                        }`}
+                                                    />
+                                                    <button 
+                                                        onClick={() => onQuantityChange && onQuantityChange(item.id, Number(item.quantity) + 1)}
+                                                        disabled={!onQuantityChange}
+                                                        className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                                                    >
+                                                        <Plus size={12} />
+                                                    </button>
+                                                </div>
+                                                <div className={`w-28 text-right font-medium ${
+                                                    isMatch ? 'text-yellow-900' : 'text-gray-900'
+                                                }`}>
+                                                    <div>{formatCurrency(cost)}</div>
+                                                    {item.labourHours > 0 && (
+                                                        <div 
+                                                            className="text-gray-400 cursor-help flex items-center justify-end gap-1 mt-0.5"
+                                                            title={`${item.quantity} × ${item.labourHours}hr = ${(Number(item.quantity) * item.labourHours).toFixed(1).replace(/\.0$/, '')} hrs`}
+                                                        >
+                                                            <span className="text-[10px] font-medium">{(Number(item.quantity) * item.labourHours).toFixed(1).replace(/\.0$/, '')}h</span>
+                                                            <Clock size={12} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {onRemoveItem ? (
+                                                    <div className="w-8 flex justify-end ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button 
+                                                            onClick={() => onRemoveItem(item.id)}
+                                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                                                            title="Remove Item"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-8 ml-2"></div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="py-6 text-center text-xs text-gray-400 italic bg-white">
+                                    No items in this section.
+                                </div>
+                            )}
+
+                            {/* Add Item Area */}
+                            {group === 'Misc' ? (
+                                <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 mt-auto">
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => handleAddClick(group)} 
+                                            className="flex-1 py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-white transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={16} /> Add Catalog Item
+                                        </button>
+                                        <button 
+                                            onClick={() => setShowManualForm(!showManualForm)} 
+                                            className="flex-1 py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 hover:text-purple-600 hover:border-purple-300 hover:bg-white transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={16} /> Add Manual Item
+                                        </button>
+                                    </div>
+                                    
+                                    {showManualForm && boardId && (
+                                        <div className="bg-white p-4 border rounded-lg shadow-sm animate-in fade-in slide-in-from-top-4">
+                                            <ManualItemForm
+                                                onSave={async (data) => {
+                                                    await addItemToBoard(boardId, {
+                                                        category: 'Other',
+                                                        name: data.partNumber || data.description,
+                                                        description: data.description,
+                                                        unitPrice: data.unitPrice,
+                                                        labourHours: data.labourHours,
+                                                        quantity: data.quantity,
+                                                        partNumber: data.partNumber || null,
+                                                        subcategory: data.type === 'Price Adjustment' ? 'Price Adjustment' : undefined
+                                                    });
+                                                    setShowManualForm(false);
+                                                }}
+                                                onCancel={() => setShowManualForm(false)}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="p-4 border-t border-gray-100 bg-gray-50/50 mt-auto">
+                                    <button 
+                                        onClick={() => handleAddClick(group)} 
+                                        className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-lg text-gray-500 hover:text-blue-600 hover:border-blue-300 hover:bg-white transition-all text-sm font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <Plus size={16} /> Add {group === 'Basic' ? 'Basic Item' : group.slice(0, -1)}
+                                    </button>
+                                </div>
+                            )}
+                            </>
+                            )}
+                        </div>
+                    )})}
+                </div>
+            </div>
+        </div>
+    );
+}

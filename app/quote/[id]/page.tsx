@@ -375,8 +375,9 @@ function QuoteBuilderContent() {
                                 setIsItemDrawerOpen(true);
                             }
                         }}
-                        onAddItems={(cat) => {
+                        onAddItems={(cat: any, l1?: string) => {
                             setDrawerCategory(cat);
+                            setDrawerL1(l1);
                             setIsItemDrawerOpen(true);
                             // Sync active step
                             if (cat === 'Switchboard') setActiveStep('switchgear');

@@ -17,6 +17,7 @@ import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
 import ManualItemForm from './ManualItemForm';
 import StepIndicator from './StepFlow';
+import EstimatorBoardContent from './EstimatorBoardContent';
 
 // ONLY these categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -100,7 +101,7 @@ const BASICS_STRICT_ORDER = [
 
 
 interface BoardContentProps {
-    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar') => void;
+    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string) => void;
     activeStep?: string;
     onStepClick?: (stepId: string) => void;
 }
@@ -109,7 +110,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
     const { 
         boards, selectedBoardId, updateItem, effectiveSettings, 
         quoteId, refreshQuote, addItemToBoard, updateBoardDetails,
-        viewMode, setViewMode, removeItem
+        viewMode, setViewMode, removeItem, presentationMode, setPresentationMode
     } = useQuote();
 
     // Force consolidated mode on mount if not already set
@@ -906,6 +907,18 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         );
     };
 
+    if (presentationMode === 'estimator') {
+        return <EstimatorBoardContent 
+            items={items} 
+            setPresentationMode={setPresentationMode} 
+            onQuantityChange={handleQuantityChange}
+            onRemoveItem={handleRemoveItem}
+            onAddItems={onAddItems}
+            boardId={selectedBoardId!}
+            onOpenDocxDescription={() => setIsDescDialogOpen(true)}
+        />;
+    }
+
     return (
         <>
             <div className="flex flex-col h-full bg-gray-50/30">
@@ -930,6 +943,13 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => setPresentationMode('estimator')}
+                        className="text-xs font-medium bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                    >
+                        <FileSpreadsheet size={14} className="text-green-600" />
+                        Estimator View
+                    </button>
                     {/* View Toggle Removed - Forcing Summary View */}
 
                     {onAddItems && (
