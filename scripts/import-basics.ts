@@ -428,8 +428,6 @@ const basicsData = [
         description: 'Meter Protection Fuse Chassis - 30-way',
         unitPrice: 720.00,
         labourHours: 1,
-        defaultQuantity: 1,
-        isAutoAdd: false
     },
 
     // Miscellaneous
