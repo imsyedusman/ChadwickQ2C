@@ -5,7 +5,7 @@ const castellItems = [
     {
         brand: 'Internal',
         category: 'Switchboard',
-        subcategory: 'Switches > Isolators',
+        subcategory: 'Switches > Isolator > 3P',
         partNumber: 'CHD-KEYBOX-3-1',
         description: '3+1 Key Exchange Box',
         unitPrice: 1380.00,
@@ -16,7 +16,7 @@ const castellItems = [
     {
         brand: 'Internal',
         category: 'Switchboard',
-        subcategory: 'Switches > Isolators',
+        subcategory: 'Switches > Isolator > 3P',
         partNumber: 'CHD-KEYBOX-2-1',
         description: '2+1 Key Exchange Box',
         unitPrice: 890.00,
@@ -27,7 +27,7 @@ const castellItems = [
     {
         brand: 'Internal',
         category: 'Switchboard',
-        subcategory: 'Switches > Isolators',
+        subcategory: 'Switches > Isolator > 3P',
         partNumber: 'CHD-CASTELL-IL',
         description: 'Castell Key Interlock',
         unitPrice: 490.00,
@@ -38,7 +38,7 @@ const castellItems = [
     {
         brand: 'Internal',
         category: 'Switchboard',
-        subcategory: 'Switches > Isolators',
+        subcategory: 'Switches > Isolator > 3P',
         partNumber: 'CHD-CASTELL-KEY',
         description: 'Castell Key',
         unitPrice: 65.00,
