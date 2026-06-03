@@ -5,6 +5,7 @@ import { TDocumentDefinitions, Content, ContextPageSize } from 'pdfmake/interfac
 import { QuoteBOM, CanonicalBOM } from '../bom-engine';
 import { formatCurrency, formatQuantity } from '../utils';
 import { resolveCostCategory } from '../items/categorization';
+import { getDisplayPartNumber } from '../display-utils';
 import path from 'path';
 
 // Define fonts with absolute paths pointing to the 'public' directory
@@ -84,7 +85,7 @@ export function generatePDF(model: QuoteBOM): Promise<Buffer> {
                 grouped[cat].forEach(item => {
                     tableBody.push([
                         { text: item.supplier || '', fontSize: 7 },
-                        { text: item.partNumber, fontSize: 8 },
+                        { text: getDisplayPartNumber(item.partNumber), fontSize: 8 },
                         { text: item.description, fontSize: 8 },
                         { text: formatQuantity(item.quantity), alignment: 'right', fontSize: 8 },
                         { text: formatCurrency(item.unitCost, 2), alignment: 'right', fontSize: 8 },

@@ -1,5 +1,6 @@
 import { QuoteBOM } from "@/lib/bom-engine";
 import { formatCurrency, formatQuantity } from "../utils";
+import { getDisplayPartNumber } from "../display-utils";
 
 export interface CSVOptions {
     mode: 'erp' | 'human';
@@ -13,7 +14,6 @@ export interface CSVOptions {
 export function generateCSV(model: QuoteBOM, options: CSVOptions): string {
     const headers = [
         'Board',
-        'Enclosure Type',
         'Category',
         'Supplier',
         'Part Number',
@@ -39,10 +39,9 @@ export function generateCSV(model: QuoteBOM, options: CSVOptions): string {
         board.items.forEach(item => {
             rows.push([
                 board.meta.boardName,
-                board.meta.boardType || 'Unknown',
                 item.category === 'Switchboard' ? 'Switchgear' : item.category,
                 item.supplier,
-                item.partNumber,
+                getDisplayPartNumber(item.partNumber),
                 item.description,
                 formatQuantity(item.quantity),
                 formatCurrency(item.unitCost, 2).replace('$', ''), // Remove $ for raw CSV data if needed, or keep for consistency. 
@@ -64,11 +63,11 @@ export function generateCSV(model: QuoteBOM, options: CSVOptions): string {
         const totalSellingPrice = formatCurrency(model.grandTotals.totalSellingPrice || 0, 2).replace('$', '');
 
         content += '\n\n'; // Blank line
-        content += `SUMMARY,,,,,,,,,\n`;
-        content += `Total Material Cost,,,,,,,,,${escapeCsv(totalMaterial)}\n`;
-        content += `Total Labour Hours,,,,,,,,,${escapeCsv(totalLabour)}\n`;
-        content += `Total Labour Cost,,,,,,,,,${escapeCsv(totalLabourCost)}\n`;
-        content += `Total Selling Price,,,,,,,,,${escapeCsv(totalSellingPrice)}\n`;
+        content += `SUMMARY,,,,,,,,\n`;
+        content += `Total Material Cost,,,,,,,,${escapeCsv(totalMaterial)}\n`;
+        content += `Total Labour Hours,,,,,,,,${escapeCsv(totalLabour)}\n`;
+        content += `Total Labour Cost,,,,,,,,${escapeCsv(totalLabourCost)}\n`;
+        content += `Total Selling Price,,,,,,,,${escapeCsv(totalSellingPrice)}\n`;
     }
 
     return content;

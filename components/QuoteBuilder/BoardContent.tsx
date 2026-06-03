@@ -9,6 +9,7 @@ import {
 import { cn, formatCurrency } from '@/lib/utils';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
+import { getDisplayPartNumber } from '@/lib/display-utils';
 import { compareItems } from '@/lib/sorting';
 import { consolidateItems, ConsolidatedItem } from '@/lib/items/consolidation';
 import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-utils';
@@ -503,7 +504,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     </div>
                     <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
                         {/* Only show item name (Part Number). Subcategory path removed as requested. */}
-                        <span className="font-medium">{item.name}</span>
+                        <span className="font-medium">{getDisplayPartNumber(item.name)}</span>
                     </div>
                 </div>
 

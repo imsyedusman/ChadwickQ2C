@@ -9,6 +9,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { compareItems } from '@/lib/sorting';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-utils';
+import { getDisplayPartNumber } from '@/lib/display-utils';
 import { AlertCircle } from 'lucide-react';
 
 interface CatalogItem {
@@ -107,7 +108,7 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                 {/* Meta Line */}
                 <div className="flex items-center gap-1.5 text-xs text-gray-500 truncate">
                     {item.partNumber && (
-                        <span className="font-medium text-gray-600">{item.partNumber}</span>
+                        <span className="font-medium text-gray-600">{getDisplayPartNumber(item.partNumber)}</span>
                     )}
                     {item.partNumber && (item.brand || item.subcategory) && <span>•</span>}
 
