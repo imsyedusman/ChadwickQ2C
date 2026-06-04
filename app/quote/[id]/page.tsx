@@ -17,7 +17,6 @@ import RevisionSelector from '@/components/QuoteBuilder/RevisionSelector';
 import ShareDialog from '@/components/QuoteBuilder/ShareDialog';
 import { Share2 } from 'lucide-react';
 import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchableDropdown';
-import StepRail from '@/components/QuoteBuilder/StepFlow';
 
 function QuoteBuilderContent() {
     const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, pipedriveOwnerName, status, projectStatus, creator, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
