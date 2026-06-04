@@ -374,50 +374,6 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                     {/* Cubic / Custom Summary Strip */}
                     <BoardSummary />
 
-                    {/* Estimator Summary Table */}
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-8">
-                        <div className="bg-slate-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
-                            <h4 className="font-bold text-slate-800">Material Cost Breakdown</h4>
-                            <div className="flex items-center text-xs text-slate-500 gap-1.5 bg-white px-2 py-1 rounded border shadow-sm">
-                                <Info size={14} className="text-blue-500" />
-                                <span>Labour, Engineering, Overheads, and Margins are calculated globally at the quote level.</span>
-                            </div>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                            <div className="grid grid-cols-4 px-6 py-2.5 bg-gray-50 text-xs font-semibold text-gray-500">
-                                <div>Section</div>
-                                <div className="text-center">Items</div>
-                                <div className="text-right">Material Cost</div>
-                                <div className="text-right">% of Material Total</div>
-                            </div>
-                            {activeGroups.map(group => {
-                                const cost = groupCosts[group];
-                                const pct = totalMaterialCost > 0 ? (cost / totalMaterialCost) * 100 : 0;
-                                return (
-                                    <div key={`summary-${group}`} className="grid grid-cols-4 px-6 py-2.5 text-sm items-center hover:bg-gray-50/50">
-                                        <div className="font-medium text-gray-900">{group}</div>
-                                        <div className="text-center text-gray-600">{groupedItems[group].length}</div>
-                                        <div className="text-right font-medium text-slate-700">{formatCurrency(cost)}</div>
-                                        <div className="text-right text-slate-500">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <span>{pct.toFixed(1)}%</span>
-                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <div className="grid grid-cols-4 px-6 py-3 bg-slate-50 font-bold text-sm border-t border-gray-200">
-                                <div className="text-slate-900">Total Material Cost</div>
-                                <div className="text-center text-slate-700">{items.length}</div>
-                                <div className="text-right text-slate-900">{formatCurrency(totalMaterialCost)}</div>
-                                <div className="text-right text-slate-500">100%</div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Grouped Sections */}
                     {activeGroups.map(group => {
                         const groupHasSearchMatch = matches.some(matchId => groupedItems[group].some(item => item.id === matchId));
@@ -604,6 +560,50 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                             )}
                         </div>
                     )})}
+
+                    {/* Estimator Summary Table */}
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mt-8">
+                        <div className="bg-slate-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+                            <h4 className="font-bold text-slate-800">Material Cost Breakdown</h4>
+                            <div className="flex items-center text-xs text-slate-500 gap-1.5 bg-white px-2 py-1 rounded border shadow-sm">
+                                <Info size={14} className="text-blue-500" />
+                                <span>Labour, Engineering, Overheads, and Margins are calculated globally at the quote level.</span>
+                            </div>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                            <div className="grid grid-cols-4 px-6 py-2.5 bg-gray-50 text-xs font-semibold text-gray-500">
+                                <div>Section</div>
+                                <div className="text-center">Items</div>
+                                <div className="text-right">Material Cost</div>
+                                <div className="text-right">% of Material Total</div>
+                            </div>
+                            {activeGroups.map(group => {
+                                const cost = groupCosts[group];
+                                const pct = totalMaterialCost > 0 ? (cost / totalMaterialCost) * 100 : 0;
+                                return (
+                                    <div key={`summary-${group}`} className="grid grid-cols-4 px-6 py-2.5 text-sm items-center hover:bg-gray-50/50">
+                                        <div className="font-medium text-gray-900">{group}</div>
+                                        <div className="text-center text-gray-600">{groupedItems[group].length}</div>
+                                        <div className="text-right font-medium text-slate-700">{formatCurrency(cost)}</div>
+                                        <div className="text-right text-slate-500">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <span>{pct.toFixed(1)}%</span>
+                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            <div className="grid grid-cols-4 px-6 py-3 bg-slate-50 font-bold text-sm border-t border-gray-200">
+                                <div className="text-slate-900">Total Material Cost</div>
+                                <div className="text-center text-slate-700">{items.length}</div>
+                                <div className="text-right text-slate-900">{formatCurrency(totalMaterialCost)}</div>
+                                <div className="text-right text-slate-500">100%</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
