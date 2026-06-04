@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoreHorizontal, FileText } from 'lucide-react';
+import { MoreHorizontal, FileText, RefreshCw } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -9,10 +9,11 @@ import {
 
 interface BoardMoreActionsProps {
     onOpenDocxDescription?: () => void;
+    onRefreshPrices?: () => void;
 }
 
-export function BoardMoreActions({ onOpenDocxDescription }: BoardMoreActionsProps) {
-    if (!onOpenDocxDescription) return null;
+export function BoardMoreActions({ onOpenDocxDescription, onRefreshPrices }: BoardMoreActionsProps) {
+    if (!onOpenDocxDescription && !onRefreshPrices) return null;
 
     return (
         <DropdownMenu>
@@ -25,16 +26,30 @@ export function BoardMoreActions({ onOpenDocxDescription }: BoardMoreActionsProp
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56 bg-white shadow-lg border border-gray-100 p-1">
-                <DropdownMenuItem
-                    onClick={() => onOpenDocxDescription()}
-                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                >
-                    <FileText size={14} className="text-blue-600" />
-                    <div className="flex flex-col">
-                        <span className="text-sm font-medium text-gray-700">DOCX Description</span>
-                        <span className="text-[10px] text-gray-400">Edit proposal bullets</span>
-                    </div>
-                </DropdownMenuItem>
+                {onOpenDocxDescription && (
+                    <DropdownMenuItem
+                        onClick={() => onOpenDocxDescription()}
+                        className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                    >
+                        <FileText size={14} className="text-blue-600" />
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-700">DOCX Description</span>
+                            <span className="text-[10px] text-gray-400">Edit proposal bullets</span>
+                        </div>
+                    </DropdownMenuItem>
+                )}
+                {onRefreshPrices && (
+                    <DropdownMenuItem
+                        onClick={() => onRefreshPrices()}
+                        className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
+                    >
+                        <RefreshCw size={14} className="text-gray-500" />
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-700">Refresh Prices</span>
+                            <span className="text-[10px] text-gray-400">Update from catalog</span>
+                        </div>
+                    </DropdownMenuItem>
+                )}
             </DropdownMenuContent>
         </DropdownMenu>
     );

@@ -18,7 +18,7 @@ import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-uti
 import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
 import ManualItemForm from './ManualItemForm';
-import StepIndicator from './StepFlow';
+
 import EstimatorBoardContent from './EstimatorBoardContent';
 import { ExportBomDropdown } from './ExportBomDropdown';
 import { BoardMoreActions } from './BoardMoreActions';
@@ -881,24 +881,9 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
             ) : (
             <div className="flex flex-col h-full bg-gray-50/30">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                <div>
-                    <div className="flex items-center gap-3 mb-1">
-                        <h3 className="text-sm font-bold text-gray-900">
-                            {selectedBoard.name} 
-                        </h3>
-                        <div className="h-3 w-px bg-gray-200" />
-                        {onStepClick && (
-                            <StepIndicator 
-                                currentStepId={activeStep}
-                                onStepClick={onStepClick}
-                            />
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Summary View</span>
-                        <span className="text-gray-300">·</span>
-                        <p className="text-xs text-gray-500">{items.length} line items</p>
-                    </div>
+                <div className="flex items-center gap-3 shrink-0">
+                    <h3 className="text-sm font-bold text-gray-900">{selectedBoard.name}</h3>
+                    <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{items.length} Total Items</span>
                 </div>
                 <div className="flex items-center gap-4">
 
@@ -923,9 +908,9 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         </button>
                     )}
                     <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
-                    <BoardMoreActions onOpenDocxDescription={() => setIsDescDialogOpen(true)} />
-                    <button
-                        onClick={async () => {
+                    <BoardMoreActions 
+                        onOpenDocxDescription={() => setIsDescDialogOpen(true)} 
+                        onRefreshPrices={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
 
                             try {
@@ -942,12 +927,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                                 alert('Network error');
                             }
                         }}
-                        className="text-[10px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                        title="Update item prices and descriptions from the latest catalog"
-                    >
-                        <RefreshCw size={10} />
-                        Refresh Prices
-                    </button>
+                    />
                     <ViewModeToggle
                         presentationMode={presentationMode || 'standard'}
                         setPresentationMode={setPresentationMode}

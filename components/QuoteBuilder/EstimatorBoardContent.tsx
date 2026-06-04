@@ -280,9 +280,9 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                     {selectedBoard && (
                         <>
                             <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
-                            <BoardMoreActions onOpenDocxDescription={onOpenDocxDescription} />
-                            <button
-                                onClick={async () => {
+                            <BoardMoreActions 
+                                onOpenDocxDescription={onOpenDocxDescription} 
+                                onRefreshPrices={async () => {
                                     if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
 
                                     try {
@@ -299,12 +299,7 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                                         alert('Network error');
                                     }
                                 }}
-                                className="text-[10px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
-                                title="Update item prices and descriptions from the latest catalog"
-                            >
-                                <RefreshCw size={10} />
-                                Refresh Prices
-                            </button>
+                            />
                         </>
                     )}
 
