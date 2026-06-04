@@ -21,6 +21,7 @@ import ManualItemForm from './ManualItemForm';
 import StepIndicator from './StepFlow';
 import EstimatorBoardContent from './EstimatorBoardContent';
 import { ExportBomDropdown } from './ExportBomDropdown';
+import { BoardMoreActions } from './BoardMoreActions';
 
 // ONLY these categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -923,6 +924,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         </button>
                     )}
                     <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
+                    <BoardMoreActions onOpenDocxDescription={() => setIsDescDialogOpen(true)} />
                     <button
                         onClick={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
@@ -957,58 +959,13 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
 
 
 
-            {/* Electrical Identity Strip */}
-            <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center text-xs text-gray-500 font-mono tracking-tight">
-                {[
-                    // IP Rating
-                    (selectedBoard.config as any)?.ipRating
-                        ? (selectedBoard.config as any).ipRating.startsWith('IP')
-                            ? (selectedBoard.config as any).ipRating
-                            : `IP${(selectedBoard.config as any).ipRating}`
-                        : 'IP—',
-
-                    // Fault Rating
-                    (selectedBoard.config as any)?.faultRating
-                        ? (selectedBoard.config as any).faultRating.toLowerCase().endsWith('ka')
-                            ? (selectedBoard.config as any).faultRating
-                            : `${(selectedBoard.config as any).faultRating}kA`
-                        : '—kA',
-
-                    // In / Out (Form)
-                    (selectedBoard.config as any)?.form
-                        ? (selectedBoard.config as any).form.replace(/^Form\s*/i, '') // Remove 'Form ' prefix if present
-                        : '—',
-
-                    // Current Rating
-                    (selectedBoard.config as any)?.currentRating
-                        ? (selectedBoard.config as any).currentRating.endsWith('A')
-                            ? (selectedBoard.config as any).currentRating
-                            : `${(selectedBoard.config as any).currentRating}A`
-                        : '—A',
-
-                ].map((val, i) => (
-                    <span key={i} className="flex items-center">
-                        {i > 0 && <span className="mx-2 text-gray-300">·</span>}
-                        {val}
-                    </span>
-                ))}
-
-                <div className="ml-auto flex items-center gap-3">
-                    <button
-                        onClick={() => setIsDescDialogOpen(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-[11px] font-semibold border border-blue-100 shadow-sm"
-                    >
-                        <FileText size={14} />
-                        DOCX Description
-                    </button>
-                </div>
-            </div>
-
-            {/* Board Composition Indicators */}
-            <BoardComposition items={items} />
+            {/* Consolidated Board Header (Summary + Composition inline) */}
+            <BoardComposition 
+                items={items} 
+                leftHeaderContent={<BoardSummary />} 
+            />
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                <BoardSummary />
                 {items.length === 0 && !showManualForm ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-2">
                         <p>No items added yet.</p>

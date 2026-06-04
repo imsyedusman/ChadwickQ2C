@@ -9,6 +9,7 @@ import BoardComposition from './BoardComposition';
 import { ItemBadges } from './ItemBadges';
 import { ViewModeToggle } from './ViewModeToggle';
 import { ExportBomDropdown } from './ExportBomDropdown';
+import { BoardMoreActions } from './BoardMoreActions';
 
 interface EstimatorBoardContentProps {
     items: Item[];
@@ -212,12 +213,12 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
             {/* Header */}
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center z-20 gap-4">
                 <div className="flex items-center gap-3 shrink-0">
-                    <h3 className="text-sm font-bold text-gray-900">Estimator View</h3>
+                    <h3 className="text-sm font-bold text-gray-900">{selectedBoard ? selectedBoard.name : 'Estimator View'}</h3>
                     <span className="text-[10px] font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{items.length} Total Items</span>
                 </div>
 
                 {/* Search Bar */}
-                <div className="flex-1 max-w-xl mx-auto flex items-center gap-2">
+                <div className="flex-1 max-w-xs mx-auto flex items-center gap-2">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <Search size={14} className="text-gray-400" />
@@ -279,6 +280,7 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                     {selectedBoard && (
                         <>
                             <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
+                            <BoardMoreActions onOpenDocxDescription={onOpenDocxDescription} />
                             <button
                                 onClick={async () => {
                                     if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
@@ -315,64 +317,15 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                 </div>
             </div>
             
-            {/* Electrical Identity Strip */}
-            {selectedBoard && (
-            <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center text-xs text-gray-500 font-mono tracking-tight z-10 relative">
-                {[
-                    // IP Rating
-                    (selectedBoard.config as any)?.ipRating
-                        ? (selectedBoard.config as any).ipRating.startsWith('IP')
-                            ? (selectedBoard.config as any).ipRating
-                            : `IP${(selectedBoard.config as any).ipRating}`
-                        : 'IP—',
-
-                    // Fault Rating
-                    (selectedBoard.config as any)?.faultRating
-                        ? (selectedBoard.config as any).faultRating.toLowerCase().endsWith('ka')
-                            ? (selectedBoard.config as any).faultRating
-                            : `${(selectedBoard.config as any).faultRating}kA`
-                        : '—kA',
-
-                    // In / Out (Form)
-                    (selectedBoard.config as any)?.form
-                        ? (selectedBoard.config as any).form.replace(/^Form\s*/i, '') // Remove 'Form ' prefix if present
-                        : '—',
-
-                    // Current Rating
-                    (selectedBoard.config as any)?.currentRating
-                        ? (selectedBoard.config as any).currentRating.endsWith('A')
-                            ? (selectedBoard.config as any).currentRating
-                            : `${(selectedBoard.config as any).currentRating}A`
-                        : '—A',
-
-                ].map((val, i) => (
-                    <span key={i} className="flex items-center">
-                        {i > 0 && <span className="mx-2 text-gray-300">·</span>}
-                        {val}
-                    </span>
-                ))}
-
-                <div className="ml-auto flex items-center gap-3">
-                    <button
-                        onClick={() => onOpenDocxDescription && onOpenDocxDescription()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors text-[11px] font-semibold border border-blue-100 shadow-sm"
-                    >
-                        <FileText size={14} />
-                        DOCX Description
-                    </button>
-                </div>
-            </div>
-            )}
-
-            {/* Board Composition Indicators */}
-            <BoardComposition items={items} />
+            {/* Consolidated Board Header (Summary + Composition inline) */}
+            <BoardComposition 
+                items={items} 
+                leftHeaderContent={<BoardSummary />} 
+            />
 
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
                 <div className="space-y-6 pb-12 max-w-5xl mx-auto">
-                    
-                    {/* Cubic / Custom Summary Strip */}
-                    <BoardSummary />
 
                     {/* Grouped Sections */}
                     {activeGroups.map(group => {
@@ -561,49 +514,6 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                         </div>
                     )})}
 
-                    {/* Estimator Summary Table */}
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mt-8">
-                        <div className="bg-slate-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
-                            <h4 className="font-bold text-slate-800">Material Cost Breakdown</h4>
-                            <div className="flex items-center text-xs text-slate-500 gap-1.5 bg-white px-2 py-1 rounded border shadow-sm">
-                                <Info size={14} className="text-blue-500" />
-                                <span>Labour, Engineering, Overheads, and Margins are calculated globally at the quote level.</span>
-                            </div>
-                        </div>
-                        <div className="divide-y divide-gray-100">
-                            <div className="grid grid-cols-4 px-6 py-2.5 bg-gray-50 text-xs font-semibold text-gray-500">
-                                <div>Section</div>
-                                <div className="text-center">Items</div>
-                                <div className="text-right">Material Cost</div>
-                                <div className="text-right">% of Material Total</div>
-                            </div>
-                            {activeGroups.map(group => {
-                                const cost = groupCosts[group];
-                                const pct = totalMaterialCost > 0 ? (cost / totalMaterialCost) * 100 : 0;
-                                return (
-                                    <div key={`summary-${group}`} className="grid grid-cols-4 px-6 py-2.5 text-sm items-center hover:bg-gray-50/50">
-                                        <div className="font-medium text-gray-900">{group}</div>
-                                        <div className="text-center text-gray-600">{groupedItems[group].length}</div>
-                                        <div className="text-right font-medium text-slate-700">{formatCurrency(cost)}</div>
-                                        <div className="text-right text-slate-500">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <span>{pct.toFixed(1)}%</span>
-                                                <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <div className="grid grid-cols-4 px-6 py-3 bg-slate-50 font-bold text-sm border-t border-gray-200">
-                                <div className="text-slate-900">Total Material Cost</div>
-                                <div className="text-center text-slate-700">{items.length}</div>
-                                <div className="text-right text-slate-900">{formatCurrency(totalMaterialCost)}</div>
-                                <div className="text-right text-slate-500">100%</div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
 

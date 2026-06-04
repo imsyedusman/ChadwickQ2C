@@ -6,6 +6,7 @@ import { resolveCostCategory } from '@/lib/items/categorization';
 
 interface BoardCompositionProps {
     items: Item[];
+    leftHeaderContent?: React.ReactNode;
 }
 
 interface Bucket {
@@ -14,7 +15,7 @@ interface Bucket {
     cost: number;
 }
 
-const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
+const BoardComposition: React.FC<BoardCompositionProps> = ({ items, leftHeaderContent }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { totals } = useQuote();
 
@@ -97,33 +98,35 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items }) => {
     return (
         <div
             className={cn(
-                "bg-white border-b border-gray-100 transition-all duration-300 ease-in-out relative z-10 origin-top overflow-hidden cursor-pointer",
-                isExpanded ? "shadow-md pb-4 pt-3" : "py-1.5 hover:bg-gray-50/50"
+                "bg-white border-b border-gray-100 transition-all duration-300 ease-in-out relative z-10 origin-top overflow-hidden",
+                isExpanded ? "shadow-md pb-4" : "hover:bg-gray-50/50 cursor-pointer"
             )}
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={() => !isExpanded && setIsExpanded(true)}
         >
             <div className={cn(
-                "px-6 flex items-center gap-6 text-[11px] font-medium overflow-hidden h-8 transition-opacity duration-200",
-                isExpanded ? "opacity-0 absolute inset-0 pointer-events-none" : "opacity-100"
+                "px-6 flex items-center justify-between transition-all duration-200",
+                isExpanded ? "py-3" : "py-2.5 h-12"
             )}>
-                <div className="text-gray-400 font-mono text-[10px] uppercase tracking-wider mr-2 shrink-0 flex items-center gap-1">
-                    Composition
-                    <ChevronDown size={12} className="opacity-50" />
+                {/* Left side: Injected Header Content (e.g. Board Summary) */}
+                <div 
+                    className="flex-1 overflow-hidden" 
+                    onClick={isExpanded ? undefined : e => e.stopPropagation()} 
+                >
+                    {leftHeaderContent}
                 </div>
-
-                {displayGroups.filter(g => mandatoryOrderKeys.includes(g.key)).map(group => (
-                    <div key={`compact-${group.key}`} className="flex items-center gap-3 shrink-0 whitespace-nowrap group">
-                        <div className="flex items-center gap-1.5">
-                            <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", group.color)} />
-                            <span className="text-gray-600 font-semibold group-hover:text-gray-900 transition-colors">{group.label}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-500 font-mono text-[10px]">
-                            <span title="Labour Hours">{group.bucket.labour.toFixed(1)}h</span>
-                            <span className="text-gray-300">|</span>
-                            <span title="Material Cost">{formatCurrency(group.bucket.cost)}</span>
-                        </div>
+                {/* Right side: Toggle */}
+                <div 
+                    className="flex items-center gap-6 text-[11px] font-medium shrink-0 ml-4 cursor-pointer"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(!isExpanded);
+                    }}
+                >
+                    <div className="text-gray-400 font-mono text-[10px] uppercase tracking-wider flex items-center gap-1 hover:text-gray-600 transition-colors">
+                        <span className="hidden sm:inline">Composition</span>
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </div>
-                ))}
+                </div>
             </div>
 
             <div className={cn(
