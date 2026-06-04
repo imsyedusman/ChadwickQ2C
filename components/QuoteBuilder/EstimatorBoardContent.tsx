@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Item, useQuote } from '@/context/QuoteContext';
-import { Search, ChevronUp, ChevronDown, ChevronRight, X, Info, Trash2, Minus, Plus, FileText, FileSpreadsheet, Clock } from 'lucide-react';
+import { Search, ChevronUp, ChevronDown, ChevronRight, X, Info, Trash2, Minus, Plus, FileText, FileSpreadsheet, Clock, RefreshCw } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import ManualItemForm from './ManualItemForm';
 import BoardSummary from './BoardSummary';
 import BoardComposition from './BoardComposition';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ItemBadges } from './ItemBadges';
+import { ViewModeToggle } from './ViewModeToggle';
+import { ExportBomDropdown } from './ExportBomDropdown';
 
 interface EstimatorBoardContentProps {
     items: Item[];
@@ -72,11 +74,14 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
     };
 
     // Group items and calculate costs
-    const { groupedItems, groupCosts, totalMaterialCost } = useMemo(() => {
+    const { groupedItems, groupCosts, groupLabourHours, totalMaterialCost } = useMemo(() => {
         const groups: Record<EstimatorGroup, Item[]> = {
             'Basic': [], 'CBs': [], 'Special CBs': [], 'Switches': [], 'Busbars': [], 'Misc': []
         };
         const costs: Record<EstimatorGroup, number> = {
+            'Basic': 0, 'CBs': 0, 'Special CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+        };
+        const labourHours: Record<EstimatorGroup, number> = {
             'Basic': 0, 'CBs': 0, 'Special CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
         };
         let totalCost = 0;
@@ -86,15 +91,17 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
             groups[group].push(item);
             
             const cost = getItemCost(item);
+            const itemLabourHours = (Number(item.labourHours) || 0) * (Number(item.quantity) || 0);
             
             // As per lib/pricing.ts, Price Adjustments are not part of Base Material Cost
             if (item.subcategory !== 'Price Adjustment') {
                 costs[group] += cost;
                 totalCost += cost;
+                labourHours[group] += itemLabourHours;
             }
         });
         
-        return { groupedItems: groups, groupCosts: costs, totalMaterialCost: totalCost };
+        return { groupedItems: groups, groupCosts: costs, groupLabourHours: labourHours, totalMaterialCost: totalCost };
     }, [items, copperPricePerKg]);
 
     // --- SEARCH STATE ---
@@ -268,91 +275,42 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0 pl-2">
-                    {/* Export BOM */}
+                    {/* Export BOM and Refresh */}
                     {selectedBoard && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <button
-                                    className="text-[10px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1 outline-none ring-0 focus:ring-2 focus:ring-blue-100"
-                                    title="Download Engineering BOM"
-                                >
-                                    <FileText size={10} />
-                                    Export BOM
-                                    <ChevronDown size={10} className="text-gray-400 group-hover:text-blue-500" />
-                                </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-64 bg-white shadow-lg border border-gray-100 p-1">
-                                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Current Board BOM</DropdownMenuLabel>
-                                
-                                <DropdownMenuItem
-                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
-                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                                >
-                                    <FileText size={14} className="text-red-600" />
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-gray-700">Export PDF</span>
-                                        <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
-                                    </div>
-                                </DropdownMenuItem>
+                        <>
+                            <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
+                            <button
+                                onClick={async () => {
+                                    if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
 
-                                <DropdownMenuItem
-                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=human`, '_blank')}
-                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                                >
-                                    <FileSpreadsheet size={14} className="text-blue-600" />
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-gray-700">Export CSV</span>
-                                        <span className="text-[10px] text-gray-400">Detailed list (Excel ready)</span>
-                                    </div>
-                                </DropdownMenuItem>
-
-                                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
-                                <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Full Quote BOM (All Boards)</DropdownMenuLabel>
-
-                                <DropdownMenuItem
-                                    onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=pdf`, '_blank')}
-                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                                >
-                                    <FileText size={14} className="text-red-600" />
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-gray-700">Export Full PDF</span>
-                                        <span className="text-[10px] text-gray-400">All boards as individual sections</span>
-                                    </div>
-                                </DropdownMenuItem>
-
-                                <DropdownMenuItem
-                                    onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=human`, '_blank')}
-                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                                >
-                                    <FileSpreadsheet size={14} className="text-blue-600" />
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-gray-700">Export Full CSV</span>
-                                        <span className="text-[10px] text-gray-400">Flat table with 'Board' column</span>
-                                    </div>
-                                </DropdownMenuItem>
-                                
-                                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
-                                <DropdownMenuItem
-                                    onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
-                                    className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none opacity-50 hover:opacity-100"
-                                >
-                                    <FileSpreadsheet size={14} className="text-green-600" />
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium text-gray-700">ERP Export (CSV)</span>
-                                        <span className="text-[10px] text-gray-400">Strict machine format</span>
-                                    </div>
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                                    try {
+                                        const res = await fetch(`/api/boards/${selectedBoard.id}/refresh-catalog`, { method: 'POST' });
+                                        if (res.ok) {
+                                            const data = await res.json();
+                                            alert(data.message);
+                                            window.location.reload(); // Simple reload to see changes
+                                        } else {
+                                            const err = await res.json();
+                                            alert(err.error || 'Failed to refresh');
+                                        }
+                                    } catch (e) {
+                                        alert('Network error');
+                                    }
+                                }}
+                                className="text-[10px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
+                                title="Update item prices and descriptions from the latest catalog"
+                            >
+                                <RefreshCw size={10} />
+                                Refresh Prices
+                            </button>
+                        </>
                     )}
 
                     {setPresentationMode && (
-                        <button
-                            onClick={() => setPresentationMode('standard')}
-                            className="text-xs font-medium bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2 shrink-0"
-                        >
-                            Standard View
-                        </button>
+                        <ViewModeToggle 
+                            presentationMode="estimator" 
+                            setPresentationMode={setPresentationMode} 
+                        />
                     )}
                 </div>
             </div>
@@ -408,28 +366,6 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
 
             {/* Board Composition Indicators */}
             <BoardComposition items={items} />
-
-            {/* Sticky Navigation Bar */}
-            {activeGroups.length > 0 && (
-                <div className="sticky top-0 z-10 bg-white border-b shadow-sm flex overflow-x-auto px-4 hide-scrollbar">
-                    {activeGroups.map(group => (
-                        <button
-                            key={group}
-                            onClick={() => scrollToSection(group)}
-                            className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors border-b-2 flex gap-1 items-center ${
-                                activeTab === group
-                                    ? 'text-blue-600 border-blue-600 bg-blue-50/50'
-                                    : 'text-gray-600 border-transparent hover:text-blue-600 hover:bg-blue-50 hover:border-blue-300'
-                            }`}
-                        >
-                            {group} 
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                                activeTab === group ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'
-                            }`}>{groupedItems[group].length}</span>
-                        </button>
-                    ))}
-                </div>
-            )}
 
             {/* Scrollable Content Area */}
             <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
@@ -502,7 +438,13 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                                     <span>{group}</span>
                                     <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded shadow-sm border border-gray-100">{groupedItems[group].length} Items</span>
                                 </div>
-                                <span className="text-sm text-slate-700">{formatCurrency(groupCosts[group])}</span>
+                                <div className="flex items-center gap-3 text-sm text-slate-700">
+                                    <span className="font-medium text-slate-600">
+                                        {groupLabourHours[group] % 1 === 0 ? groupLabourHours[group] : groupLabourHours[group].toFixed(1)}h Labour
+                                    </span>
+                                    <span className="text-gray-300">|</span>
+                                    <span className="font-bold">{formatCurrency(groupCosts[group])} Material</span>
+                                </div>
                             </div>
                             
                             {!isCollapsed && (
@@ -525,9 +467,17 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                                                 }`}
                                             >
                                                 <div className="flex-1">
-                                                    <p className="font-semibold text-gray-900">{item.name}</p>
-                                                    {item.description && (
-                                                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-1" title={item.description}>{item.description}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-semibold text-gray-900" title={item.description || item.name}>{item.description || item.name}</p>
+                                                        <ItemBadges 
+                                                            item={item} 
+                                                            boardItems={items} 
+                                                            copperPricePerKg={copperPricePerKg} 
+                                                            showConsolidationBadges={false} 
+                                                        />
+                                                    </div>
+                                                    {item.description && item.name && item.description !== item.name && (
+                                                        <p className="text-xs text-gray-500 mt-0.5 font-mono" title={item.name}>{item.name}</p>
                                                     )}
                                                     {item.subcategory && (
                                                         <p className="text-[10px] text-gray-400 mt-0.5">{item.subcategory}</p>
@@ -656,6 +606,28 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                     )})}
                 </div>
             </div>
+
+            {/* Bottom Tab Navigation (Excel Style) */}
+            {activeGroups.length > 0 && (
+                <div className="shrink-0 bg-gray-100 border-t border-gray-300 flex overflow-x-auto px-2 pt-1.5 hide-scrollbar relative z-20">
+                    {activeGroups.map(group => (
+                        <button
+                            key={group}
+                            onClick={() => scrollToSection(group)}
+                            className={`px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all flex gap-2 items-center border border-b-0 rounded-t-md mx-0.5 ${
+                                activeTab === group
+                                    ? 'text-blue-700 bg-white border-gray-300 shadow-[0_-2px_0_0_#2563eb]'
+                                    : 'text-gray-500 bg-[#e5e7eb] border-transparent hover:bg-gray-300 hover:text-gray-700'
+                            }`}
+                        >
+                            {group} 
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                activeTab === group ? 'bg-blue-100 text-blue-700' : 'bg-white/60 text-gray-500'
+                            }`}>{groupedItems[group].length}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

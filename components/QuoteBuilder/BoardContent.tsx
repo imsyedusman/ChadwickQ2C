@@ -9,6 +9,8 @@ import {
 import { cn, formatCurrency } from '@/lib/utils';
 import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { isAutoManaged, isFormulaPriced } from '@/lib/system-definitions';
+import { ItemBadges } from './ItemBadges';
+import { ViewModeToggle } from './ViewModeToggle';
 import { getDisplayPartNumber } from '@/lib/display-utils';
 import { compareItems } from '@/lib/sorting';
 import { consolidateItems, ConsolidatedItem } from '@/lib/items/consolidation';
@@ -18,6 +20,7 @@ import BoardComposition from './BoardComposition';
 import ManualItemForm from './ManualItemForm';
 import StepIndicator from './StepFlow';
 import EstimatorBoardContent from './EstimatorBoardContent';
+import { ExportBomDropdown } from './ExportBomDropdown';
 
 // ONLY these categories should appear as top-level collapsibles
 // Using singular form to match database schema
@@ -451,57 +454,12 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         <div className="font-medium text-gray-900 truncate" title={item.description || item.name}>
                             {item.description || item.name}
                         </div>
-                        {(item as ConsolidatedItem).isConsolidated && (
-                            <span className="inline-flex items-center rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/10">
-                                Aggregated
-                            </span>
-                        )}
-                        {(item as ConsolidatedItem).pricingWarning && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-inset ring-red-600/10" title="Warning: Multiple prices found for this part number. Showing price group.">
-                                <Info size={8} />
-                                Price Mismatch
-                            </span>
-                        )}
-                        {isCopper && (
-                            <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700 ring-1 ring-inset ring-orange-600/20" title={`Live Copper Price: ${formatCurrency(effectiveSettings.copperPricePerKg)}/kg`}>
-                                    <Zap size={8} className="text-orange-700" />
-                                    Cu
-                                </span>
-                            </div>
-                        )}
-                        {formulaPriced && !isCopper && (
-                            <div className="flex items-center gap-1">
-                                <SystemItemHoverCard item={{ ...item, isFormulaPriced: true } as any} boardItems={items}>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100 transition-colors cursor-help" title="">
-                                        <LockIcon size={8} className="text-amber-700" />
-                                        Calculated
-                                    </span>
-                                </SystemItemHoverCard>
-                            </div>
-                        )}
-                        {autoManaged && !formulaPriced && !isCopper && (
-                            <div className="flex items-center gap-1">
-                                <SystemItemHoverCard item={item} boardItems={items}>
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20 hover:bg-blue-100 transition-colors">
-                                        <LockIcon size={8} className="text-blue-700" />
-                                        {item.subcategory?.includes('MCCB Base') ? 'Auto (Base)' : 'Auto'}
-                                    </span>
-                                </SystemItemHoverCard>
-                            </div>
-                        )}
-                        {item.category === 'Other' && (
-                            <div className="flex items-center gap-1">
-                                <span className={cn(
-                                    "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-                                    item.subcategory === 'Price Adjustment'
-                                        ? "bg-slate-50 text-slate-700 ring-slate-600/20"
-                                        : "bg-purple-50 text-purple-700 ring-purple-600/20"
-                                )}>
-                                    {item.subcategory === 'Price Adjustment' ? 'Price Adjustment' : 'Manual Item'}
-                                </span>
-                            </div>
-                        )}
+                        <ItemBadges 
+                            item={item} 
+                            boardItems={items} 
+                            copperPricePerKg={effectiveSettings.copperPricePerKg} 
+                            showConsolidationBadges={true} 
+                        />
                     </div>
                     <div className="text-[10px] text-gray-500 truncate flex items-center gap-2">
                         {/* Only show item name (Part Number). Subcategory path removed as requested. */}
@@ -943,14 +901,6 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => setPresentationMode('estimator')}
-                        className="text-xs font-medium bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
-                    >
-                        <FileSpreadsheet size={14} className="text-green-600" />
-                        Estimator View
-                    </button>
-                    {/* View Toggle Removed - Forcing Summary View */}
 
                     {onAddItems && (
                         <button
@@ -972,80 +922,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                             Add Items
                         </button>
                     )}
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button
-                                className="text-[10px] font-medium text-gray-500 hover:text-blue-600 hover:bg-blue-50 px-2 py-1 rounded transition-colors flex items-center gap-1 outline-none ring-0 focus:ring-2 focus:ring-blue-100"
-                                title="Download Engineering BOM"
-                            >
-                                <FileText size={10} />
-                                Export BOM
-                                <ChevronDown size={10} className="text-gray-400 group-hover:text-blue-500" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64 bg-white shadow-lg border border-gray-100 p-1">
-                            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Current Board BOM</DropdownMenuLabel>
-                            
-                            <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=pdf`, '_blank')}
-                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                            >
-                                <FileText size={14} className="text-red-600" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export PDF</span>
-                                    <span className="text-[10px] text-gray-400">Engineering document (A4)</span>
-                                </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=human`, '_blank')}
-                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                            >
-                                <FileSpreadsheet size={14} className="text-blue-600" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export CSV</span>
-                                    <span className="text-[10px] text-gray-400">Detailed list (Excel ready)</span>
-                                </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
-                            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wider px-2 py-1.5">Full Quote BOM (All Boards)</DropdownMenuLabel>
-
-                            <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=pdf`, '_blank')}
-                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                            >
-                                <FileText size={14} className="text-red-600" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export Full PDF</span>
-                                    <span className="text-[10px] text-gray-400">All boards as individual sections</span>
-                                </div>
-                            </DropdownMenuItem>
-
-                            <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/export-bom?format=human`, '_blank')}
-                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none"
-                            >
-                                <FileSpreadsheet size={14} className="text-blue-600" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">Export Full CSV</span>
-                                    <span className="text-[10px] text-gray-400">Flat table with 'Board' column</span>
-                                </div>
-                            </DropdownMenuItem>
-                            
-                            <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-gray-100" />
-                            <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quoteId}/boards/${selectedBoard.id}/export-bom?format=erp`, '_blank')}
-                                className="gap-2 cursor-pointer focus:bg-gray-50 rounded-sm px-2 py-1.5 outline-none opacity-50 hover:opacity-100"
-                            >
-                                <FileSpreadsheet size={14} className="text-green-600" />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium text-gray-700">ERP Export (CSV)</span>
-                                    <span className="text-[10px] text-gray-400">Strict machine format</span>
-                                </div>
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ExportBomDropdown quoteId={quoteId} boardId={selectedBoard.id} />
                     <button
                         onClick={async () => {
                             if (!confirm('Refresh prices from catalog? This will update unit prices and labour hours for manually added items to match the current catalog. Formula-based items will effectively just update their descriptions.')) return;
@@ -1067,14 +944,14 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         className="text-[10px] font-medium text-gray-400 hover:text-gray-700 hover:bg-gray-100 px-2 py-1 rounded transition-colors flex items-center gap-1"
                         title="Update item prices and descriptions from the latest catalog"
                     >
-                        <Edit2 size={10} />
+                        <RefreshCw size={10} />
                         Refresh Prices
                     </button>
+                    <ViewModeToggle
+                        presentationMode={presentationMode || 'standard'}
+                        setPresentationMode={setPresentationMode}
+                    />
                     {/* Restore Accessories Action */}
-
-                    <div className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                        {selectedBoard.description || selectedBoard.name}
-                    </div>
                 </div>
             </div>
 
