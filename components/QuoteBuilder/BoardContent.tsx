@@ -866,20 +866,19 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         );
     };
 
-    if (presentationMode === 'estimator') {
-        return <EstimatorBoardContent 
-            items={items} 
-            setPresentationMode={setPresentationMode} 
-            onQuantityChange={handleQuantityChange}
-            onRemoveItem={handleRemoveItem}
-            onAddItems={onAddItems}
-            boardId={selectedBoardId!}
-            onOpenDocxDescription={() => setIsDescDialogOpen(true)}
-        />;
-    }
-
     return (
         <>
+            {presentationMode === 'estimator' ? (
+                <EstimatorBoardContent 
+                    items={items} 
+                    setPresentationMode={setPresentationMode} 
+                    onQuantityChange={handleQuantityChange}
+                    onRemoveItem={handleRemoveItem}
+                    onAddItems={onAddItems}
+                    boardId={selectedBoardId!}
+                    onOpenDocxDescription={() => setIsDescDialogOpen(true)}
+                />
+            ) : (
             <div className="flex flex-col h-full bg-gray-50/30">
             <div className="px-6 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                 <div>
@@ -1072,7 +1071,8 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     })
                 )}
             </div>
-        </div>
+            </div>
+            )}
 
         {/* DOCX Description Dialog */}
         <Dialog open={isDescDialogOpen} onOpenChange={setIsDescDialogOpen}>
