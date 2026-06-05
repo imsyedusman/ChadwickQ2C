@@ -173,7 +173,7 @@ export function generateDescriptionBullets(board: BoardLike): { id: string, text
     };
 
     // --- 1. MAIN SWITCHBOARD (MSB) ---
-    if (typeLower.includes("main switchboard") || typeLower.includes("(msb)")) {
+    if (typeLower.includes("main switchboard") || typeLower.includes("(msb)") || typeLower.includes("main distribution board") || typeLower.includes("(mdb)") || typeLower === "mdb") {
         // 1. Location + IP + Form + Fault + Standard
         const ip = config.ipRating || "IP42";
         const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);
@@ -255,7 +255,7 @@ export function generateDescriptionBullets(board: BoardLike): { id: string, text
     }
 
     // --- 2. DISTRIBUTION BOARD (MDB/DB) ---
-    else if (typeLower.includes("distribution board") || typeLower.includes("(mdb)") || typeLower.includes("(db)") || typeLower === "mdb" || typeLower === "db") {
+    else if (typeLower.includes("distribution board") || typeLower.includes("(db)") || typeLower === "db") {
         // 1. Location + IP + Wall-Mounted + Form + Icc
         const ip = config.ipRating || "IP42";
         const isOutdoor = ["IP55", "IP56", "IP65", "IP66"].includes(ip);

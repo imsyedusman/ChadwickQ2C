@@ -34,7 +34,7 @@ export const QUOTE_DESCRIPTION_MAPPINGS: MappingRule[] = [
     id: 'power-meters',
     displayText: 'Power Meter(s)',
     matchers: [
-      { subcategory: 'Power Meters' },
+      { subcategory: 'Power Meter' },
       { name: 'Power Meter' }
     ]
   },
