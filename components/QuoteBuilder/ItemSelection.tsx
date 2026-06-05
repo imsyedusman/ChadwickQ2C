@@ -35,6 +35,8 @@ interface ItemSelectionProps {
     onClose?: () => void;
     initialCategory?: 'Basics' | 'Switchboard' | 'Busbar';
     initialL1?: string;
+    initialL2?: string;
+    initialL3?: string;
 }
 
 interface ItemRowProps {
@@ -281,7 +283,7 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
 
 
 
-export default function ItemSelection({ onClose, initialCategory, initialL1 }: ItemSelectionProps) {
+export default function ItemSelection({ onClose, initialCategory, initialL1, initialL2, initialL3 }: ItemSelectionProps) {
     const { addItemToBoard, updateItem, removeItem, selectedBoardId, quoteId, updateUiState, boards, updateBoardConfig } = useQuote();
     // Prioritize passed initialCategory, then default to Switchboard. 
     // State restoration (Lines 50+) will only run if initialCategory is NOT provided, to respect user context.
@@ -315,6 +317,12 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
         if (initialCategory) {
             if (initialL1) {
                 setSelectedL1(initialL1);
+            }
+            if (initialL2) {
+                setSelectedL2(initialL2);
+            }
+            if (initialL3) {
+                setSelectedL3(initialL3);
             }
             return;
         }
@@ -687,16 +695,23 @@ export default function ItemSelection({ onClose, initialCategory, initialL1 }: I
     };
 
     // Reset hierarchy when master category changes
+    const prevActiveCategory = useRef(activeCategory);
     useEffect(() => {
-        setSelectedL1(null);
-        setSelectedL2(null);
-        setSelectedL3(null);
-        setSearchQuery('');
-        setMccbItemTypeFilter('All');
-        setMccbCapacityFilter('All');
-        setMccbTypeFilter('All');
-        setItems([]);
-        mccbCache.current = null; // Clear cache on master tab change to be safe
+        // Only reset state if the category actually changed from previous render
+        // This avoids React 18 StrictMode double-invocations wiping out initial state
+        if (prevActiveCategory.current !== activeCategory) {
+            setSelectedL1(null);
+            setSelectedL2(null);
+            setSelectedL3(null);
+            setSearchQuery('');
+            setMccbItemTypeFilter('All');
+            setMccbCapacityFilter('All');
+            setMccbTypeFilter('All');
+            setItems([]);
+            mccbCache.current = null; // Clear cache on master tab change to be safe
+            prevActiveCategory.current = activeCategory;
+        }
+        
         fetchCategoryTree(activeCategory);
     }, [activeCategory]);
 

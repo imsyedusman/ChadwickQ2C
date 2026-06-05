@@ -16,14 +16,14 @@ interface EstimatorBoardContentProps {
     setPresentationMode?: (mode: 'standard' | 'estimator') => void;
     onQuantityChange?: (itemId: string, newQty: number) => void;
     onRemoveItem?: (itemId: string) => void;
-    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string) => void;
+    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string, l2?: string, l3?: string) => void;
     boardId?: string;
     onOpenDocxDescription?: () => void;
 }
 
-type EstimatorGroup = 'Basic' | 'CBs' | 'Special CBs' | 'Switches' | 'Busbars' | 'Misc';
+type EstimatorGroup = 'Basic' | 'CBs' | 'Switches' | 'Busbars' | 'Misc';
 
-const GROUP_ORDER: EstimatorGroup[] = ['Basic', 'CBs', 'Special CBs', 'Switches', 'Busbars', 'Misc'];
+const GROUP_ORDER: EstimatorGroup[] = ['Basic', 'CBs', 'Switches', 'Busbars', 'Misc'];
 
 function getEstimatorGroup(item: Item): EstimatorGroup {
     if (item.category === 'Basics') return 'Basic';
@@ -32,8 +32,7 @@ function getEstimatorGroup(item: Item): EstimatorGroup {
 
     if (item.category === 'Switchboard') {
         const sub = item.subcategory || '';
-        if (sub.includes('ACB') || sub.includes('ATS')) return 'Special CBs';
-        if (sub.includes('Circuit Breakers')) return 'CBs';
+        if (sub.includes('Circuit Breakers') || sub.includes('ACB') || sub.includes('ATS')) return 'CBs';
         if (sub.includes('Switches')) return 'Switches';
         return 'Misc';
     }
@@ -77,13 +76,13 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
     // Group items and calculate costs
     const { groupedItems, groupCosts, groupLabourHours, totalMaterialCost } = useMemo(() => {
         const groups: Record<EstimatorGroup, Item[]> = {
-            'Basic': [], 'CBs': [], 'Special CBs': [], 'Switches': [], 'Busbars': [], 'Misc': []
+            'Basic': [], 'CBs': [], 'Switches': [], 'Busbars': [], 'Misc': []
         };
         const costs: Record<EstimatorGroup, number> = {
-            'Basic': 0, 'CBs': 0, 'Special CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+            'Basic': 0, 'CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
         };
         const labourHours: Record<EstimatorGroup, number> = {
-            'Basic': 0, 'CBs': 0, 'Special CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+            'Basic': 0, 'CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
         };
         let totalCost = 0;
         
@@ -201,7 +200,6 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
         switch(group) {
             case 'Basic': onAddItems('Basics'); break;
             case 'CBs': onAddItems('Switchboard', 'Circuit Breakers'); break;
-            case 'Special CBs': onAddItems('Switchboard', 'Circuit Breakers'); break;
             case 'Switches': onAddItems('Switchboard', 'Switches'); break;
             case 'Busbars': onAddItems('Busbar'); break;
             case 'Misc': onAddItems('Switchboard', 'Miscellaneous'); break;

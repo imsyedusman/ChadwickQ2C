@@ -25,6 +25,8 @@ function QuoteBuilderContent() {
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
     const [drawerCategory, setDrawerCategory] = useState<'Basics' | 'Switchboard' | 'Busbar' | undefined>(undefined);
     const [drawerL1, setDrawerL1] = useState<string | undefined>(undefined);
+    const [drawerL2, setDrawerL2] = useState<string | undefined>(undefined);
+    const [drawerL3, setDrawerL3] = useState<string | undefined>(undefined);
     const [isHeaderExpanded, setIsHeaderExpanded] = useState(false);
     const [isShareOpen, setIsShareOpen] = useState(false);
     const [activeStep, setActiveStep] = useState<string | undefined>('switchgear');
@@ -374,9 +376,11 @@ function QuoteBuilderContent() {
                                 setIsItemDrawerOpen(true);
                             }
                         }}
-                        onAddItems={(cat: any, l1?: string) => {
+                        onAddItems={(cat: any, l1?: string, l2?: string, l3?: string) => {
                             setDrawerCategory(cat);
                             setDrawerL1(l1);
+                            setDrawerL2(l2);
+                            setDrawerL3(l3);
                             setIsItemDrawerOpen(true);
                             // Sync active step
                             if (cat === 'Switchboard') setActiveStep('switchgear');
@@ -435,9 +439,13 @@ function QuoteBuilderContent() {
                                 onClose={() => {
                                     setIsItemDrawerOpen(false);
                                     setDrawerL1(undefined);
+                                    setDrawerL2(undefined);
+                                    setDrawerL3(undefined);
                                 }} 
                                 initialCategory={drawerCategory} 
                                 initialL1={drawerL1}
+                                initialL2={drawerL2}
+                                initialL3={drawerL3}
                             />
                         </div>
                     </div>

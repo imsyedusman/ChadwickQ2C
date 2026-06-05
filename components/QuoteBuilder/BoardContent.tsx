@@ -105,7 +105,7 @@ const BASICS_STRICT_ORDER = [
 
 
 interface BoardContentProps {
-    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string) => void;
+    onAddItems?: (category?: 'Basics' | 'Switchboard' | 'Busbar', l1?: string, l2?: string, l3?: string) => void;
     activeStep?: string;
     onStepClick?: (stepId: string) => void;
 }
