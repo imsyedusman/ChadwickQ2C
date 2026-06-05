@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 const basicsData = [
     // 1A - Cubic Switchboard Enclosures
     {
-        brand: null, // Basics are internal items without a vendor brand
+        brand: 'Internal', // Basics are internal items without a vendor brand
         category: 'Basics',
         subcategory: 'Cubic Switchboard Enclosures (includes busbar supports)',
         partNumber: '1A-TIERS',
@@ -17,7 +17,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Cubic Switchboard Enclosures (includes busbar supports)',
         partNumber: '1A-COMPARTMENTS',
@@ -28,7 +28,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Cubic Switchboard Enclosures (includes busbar supports)',
         partNumber: '1A-50KA',
@@ -39,7 +39,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Cubic Switchboard Enclosures (includes busbar supports)',
         partNumber: '1A-COLOUR',
@@ -52,7 +52,7 @@ const basicsData = [
 
     // 1B - Outdoor & Custom Switchboard Enclosures
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-TIERS-400',
@@ -63,7 +63,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-COMPARTMENTS',
@@ -74,7 +74,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-BASE',
@@ -85,7 +85,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-DOORS',
@@ -96,7 +96,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-600MM',
@@ -107,7 +107,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-800MM',
@@ -118,7 +118,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-SS-2B',
@@ -129,7 +129,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-SS-NO4',
@@ -140,7 +140,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-ABLOY',
@@ -151,7 +151,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-DUAL-LOCK',
@@ -162,7 +162,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Outdoor & Custom Switchboard Enclosures',
         partNumber: '1B-QUOTED',
@@ -175,7 +175,7 @@ const basicsData = [
 
     // 1B1 - Busbar Supports
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-SMALL-1',
@@ -186,7 +186,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-SMALL-2',
@@ -197,7 +197,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-LARGE-2',
@@ -208,7 +208,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Busbar', // Changed from Basics to Busbar
         subcategory: 'Busbar Supports - Required for Custom Boards Only',
         partNumber: '1B1-CLEAT-LARGE-3',
@@ -221,7 +221,7 @@ const basicsData = [
 
     // CT Metering
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-COMPARTMENTS',
@@ -232,7 +232,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-S-TYPE',
@@ -243,7 +243,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-T-TYPE',
@@ -254,7 +254,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-W-TYPE',
@@ -265,7 +265,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-U-TYPE',
@@ -276,7 +276,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-TEST-BLOCK',
@@ -287,7 +287,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-PANEL',
@@ -298,7 +298,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-WIRING',
@@ -309,7 +309,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'CT Metering',
         partNumber: 'CT-CTC400',
@@ -322,7 +322,7 @@ const basicsData = [
 
     // 100A Series Metering
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-PANEL',
@@ -333,7 +333,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-FUSE',
@@ -344,7 +344,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-WIRING-1PH',
@@ -355,7 +355,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-WIRING-3PH',
@@ -366,7 +366,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-NEUTRAL-LINK',
@@ -377,7 +377,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-MCB-1PH',
@@ -388,7 +388,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-MCB-3PH',
@@ -399,7 +399,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-CHASSIS-18',
@@ -410,7 +410,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-CHASSIS-24',
@@ -421,7 +421,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: '100A Series Metering',
         partNumber: '100A-CHASSIS-30',
@@ -432,7 +432,7 @@ const basicsData = [
 
     // Miscellaneous
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-CABLE-TRAY',
@@ -443,7 +443,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-LABELS',
@@ -454,7 +454,7 @@ const basicsData = [
         isAutoAdd: true // Common default item
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-HARDWARE',
@@ -465,7 +465,7 @@ const basicsData = [
         isAutoAdd: true // Common default item
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-TEST-TIERS',
@@ -476,7 +476,7 @@ const basicsData = [
         isAutoAdd: true // Auto-added based on tier count
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-DELIVERY-HIAB',
@@ -487,7 +487,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-DELIVERY-UTE',
@@ -498,7 +498,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-SITE-RECONNECTION',
@@ -509,7 +509,7 @@ const basicsData = [
         isAutoAdd: false
     },
     {
-        brand: null,
+        brand: 'Internal',
         category: 'Basics',
         subcategory: 'Miscellaneous',
         partNumber: 'MISC-MISC',
