@@ -330,8 +330,8 @@ export class AutomationService {
                         const newItem = await prisma.item.create({
                             data: {
                                 boardId,
-                                category: 'Switchboard',
-                                subcategory: req.sub,
+                                category: catalogItem.category || 'Switchboard',
+                                subcategory: catalogItem.subcategory || req.sub,
                                 name: req.sku,
                                 partNumber: req.sku,
                                 description: catalogItem.description,
