@@ -267,6 +267,7 @@ model Board {
   hideAutoDescription  Boolean  @default(false)
   customDescription    String?
   descriptionOptions   Json     @default("{}")
+  reviewedCategories   Json?    @default("[]")
   quote                Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   items                Item[]
 }

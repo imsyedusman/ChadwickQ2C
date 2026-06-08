@@ -68,6 +68,7 @@ export interface Board {
     hideAutoDescription: boolean;
     customDescription: string | null;
     descriptionOptions?: any;
+    reviewedCategories?: any;
     config?: any;
     items: Item[];
 }
@@ -163,6 +164,7 @@ interface QuoteContextType {
     updateUiState: (key: string, value: any) => void;
     updateBoardConfig: (boardId: string, config: any) => Promise<void>;
     updateBoardDetails: (boardId: string, updates: Partial<Board>) => Promise<void>;
+    toggleCategoryReview: (boardId: string, category: string, isReviewed: boolean) => Promise<void>;
     viewMode: 'raw' | 'consolidated';
     setViewMode: (mode: 'raw' | 'consolidated') => void;
     presentationMode: 'standard' | 'estimator';
@@ -475,7 +477,12 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 setServerTotals(data.calculatedTotals);
                 setBoards(prev => prev.map(b => {
                     if (b.id === boardId) {
-                        return { ...b, items: data.items };
+                        // Invalidate review status for this board
+                        const categoryName = item.category === 'Basics' ? 'Basics' : (item.category === 'Busbar' ? 'Busbars' : item.category);
+                        // Using simplistic invalidation: wipe them all or just the affected? The requirement says "its acknowledgement must automatically reset".
+                        // Wait, to be safe and comprehensive since categories map differently across views, let's just clear the review array for this board if an item is added. Or we can clear it completely to be safe.
+                        // Actually, let's do a more surgical update later if needed, or for now just wipe it because of backend synchronization, we don't have the current state reliably here without another API call. Let's just clear reviewedCategories.
+                        return { ...b, items: data.items, reviewedCategories: [] };
                     }
                     return b;
                 }));
@@ -517,7 +524,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 const finalBoardId = boardId;
                 setServerTotals(data.calculatedTotals);
                 setBoards(prev => prev.map(b =>
-                    b.id === finalBoardId ? { ...b, items: data.items } : b
+                    b.id === finalBoardId ? { ...b, items: data.items, reviewedCategories: [] } : b
                 ));
             }
         } catch (error) {
@@ -557,7 +564,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 setServerTotals(data.calculatedTotals);
                 setBoards(prev => prev.map(b => {
                     if (boardId && b.id === boardId) {
-                        return { ...b, items: data.items };
+                        return { ...b, items: data.items, reviewedCategories: [] };
                     }
                     return b;
                 }));
@@ -747,6 +754,34 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         }
     };
 
+    const toggleCategoryReview = async (boardId: string, category: string, isReviewed: boolean) => {
+        const board = boards.find(b => b.id === boardId);
+        if (!board) return;
+
+        let currentReviewed = Array.isArray(board.reviewedCategories) ? [...board.reviewedCategories] : [];
+        if (isReviewed) {
+            if (!currentReviewed.includes(category)) {
+                currentReviewed.push(category);
+            }
+        } else {
+            currentReviewed = currentReviewed.filter(c => c !== category);
+        }
+
+        // Optimistically update
+        setBoards(prev => prev.map(b => b.id === boardId ? { ...b, reviewedCategories: currentReviewed } : b));
+
+        try {
+            await fetch(`/api/quotes/${quoteId}/boards/${boardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reviewedCategories: currentReviewed })
+            });
+        } catch (error) {
+            console.error('Failed to toggle category review', error);
+            // Rollback could be done here if needed
+        }
+    };
+
     return (
         <QuoteContext.Provider
             value={{
@@ -790,6 +825,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 updateUiState,
                 updateBoardConfig,
                 updateBoardDetails,
+                toggleCategoryReview,
                 viewMode,
                 setViewMode,
                 presentationMode,

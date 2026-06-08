@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuote } from '@/context/QuoteContext';
-import { FileDown, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { FileDown, Loader2, ChevronDown, ChevronUp, Info, CheckSquare, Square } from 'lucide-react';
 import { ExportService } from '@/lib/export-service';
 import { formatCurrency } from '@/lib/utils';
 import FinancialsHeroCard from './FinancialsHeroCard';
@@ -23,7 +23,10 @@ export default function GrandTotalView() {
         effectiveSettings, 
         allBoardTotals, 
         creator,
-        isSyncing 
+        isSyncing,
+        presentationMode,
+        toggleCategoryReview,
+        selectedBoardId
     } = useQuote();
     const [isExporting, setIsExporting] = useState(false);
     const [isDetailed, setIsDetailed] = useState(true);
@@ -59,6 +62,47 @@ export default function GrandTotalView() {
     const labourPct = getContribution(labourCost);
     const overheadPct = getContribution(overheadAmount);
     const engineeringPct = getContribution(engineeringCost);
+
+    const getBoardCategories = (board: any) => {
+        const cats = new Set<string>();
+        board.items?.forEach((item: any) => {
+            if (item.category === 'Basics') cats.add('Basic');
+            else if (item.category === 'Busbar') cats.add('Busbars');
+            else if (item.category === 'Other') cats.add('Misc');
+            else if (item.category === 'Switchboard') {
+                const sub = item.subcategory || '';
+                if (sub.includes('Circuit Breakers') || sub.includes('ACB') || sub.includes('ATS')) cats.add('Switchgears');
+                else if (sub.includes('Switches')) cats.add('Switches');
+                else cats.add('Misc');
+            } else {
+                cats.add('Misc');
+            }
+        });
+        
+        const order = ['Basic', 'Switchgears', 'Switches', 'Busbars', 'Misc'];
+        return Array.from(cats).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    };
+
+    let allReviewed = true;
+    let totalRequired = 0;
+
+    boards.forEach(board => {
+        const requiredCats = getBoardCategories(board);
+        const reviewedCats = Array.isArray(board.reviewedCategories) ? board.reviewedCategories : [];
+        
+        requiredCats.forEach(cat => {
+            totalRequired++;
+            if (!reviewedCats.includes(cat)) {
+                allReviewed = false;
+            }
+        });
+    });
+
+    const selectedBoard = boards.find(b => b.id === selectedBoardId);
+    const currentBoardRequired = selectedBoard ? getBoardCategories(selectedBoard) : [];
+    const currentBoardReviewed = selectedBoard && Array.isArray(selectedBoard.reviewedCategories) ? selectedBoard.reviewedCategories.filter(c => currentBoardRequired.includes(c)) : [];
+    const currentReviewedCount = currentBoardReviewed.length;
+    const currentRequiredCount = currentBoardRequired.length;
 
     const handleExport = async () => {
         setIsExporting(true);
@@ -327,24 +371,71 @@ export default function GrandTotalView() {
                     </div>
                 </div>
 
-                {/* Export Button */}
-                <button
-                    onClick={handleExport}
-                    disabled={isExporting}
-                    className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white rounded-2xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-gray-200/50 text-sm mt-4 hover:scale-[1.01] active:scale-[0.99] border-t border-white/10"
-                >
-                    {isExporting ? (
-                        <>
-                            <Loader2 className="animate-spin" size={18} />
-                            Generating...
-                        </>
-                    ) : (
-                        <>
-                            <FileDown size={18} />
-                            Export Quote
-                        </>
+                {/* Review & Export Section */}
+                <div className="pt-4 mt-2 border-t border-gray-200">
+                    {selectedBoard && currentBoardRequired.length > 0 && (
+                        <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2 px-1">
+                                <h4 className="text-[11px] font-bold text-gray-900 uppercase tracking-widest">
+                                    Review Checklist
+                                </h4>
+                                <span className="text-[10px] font-medium text-gray-500">
+                                    {selectedBoard.name}
+                                </span>
+                            </div>
+                            <div className="space-y-1 bg-white rounded-lg border border-gray-200 shadow-sm p-1">
+                                {currentBoardRequired.map(cat => {
+                                    const isChecked = currentBoardReviewed.includes(cat);
+                                    return (
+                                        <button
+                                            key={cat}
+                                            onClick={() => toggleCategoryReview(selectedBoard.id, cat, !isChecked)}
+                                            className={`w-full flex items-center justify-between p-2 rounded-md transition-colors text-sm ${
+                                                isChecked ? 'bg-green-50/50 hover:bg-green-50 text-gray-900' : 'hover:bg-gray-50 text-gray-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isChecked ? (
+                                                    <CheckSquare size={16} className="text-green-600" />
+                                                ) : (
+                                                    <Square size={16} className="text-gray-300" />
+                                                )}
+                                                <span className={isChecked ? 'font-medium' : ''}>{cat}</span>
+                                            </div>
+                                            {isChecked && <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">Reviewed</span>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     )}
-                </button>
+
+                    <button
+                        onClick={handleExport}
+                        disabled={isExporting || !allReviewed || totalRequired === 0}
+                        className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl text-sm ${
+                            (!allReviewed || totalRequired === 0)
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none border-t border-gray-100'
+                                : 'bg-gray-900 hover:bg-gray-800 text-white shadow-gray-200/50 hover:scale-[1.01] active:scale-[0.99] border-t border-white/10'
+                        }`}
+                    >
+                        {isExporting ? (
+                            <>
+                                <Loader2 className="animate-spin" size={18} />
+                                Generating...
+                            </>
+                        ) : (
+                            <>
+                                <FileDown size={18} />
+                                {allReviewed 
+                                    ? 'Export Tender Document' 
+                                    : (currentReviewedCount < currentRequiredCount 
+                                        ? `Review Required (${currentReviewedCount}/${currentRequiredCount})` 
+                                        : 'Review Other Boards')}
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
         </TooltipProvider>

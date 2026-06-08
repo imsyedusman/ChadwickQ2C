@@ -194,9 +194,9 @@ interface EstimatorBoardContentProps {
     onOpenDocxDescription?: () => void;
 }
 
-type EstimatorGroup = 'Basic' | 'CBs' | 'Switches' | 'Busbars' | 'Misc';
+type EstimatorGroup = 'Basic' | 'Switchgears' | 'Switches' | 'Busbars' | 'Misc';
 
-const GROUP_ORDER: EstimatorGroup[] = ['Basic', 'CBs', 'Switches', 'Busbars', 'Misc'];
+const GROUP_ORDER: EstimatorGroup[] = ['Basic', 'Switchgears', 'Switches', 'Busbars', 'Misc'];
 
 function getEstimatorGroup(item: Item): EstimatorGroup {
     if (item.category === 'Basics') return 'Basic';
@@ -205,7 +205,7 @@ function getEstimatorGroup(item: Item): EstimatorGroup {
 
     if (item.category === 'Switchboard') {
         const sub = item.subcategory || '';
-        if (sub.includes('Circuit Breakers') || sub.includes('ACB') || sub.includes('ATS')) return 'CBs';
+        if (sub.includes('Circuit Breakers') || sub.includes('ACB') || sub.includes('ATS')) return 'Switchgears';
         if (sub.includes('Switches')) return 'Switches';
         return 'Misc';
     }
@@ -237,20 +237,20 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
     // Group items, build trees, and calculate costs
     const { groupedItems, groupTrees, groupCosts, groupLabourHours, totalMaterialCost } = useMemo(() => {
         const groups: Record<EstimatorGroup, Item[]> = {
-            'Basic': [], 'CBs': [], 'Switches': [], 'Busbars': [], 'Misc': []
+            'Basic': [], 'Switchgears': [], 'Switches': [], 'Busbars': [], 'Misc': []
         };
         const trees: Record<EstimatorGroup, TreeNode> = {
             'Basic': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 },
-            'CBs': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 },
+            'Switchgears': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 },
             'Switches': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 },
             'Busbars': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 },
             'Misc': { name: 'root', path: 'root', items: [], children: {}, totalCost: 0, totalLabour: 0, totalItems: 0 }
         };
         const costs: Record<EstimatorGroup, number> = {
-            'Basic': 0, 'CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+            'Basic': 0, 'Switchgears': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
         };
         const labourHours: Record<EstimatorGroup, number> = {
-            'Basic': 0, 'CBs': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
+            'Basic': 0, 'Switchgears': 0, 'Switches': 0, 'Busbars': 0, 'Misc': 0
         };
         let totalCost = 0;
         
@@ -399,7 +399,7 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
         if (!onAddItems) return;
         switch(group) {
             case 'Basic': onAddItems('Basics'); break;
-            case 'CBs': onAddItems('Switchboard', 'Circuit Breakers'); break;
+            case 'Switchgears': onAddItems('Switchboard', 'Circuit Breakers'); break;
             case 'Switches': onAddItems('Switchboard', 'Switches'); break;
             case 'Busbars': onAddItems('Busbar'); break;
             case 'Misc': onAddItems('Switchboard', 'Miscellaneous'); break;

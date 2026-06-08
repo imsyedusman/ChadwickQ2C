@@ -17,7 +17,8 @@ export async function PUT(
             useCustomDescription, 
             hideAutoDescription,
             customDescription, 
-            descriptionOptions 
+            descriptionOptions,
+            reviewedCategories
         } = body;
 
         // Resolve new MCCB Variant if fault rating changed
@@ -47,6 +48,9 @@ export async function PUT(
             data.descriptionOptions = typeof descriptionOptions === 'string' 
                 ? JSON.parse(descriptionOptions) 
                 : descriptionOptions;
+        }
+        if (reviewedCategories !== undefined) {
+            data.reviewedCategories = reviewedCategories;
         }
         if (config !== undefined) {
             data.config = JSON.stringify(config);
