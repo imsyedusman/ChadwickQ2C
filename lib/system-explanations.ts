@@ -41,6 +41,15 @@ export function getSystemItemExplanation(item: Item, allItems: Item[]): SystemEx
     }
 
     // 0. BASE INCLUSIONS (Default Items)
+    if (item.category === 'Busbar' && isDefault) {
+        return {
+            reason: "Standard busbar inclusion based on board rating.",
+            calculation: "Quantity changes override the default generated quantity and will be preserved.",
+            ruleName: "BUSBAR_GENERATION",
+            handler: "syncBoardItems"
+        };
+    }
+
     if (isDefault && !(item as any).systemRuleType && !(item as any).systemTag) {
         return {
             reason: "Standard inclusion for this board type.",

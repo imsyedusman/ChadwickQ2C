@@ -296,6 +296,13 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         const targetItem = items.find(i => i.id === itemId) as ConsolidatedItem;
         if (!targetItem) return;
 
+        if (targetItem.category === 'Busbar' && targetItem.isDefault) {
+            const confirmDelete = window.confirm(
+                "Auto-generated busbar\n\nThis busbar was automatically generated from the board configuration.\n\nDeleting it will prevent this specific busbar from being regenerated automatically unless the board configuration changes."
+            );
+            if (!confirmDelete) return;
+        }
+
         if (targetItem.isConsolidated && targetItem.originalIds && targetItem.originalIds.length > 1) {
             // Multi-item delete
             if (!confirm(`This will remove all ${targetItem.originalIds.length} merged instances of this part. Continue?`)) return;
@@ -475,7 +482,7 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         "flex items-center gap-1 border rounded px-1 h-6",
                         isQtyLocked ? "bg-gray-100 border-gray-200 cursor-not-allowed" : "bg-white border-gray-200"
                     )}
-                    title={autoManaged ? "Quantity is controlled by board configuration" : undefined}
+                    title={autoManaged ? (isQtyLocked ? "Quantity is controlled by board configuration" : "Quantity changes override the default generated quantity and will be preserved") : undefined}
                 >
                     <button
                         onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - (isCopper ? 0.1 : 1))}
