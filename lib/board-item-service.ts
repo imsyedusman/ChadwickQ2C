@@ -221,7 +221,8 @@ function addCtItems(
     qty: number,
     includeCtType: boolean,
     config: BoardConfig,
-    existingItems: any[]
+    existingItems: any[],
+    deletedSkus: string[] = []
 ) {
     // Layer 1 – Core CT Metering (always added when CT Metering = Yes)
     targetMap('CT-COMPARTMENTS', qty);
@@ -243,7 +244,7 @@ function addCtItems(
         // Busbars
         if (config.enclosureType) {
             const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
-            if (busbarPartNumber) {
+            if (busbarPartNumber && !deletedSkus.includes(busbarPartNumber)) {
                 // Respect user edits for busbars (don't force-reset to 1)
                 // BUT skip if already added in this sync to prevent compounding / doubling.
                 // Busbars represent the entire board's copper system, so they only need to be initialized once per sync.
@@ -936,13 +937,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // 1. Active Metering
     if (isCtMode) {
         const activeQty = config.ctQuantity || 1;
-        addCtItems(addCtTarget, activeQty, true, config, existingItems);
+        addCtItems(addCtTarget, activeQty, true, config, existingItems, deletedSkus);
     }
 
     // 2. Spare CT Provisioning
     if (config.ctSpareProvision === 'Yes') {
         const spareQty = config.ctSpareQuantity || 1;
-        addCtItems(addCtTarget, spareQty, false, config, existingItems);
+        addCtItems(addCtTarget, spareQty, false, config, existingItems, deletedSkus);
     }
 
     // 3. Apply Totals to Main Target Map & Scoped Cleanup

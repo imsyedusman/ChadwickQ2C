@@ -165,6 +165,7 @@ export async function DELETE(
                 productFrame: true, 
                 partNumber: true,
                 isSystemManaged: true,
+                isDefault: true,
                 parentItemId: true,
                 autoAdded: true
             }
@@ -177,8 +178,9 @@ export async function DELETE(
         }
 
         const isSwitchboardAuto = (item.category === 'Switchboard' && (item.isSystemManaged || (item as any).autoAdded));
+        const isTrackableAutoItem = isSwitchboardAuto || (item.category === 'Busbar' && item.isDefault);
         
-        if (isSwitchboardAuto) {
+        if (isTrackableAutoItem) {
             const boardId = item.boardId;
             const parentItemId = (item as any).parentItemId;
             const accessoryType = getAccessoryType(item.name);

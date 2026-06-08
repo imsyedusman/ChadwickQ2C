@@ -405,7 +405,8 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         const isAutoAccessory = (item as any).autoAdded === true || item.systemTag === 'MCCB_ACCESSORIES';
         
         // Switchgear auto-items should be UNLOCKED as per user request
-        const isQtyLocked = (!!autoManaged && !isAutoAccessory && !isSwitchgear);
+        const isBusbar = item.category === 'Busbar';
+        const isQtyLocked = (!!autoManaged && !isAutoAccessory && !isSwitchgear && !isBusbar);
         const isDeleteLocked = false; // Always allow delete in summary view
 
         // Determine Tooltip Text
