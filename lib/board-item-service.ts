@@ -8,6 +8,7 @@ import { getGlobalSettings } from './settings-service';
 export interface BoardConfig {
     ctMetering: string;
     ctType?: string;
+    ctRating?: string;
     ctQuantity?: number;
     meterPanel: string;
     wholeCurrentMetering?: string;
@@ -222,7 +223,8 @@ function addCtItems(
     includeCtType: boolean,
     config: BoardConfig,
     existingItems: any[],
-    deletedSkus: string[] = []
+    deletedSkus: string[] = [],
+    baseBusbars?: Map<string, number>
 ) {
     // Layer 1 – Core CT Metering (always added when CT Metering = Yes)
     targetMap('CT-COMPARTMENTS', qty);
@@ -239,27 +241,21 @@ function addCtItems(
         targetMap('CT-WIRING', qty);
     }
 
-    // 4. Busbars & Labour (Only if rating available)
-    if (config.currentRating) {
-        // Busbars
-        if (config.enclosureType) {
-            const busbarPartNumber = getBusbarPartNumber(config.currentRating, config.enclosureType);
+    // 4. CT Busbars & Labour (Driven by ctRating)
+    // Fallback to currentRating if legacy quote doesn't have ctRating
+    const effectiveRating = config.ctRating || config.currentRating;
+    
+    if (effectiveRating) {
+        // CT Busbars (Droppers)
+        if (config.enclosureType && baseBusbars) {
+            const busbarPartNumber = getBusbarPartNumber(effectiveRating, config.enclosureType);
             if (busbarPartNumber && !deletedSkus.includes(busbarPartNumber)) {
-                // Respect user edits for busbars (don't force-reset to 1)
-                // BUT skip if already added in this sync to prevent compounding / doubling.
-                // Busbars represent the entire board's copper system, so they only need to be initialized once per sync.
-                if (! (targetMap as any).tracker?.has(busbarPartNumber)) {
-                    if (! (targetMap as any).tracker) (targetMap as any).tracker = new Set<string>();
-                    (targetMap as any).tracker.add(busbarPartNumber);
-
-                    const existingBusbar = existingItems.find((i: Item) => i.name === busbarPartNumber);
-                    const busbarQty = existingBusbar ? existingBusbar.quantity : 1;
-                    targetMap(busbarPartNumber, busbarQty);
-                }
+                // Register base system requirement (scaled by number of CT chambers)
+                baseBusbars.set(busbarPartNumber, (baseBusbars.get(busbarPartNumber) || 0) + qty);
             }
         }
-        // Labour
-        const labour = getLabourPartNumber(config.currentRating);
+        // CT Labour
+        const labour = getLabourPartNumber(effectiveRating);
         if (labour) targetMap(labour, qty);
     }
 }
@@ -333,7 +329,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     if (partNumbers.length > 0) {
         // Bulk fetch catalog items to avoid N+1 queries
         const catalogItems = await prisma.catalogItem.findMany({
-            where: { partNumber: { in: partNumbers } }
+            where: { partNumber: { in: partNumbers } },
+            orderBy: { updatedAt: 'asc' }
         });
         const catalogMap = new Map((catalogItems as any[]).map(c => [c.partNumber, c]));
 
@@ -835,6 +832,17 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         addTarget('MISC-CABLE-TRAY', config.cableZoneCount || 1);
     }
 
+    // --- MAIN BOARD INFRASTRUCTURE ---
+    const baseBusbars = new Map<string, number>();
+
+    // 1. Board-Level Busbar (Decoupled from Metering)
+    if (config.currentRating && config.enclosureType) {
+        const boardBusbarPn = getBusbarPartNumber(config.currentRating, config.enclosureType);
+        if (boardBusbarPn && !deletedSkus.includes(boardBusbarPn)) {
+            baseBusbars.set(boardBusbarPn, 1);
+        }
+    }
+
     // --- METERING LOGIC ---
     // Refactored 2026-02-17 to allow Coexistence of CT and Whole Current Metering (Scoped Ownership)
 
@@ -937,13 +945,13 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // 1. Active Metering
     if (isCtMode) {
         const activeQty = config.ctQuantity || 1;
-        addCtItems(addCtTarget, activeQty, true, config, existingItems, deletedSkus);
+        addCtItems(addCtTarget, activeQty, true, config, existingItems, deletedSkus, baseBusbars);
     }
 
     // 2. Spare CT Provisioning
     if (config.ctSpareProvision === 'Yes') {
         const spareQty = config.ctSpareQuantity || 1;
-        addCtItems(addCtTarget, spareQty, false, config, existingItems, deletedSkus);
+        addCtItems(addCtTarget, spareQty, false, config, existingItems, deletedSkus, baseBusbars);
     }
 
     // 3. Apply Totals to Main Target Map & Scoped Cleanup
@@ -1202,6 +1210,31 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     // --- 3. FETCH CATALOG DATA ---
     // We need catalog data BEFORE SS Calculation to properly price items like 1B-DOORS
 
+    // --- PROCESS ACCUMULATED BUSBARS ---
+    for (const [pn, baseQty] of baseBusbars.entries()) {
+        const existing = existingItems.find((i: Item) => i.name === pn);
+        // Safely preserve manual increases. Auto-upgrade old quotes from 1 to 2 if needed.
+        const finalQty = existing ? Math.max(Number(existing.quantity), baseQty) : baseQty;
+        // Tag as system generated busbar so it can be cleaned up if ratings change
+        itemTags.set(pn, 'SYSTEM_BUSBAR');
+        // Add to main targets (systemTag will be picked up from itemTags)
+        addTarget(pn, finalQty);
+    }
+
+    // SCOPED CLEANUP: SYSTEM_BUSBAR
+    // If an old busbar was generated by the system, but the rating changed (no longer in baseBusbars), remove it.
+    const obsoleteSystemBusbars = existingItems.filter((i: Item) => 
+        i.systemTag === 'SYSTEM_BUSBAR' && !baseBusbars.has(i.name)
+    );
+    if (obsoleteSystemBusbars.length > 0) {
+        console.log(`[Busbars] Cleaning up ${obsoleteSystemBusbars.length} obsolete system busbars.`);
+        await prisma.item.deleteMany({
+            where: { id: { in: obsoleteSystemBusbars.map((i: Item) => i.id) } }
+        });
+        // Remove from existingItems so it doesn't interfere with future checks
+        existingItems = existingItems.filter((i: Item) => !obsoleteSystemBusbars.some(ob => ob.id === i.id));
+    }
+
     // Ensure 1A-COMPARTMENTS is targeted for Cubic before fetch
     if (config.enclosureType === 'Cubic') {
         targetItemPartNumbers.add('1A-COMPARTMENTS');
@@ -1229,7 +1262,8 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
 
     // Fetch catalog info for all targets
     const catalogItems = await prisma.catalogItem.findMany({
-        where: { partNumber: { in: targetPartNumbersArray } }
+        where: { partNumber: { in: targetPartNumbersArray } },
+        orderBy: { updatedAt: 'asc' }
     });
     const catalogMap = new Map<string, CatalogItem>(); // Local interface usage
     catalogItems.forEach((i: PrismaCatalogItem) => { if (i.partNumber) catalogMap.set(i.partNumber, i as any); });

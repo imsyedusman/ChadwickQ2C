@@ -106,6 +106,7 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     spd: '',
     ctMetering: 'No',
     ctType: 'S',
+    ctRating: '160A',
     ctQuantity: 1,
     meterPanel: 'No',
     wholeCurrentMetering: 'No',
@@ -133,6 +134,25 @@ const DEFAULT_BOARD_CONFIG: Partial<BoardConfig> = {
     extraForDoorsOver: false,
     bakeliteQty: 1
 };
+
+export function getCtTypeFromRating(rating: string): string {
+    if (!rating) return 'S';
+    const amps = parseInt(rating.replace(/[^0-9]/g, '')) || 0;
+    if (amps <= 200) return 'S';
+    if (amps <= 800) return 'T';
+    if (amps <= 1600) return 'W';
+    return 'U';
+}
+
+export function getLegacyRatingFromType(type: string): string {
+    switch (type) {
+        case 'S': return '160A';
+        case 'T': return '400A';
+        case 'W': return '1200A';
+        case 'U': return '2000A';
+        default: return '160A';
+    }
+}
 
 const SegmentedControl = ({ value, onChange, options = ['No', 'Yes'], disabled }: { value: string, onChange: (val: string) => void, options?: string[], disabled?: boolean }) => (
     <div className={cn("flex bg-gray-100/80 p-1 rounded-lg border border-gray-200 w-full", disabled && "opacity-60 cursor-not-allowed")}>
@@ -552,7 +572,6 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         value={config.location || ''}
                         onChange={v => {
                             setConfig({ ...config, location: v, ipRating: '' });
-                            setIsMeterPanelOverridden(false);
                         }}
                         options={LOCATIONS}
                     />
@@ -859,35 +878,72 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                     value={config.ctMetering || 'No'}
                                     onChange={v => {
                                         setConfig({ ...config, ctMetering: v });
-                                        setIsMeterPanelOverridden(false);
                                     }}
                                 />
                             </div>
                         </div>
-                        {config.ctMetering === 'Yes' && (
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100">
-                                <div>
-                                    <label className="text-[10px] text-gray-500 block">Type</label>
-                                    <select
-                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.ctType}
-                                        onChange={e => setConfig({ ...config, ctType: e.target.value })}
-                                    >
-                                        {CT_TYPES.map(t => <option key={t} value={t}>{t}-Type</option>)}
-                                    </select>
+                        {config.ctMetering === 'Yes' && (() => {
+                            const isLegacy = !config.ctRating && !!config.ctType;
+                            const displayRating = config.ctRating || (isLegacy ? getLegacyRatingFromType(config.ctType!) : '');
+                            const displayType = config.ctType || getCtTypeFromRating(displayRating);
+                            
+                            const boardAmps = parseInt((config.currentRating || '').replace(/[^0-9]/g, '')) || 0;
+                            const ctAmps = parseInt(displayRating.replace(/[^0-9]/g, '')) || 0;
+                            const isOverBoardRating = boardAmps > 0 && ctAmps > boardAmps;
+
+                            return (
+                                <div className="pt-2 border-t border-gray-100 space-y-2">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block">Current Rating</label>
+                                            <select
+                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                value={displayRating}
+                                                onChange={e => {
+                                                    const rating = e.target.value;
+                                                    setConfig({ 
+                                                        ...config, 
+                                                        ctRating: rating,
+                                                        ctType: getCtTypeFromRating(rating)
+                                                    });
+                                                }}
+                                            >
+                                                <option value="" disabled>Select Rating...</option>
+                                                {getCurrentOptions()
+                                                    .filter(r => (parseInt(r.replace(/[^0-9]/g, '')) || 0) >= 100)
+                                                    .map(r => (
+                                                    <option key={r} value={r}>{r} ({getCtTypeFromRating(r)}-Type)</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-500 block">Qty</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                value={config.ctQuantity ?? 1}
+                                                onChange={e => setConfig({ ...config, ctQuantity: parseInt(e.target.value) || 1 })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        {displayType && (
+                                            <p className="text-[10px] text-purple-600 flex items-center gap-1 font-medium">
+                                                <Check size={12} className="shrink-0" />
+                                                {isLegacy ? `Imported from legacy CT Type selection: ${displayType}-Type` : `Mapped to ${displayType}-Type`}
+                                            </p>
+                                        )}
+                                        {isOverBoardRating && (
+                                            <p className="text-[10px] text-orange-600 flex items-start gap-1 font-medium animate-in fade-in">
+                                                <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                                                Warning: CT Rating exceeds Main Board Rating
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] text-gray-500 block">Qty</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                        value={config.ctQuantity ?? 1}
-                                        onChange={e => setConfig({ ...config, ctQuantity: parseInt(e.target.value) || 1 })}
-                                    />
-                                </div>
-                            </div>
-                        )}
+                            );
+                        })()}
                     </div>
 
                     {/* CT Spare Provisioning */}
