@@ -460,14 +460,12 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
 
     // Automation: CT Metering Panel Defaulting
     useEffect(() => {
-        if (isMeterPanelOverridden) return;
         if (config.ctMetering === 'Yes') {
-            const newDefault = config.location === 'Outdoor' ? 'Yes' : 'No';
-            if (config.meterPanel !== newDefault) {
-                setConfig(prev => ({ ...prev, meterPanel: newDefault }));
+            if (config.meterPanel !== 'Yes') {
+                setConfig(prev => ({ ...prev, meterPanel: 'Yes' }));
             }
         }
-    }, [config.location, config.ctMetering, isMeterPanelOverridden]);
+    }, [config.ctMetering]);
 
 
 
