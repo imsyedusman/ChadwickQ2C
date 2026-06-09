@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, ArrowRight, ArrowLeft, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BoardConfig } from '@/lib/board-item-service';
+import { getBusbarPartNumber, getLabourPartNumber } from '@/lib/busbar-mapping';
 import { applyBoardPrefix } from '@/lib/board-naming';
 
 import {
@@ -909,7 +910,7 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                                 }}
                                             >
                                                 <option value="" disabled>Select Rating...</option>
-                                                {getCurrentOptions()
+                                                {CURRENT_RATINGS
                                                     .filter(r => (parseInt(r.replace(/[^0-9]/g, '')) || 0) >= 100)
                                                     .map(r => (
                                                     <option key={r} value={r}>{r} ({getCtTypeFromRating(r)}-Type)</option>
@@ -940,6 +941,23 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                                                 Warning: CT Rating exceeds Main Board Rating
                                             </p>
                                         )}
+                                        <div className="mt-1 pl-1 border-l-2 border-blue-200 animate-in fade-in">
+                                            {!config.ctRating ? (
+                                                <p className="text-[10px] text-gray-400 italic">Awaiting CT Rating selection...</p>
+                                            ) : (
+                                                <>
+                                                    <p className="text-[10px] text-gray-400 italic">Will generate:</p>
+                                                    <ul className="text-[10px] text-gray-500 font-medium list-disc ml-4 mt-0.5">
+                                                        {getBusbarPartNumber(config.ctRating, config.enclosureType || '') && (
+                                                            <li>{getBusbarPartNumber(config.ctRating, config.enclosureType || '')}</li>
+                                                        )}
+                                                        {getLabourPartNumber(config.ctRating) && (
+                                                            <li>{getLabourPartNumber(config.ctRating)}</li>
+                                                        )}
+                                                    </ul>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );
