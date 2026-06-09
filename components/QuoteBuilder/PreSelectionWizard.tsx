@@ -883,79 +883,125 @@ export default function PreSelectionWizard({ isOpen, onClose, onConfirm, initial
                         </div>
                         {config.ctMetering === 'Yes' && (() => {
                             const isLegacy = !config.ctRating && !!config.ctType;
-                            const displayRating = config.ctRating || (isLegacy ? getLegacyRatingFromType(config.ctType!) : '');
-                            const displayType = config.ctType || getCtTypeFromRating(displayRating);
+                            const legacyRating = isLegacy ? getLegacyRatingFromType(config.ctType!) : '';
                             
+                            const displayAssemblies = config.ctAssemblies || [{
+                                rating: config.ctRating || legacyRating || '',
+                                quantity: config.ctQuantity ?? 1
+                            }];
+
                             const boardAmps = parseInt((config.currentRating || '').replace(/[^0-9]/g, '')) || 0;
-                            const ctAmps = parseInt(displayRating.replace(/[^0-9]/g, '')) || 0;
-                            const isOverBoardRating = boardAmps > 0 && ctAmps > boardAmps;
+
+                            const generatedItems = new Map<string, number>();
+                            displayAssemblies.forEach(a => {
+                                const r = a.rating;
+                                const q = a.quantity || 1;
+                                if (r) {
+                                    const bb = getBusbarPartNumber(r, config.enclosureType || '');
+                                    if (bb) generatedItems.set(bb, (generatedItems.get(bb) || 0) + q);
+                                    
+                                    const lab = getLabourPartNumber(r);
+                                    if (lab) generatedItems.set(lab, (generatedItems.get(lab) || 0) + q);
+                                    
+                                    const type = getCtTypeFromRating(r);
+                                    if (type) generatedItems.set(`CT-${type}-TYPE`, (generatedItems.get(`CT-${type}-TYPE`) || 0) + q);
+                                }
+                            });
 
                             return (
-                                <div className="pt-2 border-t border-gray-100 space-y-2">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <label className="text-[10px] text-gray-500 block">Current Rating</label>
-                                            <select
-                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                                value={displayRating}
-                                                onChange={e => {
-                                                    const rating = e.target.value;
-                                                    setConfig({ 
-                                                        ...config, 
-                                                        ctRating: rating,
-                                                        ctType: getCtTypeFromRating(rating)
-                                                    });
-                                                }}
-                                            >
-                                                <option value="" disabled>Select Rating...</option>
-                                                {CURRENT_RATINGS
-                                                    .filter(r => (parseInt(r.replace(/[^0-9]/g, '')) || 0) >= 100)
-                                                    .map(r => (
-                                                    <option key={r} value={r}>{r} ({getCtTypeFromRating(r)}-Type)</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-gray-500 block">Qty</label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
-                                                value={config.ctQuantity ?? 1}
-                                                onChange={e => setConfig({ ...config, ctQuantity: parseInt(e.target.value) || 1 })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col gap-1 mt-1">
-                                        {displayType && (
-                                            <p className="text-[10px] text-purple-600 flex items-center gap-1 font-medium">
-                                                <Check size={12} className="shrink-0" />
-                                                {isLegacy ? `Imported from legacy CT Type selection: ${displayType}-Type` : `Mapped to ${displayType}-Type`}
-                                            </p>
+                                <div className="pt-2 border-t border-gray-100 space-y-3">
+                                    {displayAssemblies.map((assembly, index) => {
+                                        const ctAmps = parseInt(assembly.rating.replace(/[^0-9]/g, '')) || 0;
+                                        const isOverBoardRating = boardAmps > 0 && ctAmps > boardAmps;
+                                        const displayType = getCtTypeFromRating(assembly.rating);
+
+                                        return (
+                                            <div key={index} className="space-y-2 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                                                <div className="flex gap-2 items-end">
+                                                    <div className="flex-1">
+                                                        <label className="text-[10px] text-gray-500 block">Current Rating</label>
+                                                        <select
+                                                            className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                            value={assembly.rating}
+                                                            onChange={e => {
+                                                                const newAssemblies = [...displayAssemblies];
+                                                                newAssemblies[index] = { ...assembly, rating: e.target.value };
+                                                                setConfig({ ...config, ctAssemblies: newAssemblies });
+                                                            }}
+                                                        >
+                                                            <option value="" disabled>Select Rating...</option>
+                                                            {CURRENT_RATINGS
+                                                                .filter(r => (parseInt(r.replace(/[^0-9]/g, '')) || 0) >= 100)
+                                                                .map(r => (
+                                                                <option key={r} value={r}>{r} ({getCtTypeFromRating(r)}-Type)</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div className="w-16">
+                                                        <label className="text-[10px] text-gray-500 block mb-1">Qty</label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            className="w-full p-1.5 bg-white border border-gray-300 rounded text-xs text-gray-900 focus:ring-2 focus:ring-purple-500 outline-none"
+                                                            value={assembly.quantity ?? 1}
+                                                            onChange={e => {
+                                                                const newAssemblies = [...displayAssemblies];
+                                                                newAssemblies[index] = { ...assembly, quantity: parseInt(e.target.value) || 1 };
+                                                                setConfig({ ...config, ctAssemblies: newAssemblies });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    {displayAssemblies.length > 1 && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const newAssemblies = [...displayAssemblies];
+                                                                newAssemblies.splice(index, 1);
+                                                                setConfig({ ...config, ctAssemblies: newAssemblies });
+                                                            }}
+                                                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors mb-0.5"
+                                                            title="Remove Assembly"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    {isOverBoardRating && (
+                                                        <p className="text-[10px] text-orange-600 flex items-start gap-1 font-medium animate-in fade-in">
+                                                            <AlertCircle size={12} className="shrink-0 mt-0.5" />
+                                                            Warning: CT Rating exceeds Main Board Rating
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+
+                                    <button
+                                        onClick={() => {
+                                            const newAssemblies = [...displayAssemblies];
+                                            newAssemblies.push({ rating: '400A', quantity: 1 });
+                                            setConfig({ ...config, ctAssemblies: newAssemblies });
+                                        }}
+                                        className="w-full py-1.5 flex items-center justify-center gap-1.5 text-[11px] font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded border border-purple-200 transition-colors"
+                                    >
+                                        <Plus size={12} />
+                                        Add CT Assembly
+                                    </button>
+
+                                    <div className="mt-2 pl-1 border-l-2 border-blue-200 animate-in fade-in bg-gray-50/50 p-2 rounded-r">
+                                        {generatedItems.size === 0 ? (
+                                            <p className="text-[10px] text-gray-400 italic">Awaiting CT Rating selection...</p>
+                                        ) : (
+                                            <>
+                                                <p className="text-[10px] text-gray-500 font-bold mb-1">Will generate:</p>
+                                                <ul className="text-[10px] text-gray-600 font-medium list-disc ml-4 space-y-0.5">
+                                                    {Array.from(generatedItems.entries()).map(([part, qty]) => (
+                                                        <li key={part}>{part} x{qty}</li>
+                                                    ))}
+                                                </ul>
+                                            </>
                                         )}
-                                        {isOverBoardRating && (
-                                            <p className="text-[10px] text-orange-600 flex items-start gap-1 font-medium animate-in fade-in">
-                                                <AlertCircle size={12} className="shrink-0 mt-0.5" />
-                                                Warning: CT Rating exceeds Main Board Rating
-                                            </p>
-                                        )}
-                                        <div className="mt-1 pl-1 border-l-2 border-blue-200 animate-in fade-in">
-                                            {!config.ctRating ? (
-                                                <p className="text-[10px] text-gray-400 italic">Awaiting CT Rating selection...</p>
-                                            ) : (
-                                                <>
-                                                    <p className="text-[10px] text-gray-400 italic">Will generate:</p>
-                                                    <ul className="text-[10px] text-gray-500 font-medium list-disc ml-4 mt-0.5">
-                                                        {getBusbarPartNumber(config.ctRating, config.enclosureType || '') && (
-                                                            <li>{getBusbarPartNumber(config.ctRating, config.enclosureType || '')}</li>
-                                                        )}
-                                                        {getLabourPartNumber(config.ctRating) && (
-                                                            <li>{getLabourPartNumber(config.ctRating)}</li>
-                                                        )}
-                                                    </ul>
-                                                </>
-                                            )}
-                                        </div>
                                     </div>
                                 </div>
                             );

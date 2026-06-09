@@ -69,3 +69,12 @@ export function getLabourPartNumber(currentRating: string): string | null {
     if (!band) return null;
     return labourMapping[band] || null;
 }
+
+export function getCtTypeFromRating(rating: string): string {
+    if (!rating) return 'S';
+    const amps = parseInt(rating.replace(/[^0-9]/g, '')) || 0;
+    if (amps <= 200) return 'S';
+    if (amps <= 800) return 'T';
+    if (amps <= 1600) return 'W';
+    return 'U';
+}

@@ -1,16 +1,22 @@
 import prisma from './prisma';
 import { Item, CatalogItem as PrismaCatalogItem } from '@prisma/client';
-import { getBusbarPartNumber, getLabourPartNumber } from './busbar-mapping';
+import { getBusbarPartNumber, getLabourPartNumber, getCtTypeFromRating } from './busbar-mapping';
 import { calculateBusbarUnitPrice } from './pricing';
 import { Prisma } from '@prisma/client'; // For Decimal
 import { isPermanentManualCategory } from './system-definitions';
 import { getGlobalSettings } from './settings-service';
+
+export interface CtAssembly {
+    rating: string;
+    quantity: number;
+}
 
 export interface BoardConfig {
     ctMetering: string;
     ctType?: string;
     ctRating?: string;
     ctQuantity?: number;
+    ctAssemblies?: CtAssembly[];
     meterPanel: string;
     wholeCurrentMetering?: string;
     wcType?: string;
@@ -150,37 +156,76 @@ export function addCtItems(
     deletedSkus: string[] = [],
     baseBusbars?: Map<string, number>
 ) {
-    // Layer 1 – Core CT Metering (always added when CT Metering = Yes)
-    targetMap('CT-COMPARTMENTS', qty);
+    if (includeCtType) {
+        // ACTIVE METERING MODE
+        let assemblies: CtAssembly[] = [];
+        if (config.ctAssemblies && config.ctAssemblies.length > 0) {
+            assemblies = config.ctAssemblies;
+        } else {
+            // Fallback to legacy
+            assemblies = [{
+                rating: config.ctRating || config.currentRating || '',
+                quantity: config.ctQuantity || 1
+            }];
+        }
 
-    // CT Type (Coils) - Only if Active Metering
-    if (includeCtType && config.ctType) {
-        targetMap(`CT-${config.ctType}-TYPE`, qty);
-    }
+        const totalQty = assemblies.reduce((sum, a) => sum + (a.quantity || 1), 0);
 
-    // Layer 2 – Meter Panel Section (only added when Meter Panel Included = Yes)
-    if (config.meterPanel === 'Yes') {
-        targetMap('CT-PANEL', qty);
-        targetMap('CT-TEST-BLOCK', qty);
-        targetMap('CT-WIRING', qty);
-    }
+        // Layer 1 - Core CT Metering (always added when CT Metering = Yes)
+        targetMap('CT-COMPARTMENTS', totalQty);
 
-    // 4. CT Busbars & Labour (Driven by ctRating)
-    // Fallback to currentRating if legacy quote doesn't have ctRating
-    const effectiveRating = config.ctRating || config.currentRating;
-    
-    if (effectiveRating) {
-        // CT Busbars (Droppers)
-        if (config.enclosureType && baseBusbars) {
-            const busbarPartNumber = getBusbarPartNumber(effectiveRating, config.enclosureType);
-            if (busbarPartNumber && !deletedSkus.includes(busbarPartNumber)) {
-                // Register base system requirement (scaled by number of CT chambers)
-                baseBusbars.set(busbarPartNumber, (baseBusbars.get(busbarPartNumber) || 0) + qty);
+        // Layer 2 - Meter Panel Section (only added when Meter Panel Included = Yes)
+        if (config.meterPanel === 'Yes') {
+            targetMap('CT-PANEL', totalQty);
+            targetMap('CT-TEST-BLOCK', totalQty);
+            targetMap('CT-WIRING', totalQty);
+        }
+
+        // Layer 3 - Specific Items per Assembly
+        for (const assembly of assemblies) {
+            const aQty = assembly.quantity || 1;
+            const effectiveRating = assembly.rating;
+            if (effectiveRating) {
+                // CT Type (Coils)
+                const ctType = getCtTypeFromRating(effectiveRating);
+                if (ctType) {
+                    targetMap(`CT-${ctType}-TYPE`, aQty);
+                }
+
+                // CT Busbars (Droppers)
+                if (config.enclosureType && baseBusbars) {
+                    const busbarPartNumber = getBusbarPartNumber(effectiveRating, config.enclosureType);
+                    if (busbarPartNumber && !deletedSkus.includes(busbarPartNumber)) {
+                        baseBusbars.set(busbarPartNumber, (baseBusbars.get(busbarPartNumber) || 0) + aQty);
+                    }
+                }
+                
+                // CT Labour
+                const labour = getLabourPartNumber(effectiveRating);
+                if (labour) targetMap(labour, aQty);
             }
         }
-        // CT Labour
-        const labour = getLabourPartNumber(effectiveRating);
-        if (labour) targetMap(labour, qty);
+    } else {
+        // SPARE METERING MODE (Untouched Legacy Logic)
+        targetMap('CT-COMPARTMENTS', qty);
+
+        if (config.meterPanel === 'Yes') {
+            targetMap('CT-PANEL', qty);
+            targetMap('CT-TEST-BLOCK', qty);
+            targetMap('CT-WIRING', qty);
+        }
+
+        const effectiveRating = config.ctRating || config.currentRating;
+        if (effectiveRating) {
+            if (config.enclosureType && baseBusbars) {
+                const busbarPartNumber = getBusbarPartNumber(effectiveRating, config.enclosureType);
+                if (busbarPartNumber && !deletedSkus.includes(busbarPartNumber)) {
+                    baseBusbars.set(busbarPartNumber, (baseBusbars.get(busbarPartNumber) || 0) + qty);
+                }
+            }
+            const labour = getLabourPartNumber(effectiveRating);
+            if (labour) targetMap(labour, qty);
+        }
     }
 }
 
