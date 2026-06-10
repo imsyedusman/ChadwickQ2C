@@ -41,6 +41,9 @@ export interface Item {
     labourHours: number;
     cost: number;
     notes: string | null;
+    manualQuantity?: number;
+    requiredQty?: number;
+    dependencySources?: any;
     isDefault?: boolean;
     isSheetmetal?: boolean;
     isSystemManaged?: boolean;

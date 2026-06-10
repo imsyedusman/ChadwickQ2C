@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { normalizePartNumber } from './normalization';
 
 const prisma = new PrismaClient();
@@ -348,7 +348,7 @@ export class AutomationService {
                             quantity: manualQty,
                             requiredQty: 0,
                             cost: item.unitPrice * manualQty,
-                            dependencySources: null,
+                            dependencySources: Prisma.DbNull,
                             isSystemManaged: false,
                             autoAdded: false,
                             systemTag: null,
