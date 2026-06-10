@@ -805,12 +805,15 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
     const baseBusbars = new Map<string, number>();
 
     // 1. Board-Level Busbar (Decoupled from Metering)
+    // REMOVED 2026-06-10: Stop automatically adding board-level busbar.
+    /*
     if (config.currentRating && config.enclosureType) {
         const boardBusbarPn = getBusbarPartNumber(config.currentRating, config.enclosureType);
         if (boardBusbarPn && !deletedSkus.includes(boardBusbarPn)) {
             baseBusbars.set(boardBusbarPn, 1);
         }
     }
+    */
 
     // --- METERING LOGIC ---
     // Refactored 2026-02-17 to allow Coexistence of CT and Whole Current Metering (Scoped Ownership)
@@ -1196,12 +1199,52 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         i.systemTag === 'SYSTEM_BUSBAR' && !baseBusbars.has(i.name)
     );
     if (obsoleteSystemBusbars.length > 0) {
-        console.log(`[Busbars] Cleaning up ${obsoleteSystemBusbars.length} obsolete system busbars.`);
-        await prisma.item.deleteMany({
-            where: { id: { in: obsoleteSystemBusbars.map((i: Item) => i.id) } }
+        // Distinguish between the board-level busbar (which we stopped auto-generating) 
+        // and an old CT busbar (which should be deleted if the CT rating changed).
+        const boardBusbarPn = (config.currentRating && config.enclosureType) 
+            ? getBusbarPartNumber(config.currentRating, config.enclosureType) 
+            : null;
+
+        const busbarsToDelete: Item[] = [];
+        const busbarsToDetach: Item[] = [];
+
+        for (const ob of obsoleteSystemBusbars) {
+            if (ob.name === boardBusbarPn) {
+                // This is the main board busbar that the system previously generated.
+                // Convert it to a manual item so it isn't deleted from existing quotes.
+                busbarsToDetach.push(ob);
+            } else {
+                // This is an obsolete CT busbar (e.g. CT rating changed). Safe to delete.
+                busbarsToDelete.push(ob);
+            }
+        }
+
+        if (busbarsToDelete.length > 0) {
+            console.log(`[Busbars] Cleaning up ${busbarsToDelete.length} obsolete system busbars.`);
+            await prisma.item.deleteMany({
+                where: { id: { in: busbarsToDelete.map((i: Item) => i.id) } }
+            });
+        }
+
+        if (busbarsToDetach.length > 0) {
+            console.log(`[Busbars] Detaching ${busbarsToDetach.length} previously auto-generated board busbars.`);
+            await prisma.item.updateMany({
+                where: { id: { in: busbarsToDetach.map((i: Item) => i.id) } },
+                data: { systemTag: null, isSystemManaged: false, autoAdded: false }
+            });
+        }
+
+        // Remove deleted items from existingItems so it doesn't interfere with future checks
+        existingItems = existingItems.filter((i: Item) => !busbarsToDelete.some(ob => ob.id === i.id));
+        
+        // Update detached items in memory
+        existingItems.forEach((i: Item) => {
+            if (busbarsToDetach.some(ob => ob.id === i.id)) {
+                i.systemTag = null;
+                i.isSystemManaged = false;
+                i.autoAdded = false;
+            }
         });
-        // Remove from existingItems so it doesn't interfere with future checks
-        existingItems = existingItems.filter((i: Item) => !obsoleteSystemBusbars.some(ob => ob.id === i.id));
     }
 
     // Ensure 1A-COMPARTMENTS is targeted for Cubic before fetch
@@ -1495,6 +1538,60 @@ export async function syncBoardItems(boardId: string, config: BoardConfig, optio
         await prisma.item.deleteMany({
             where: { id: { in: itemsToRemove.map((i: Item) => i.id) } }
         });
+    }
+
+    // --- SELF-HEALING DEDUPLICATION PHASE ---
+    const EXPLICIT_SINGLETONS = [
+        BUSBAR_INSULATION_ITEM,
+        '1A-50KA', 
+        '1A-COLOUR',
+        '1B-BASE',
+        '1B-SS-2B', 
+        '1B-SS-NO4',
+        '1B-600MM', 
+        '1B-800MM',
+        '1B-TIERS-400',
+        '1A-COMPARTMENTS',
+        '1B-COMPARTMENTS',
+        'MISC-SITE-RECONNECTION',
+        'MISC-CABLE-TRAY',
+        'CT-WIRING',
+        'CT-TEST-BLOCK',
+        'CT-PANEL',
+        'CT-COMPARTMENTS',
+        'CT-S-TYPE', 'CT-T-TYPE', 'CT-W-TYPE', 'CT-U-TYPE'
+    ];
+
+    const deduplicationGroups = new Map<string, Item[]>();
+    for (const item of existingItems) {
+        if (item.isDefault && item.name && EXPLICIT_SINGLETONS.includes(item.name)) {
+            const group = deduplicationGroups.get(item.name) || [];
+            group.push(item);
+            deduplicationGroups.set(item.name, group);
+        }
+    }
+
+    const duplicatesToDelete: Item[] = [];
+    for (const [name, group] of deduplicationGroups.entries()) {
+        if (group.length > 1) {
+            // Keep the first one (mirroring .find() logic), delete the rest
+            const survivor = group[0];
+            const redundant = group.slice(1);
+            duplicatesToDelete.push(...redundant);
+            
+            console.log(`[Deduplication] Board: ${boardId}`);
+            console.log(`Identified ${group.length} duplicates for item: ${name}`);
+            console.log(`Surviving item ID: ${survivor.id}`);
+            console.log(`Deleting redundant item IDs:`, redundant.map(r => r.id));
+        }
+    }
+
+    if (duplicatesToDelete.length > 0) {
+        await prisma.item.deleteMany({
+            where: { id: { in: duplicatesToDelete.map(i => i.id) } }
+        });
+        // Remove from memory so update phase only sees the survivor
+        existingItems = existingItems.filter((i: Item) => !duplicatesToDelete.some(d => d.id === i.id));
     }
 
     // B. Add / Update Items
