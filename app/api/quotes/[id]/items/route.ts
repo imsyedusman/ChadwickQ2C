@@ -238,6 +238,7 @@ export async function POST(
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyGeneralControlRules(boardId);
             await AutomationService.applyAdditionalControlWiringRules(boardId);
+            await AutomationService.syncPowerMeterDependencies(boardId);
         }
 
         // Return full enriched item list and updated totals

@@ -4,24 +4,8 @@ const prisma = new PrismaClient();
 
 const compositeMappings = [
     {
-        parent: 'TRV00121',
-        components: [{ partNumber: 'LV434201', quantity: 1 }]
-    },
-    {
-        parent: 'LV434128',
-        components: [{ partNumber: 'LV434201', quantity: 1 }]
-    },
-    {
         parent: 'EM27072DMV53X2SN',
         components: [{ partNumber: 'TCD3X630150CMX', quantity: 2 }]
-    },
-    {
-        parent: '48250500',
-        components: [{ partNumber: '48250082', quantity: 1 }]
-    },
-    {
-        parent: '48250501',
-        components: [{ partNumber: '48250082', quantity: 1 }]
     }
 ];
 

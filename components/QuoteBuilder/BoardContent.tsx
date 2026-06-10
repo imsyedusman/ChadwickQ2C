@@ -413,7 +413,8 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
         
         // Switchgear auto-items should be UNLOCKED as per user request
         const isBusbar = item.category === 'Busbar';
-        const isQtyLocked = (!!autoManaged && !isAutoAccessory && !isSwitchgear && !isBusbar);
+        const isPowerMeterDep = item.systemTag === 'POWER_METER_DEP';
+        const isQtyLocked = (!!autoManaged && !isAutoAccessory && !isSwitchgear && !isBusbar && !isPowerMeterDep);
         const isDeleteLocked = false; // Always allow delete in summary view
 
         // Determine Tooltip Text
@@ -474,6 +475,28 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         {/* Only show item name (Part Number). Subcategory path removed as requested. */}
                         <span className="font-medium">{getDisplayPartNumber(item.name)}</span>
                     </div>
+                    {item.systemTag === 'POWER_METER_DEP' && (
+                        <div className="text-[10px] text-blue-600 mt-0.5">
+                            <span className="font-medium">Required accessory</span>
+                            <br />
+                            <span className="opacity-80">Source: {(() => {
+                                try {
+                                    return JSON.parse((item as any).dependencySources || "[]").join(', ');
+                                } catch {
+                                    return '';
+                                }
+                            })()}</span>
+                            {(Number(item.manualQuantity) > 0 || Number(item.requiredQty) > 0) && (
+                                <>
+                                    <br />
+                                    <span className="opacity-90">
+                                        Required: {Number(item.requiredQty)}
+                                        {Number(item.manualQuantity) > 0 && ` | Manual: ${Number(item.manualQuantity)}`}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Quantity Control (Lock if Auto-Managed) */}
@@ -485,7 +508,11 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                     title={autoManaged ? (isQtyLocked ? "Quantity is controlled by board configuration" : "Quantity changes override the default generated quantity and will be preserved") : undefined}
                 >
                     <button
-                        onClick={() => handleQuantityChange(item.id, parseFloat(item.quantity as any) - (isCopper ? 0.1 : 1))}
+                        onClick={() => {
+                            const newQty = parseFloat(item.quantity as any) - (isCopper ? 0.1 : 1);
+                            const minQty = isPowerMeterDep ? Math.max(0, Number(item.requiredQty || 0)) : 0;
+                            if (newQty >= minQty) handleQuantityChange(item.id, newQty);
+                        }}
                         className={cn(
                             "transition-colors",
                             isQtyLocked ? "text-gray-300 cursor-not-allowed" : "text-gray-400 hover:text-red-600"
@@ -501,12 +528,12 @@ export default function BoardContent({ onAddItems, activeStep, onStepClick }: Bo
                         onBlur={(e) => {
                             if (isQtyLocked) return;
                             // On blur, validate and update
-                            const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                            if (isNaN(val) || val < 0) {
-                                handleQuantityChange(item.id, 0);
-                            } else {
-                                handleQuantityChange(item.id, val);
+                            let val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                            const minQty = isPowerMeterDep ? Math.max(0, Number(item.requiredQty || 0)) : 0;
+                            if (isNaN(val) || val < minQty) {
+                                val = minQty;
                             }
+                            handleQuantityChange(item.id, val);
                         }}
                         onKeyDown={(e) => {
                             // Allow Enter to blur and save

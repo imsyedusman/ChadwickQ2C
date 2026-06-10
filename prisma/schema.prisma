@@ -280,6 +280,9 @@ model Item {
   name            String
   description     String?
   quantity        Decimal  @default(1) @db.Decimal(10, 3)
+  manualQuantity  Decimal  @default(0) @db.Decimal(10, 3)
+  requiredQty     Decimal  @default(0) @db.Decimal(10, 3)
+  dependencySources Json?
   unitPrice       Float    @default(0)
   labourHours     Float    @default(0)
   cost            Float    @default(0)

@@ -14,10 +14,10 @@ export async function PUT(
         const body = await request.json();
         const { quantity, notes, unitPrice, labourHours, name, description } = body;
 
-        // Get the item before update to check if it's a tier item
+        // Get the item before update to check if it's a tier item and get requiredQty
         const item = await prisma.item.findUnique({
             where: { id: itemId },
-            select: { name: true, boardId: true, quantity: true, category: true, unitPrice: true }
+            select: { name: true, boardId: true, quantity: true, category: true, unitPrice: true, systemTag: true, requiredQty: true }
         });
 
         // Calculate new cost if unitPrice or quantity is provided
@@ -26,12 +26,29 @@ export async function PUT(
         const newCost = finalQuantity * finalUnitPrice;
 
         const isPermanentlyManual = isPermanentManualCategory(item?.category);
-        const finalIsSystemManaged = isPermanentlyManual ? false : ((quantity !== undefined || unitPrice !== undefined) ? false : undefined);
+        let finalIsSystemManaged = isPermanentlyManual ? false : ((quantity !== undefined || unitPrice !== undefined) ? false : undefined);
+
+        let finalQuantityToSave = quantity !== undefined ? parseFloat(quantity) : undefined;
+        let finalManualQuantity: number | undefined = undefined;
+
+        if (item?.systemTag === 'POWER_METER_DEP' && quantity !== undefined) {
+            const reqQty = Number(item.requiredQty || 0);
+            const newTotalQty = parseFloat(quantity);
+            
+            if (newTotalQty < reqQty) {
+                return NextResponse.json({ error: `Quantity cannot be less than required quantity (${reqQty})` }, { status: 400 });
+            }
+            
+            finalManualQuantity = newTotalQty - reqQty;
+            finalQuantityToSave = newTotalQty;
+            finalIsSystemManaged = true; // KEEP system managed so sync rules still pick it up
+        }
 
         const updatedItem = await prisma.item.update({
             where: { id: itemId },
             data: {
-                quantity: quantity !== undefined ? parseFloat(quantity) : undefined,
+                quantity: finalQuantityToSave,
+                manualQuantity: finalManualQuantity !== undefined ? finalManualQuantity : undefined,
                 notes: notes !== undefined ? notes : undefined,
                 unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : undefined,
                 labourHours: labourHours || undefined,
@@ -110,6 +127,7 @@ export async function PUT(
             const { AutomationService } = await import('@/lib/automation');
             await AutomationService.applyGeneralControlRules(freshItem.boardId);
             await AutomationService.applyAdditionalControlWiringRules(freshItem.boardId);
+            await AutomationService.syncPowerMeterDependencies(freshItem.boardId);
         }
 
         // Hook: MCCB Trip Base Pairing (Update)
@@ -296,6 +314,7 @@ export async function DELETE(
         // Hook: General Control Automation (Post-Delete)
         await AutomationService.applyGeneralControlRules(boardId);
         await AutomationService.applyAdditionalControlWiringRules(boardId);
+        await AutomationService.syncPowerMeterDependencies(boardId);
 
         // Return the full updated list of items to ensure frontend is in sync
         const [allItems, quoteWithBoards] = await Promise.all([

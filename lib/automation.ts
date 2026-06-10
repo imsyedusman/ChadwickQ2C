@@ -164,6 +164,12 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
         reason: 'Required for Digital Metering.',
         quantityExplanation: 'Scaled strictly based on the number of Digital Meters on the board.'
     },
+    'POWER_METER_AUTOMATION': {
+        id: 'POWER_METER_AUTOMATION',
+        handler: 'syncPowerMeterDependencies',
+        reason: 'Adds mandatory accessories for power meters (e.g. communication modules).',
+        quantityExplanation: 'Required quantity exactly matches the sum of the parent meters on the board.'
+    },
     'GENERAL_CONTROL_AUTOMATION': {
         id: 'GENERAL_CONTROL_AUTOMATION',
         handler: 'applyGeneralControlRules',
@@ -177,6 +183,15 @@ export const SYSTEM_RULES: Record<string, SystemRuleMetadata> = {
         quantityExplanation: 'Wiring qty = Total Contactors * 2 wires per unit.'
     }
 };
+
+export const POWER_METER_DEPENDENCIES = {
+    // Parent -> Dependency
+    'TRV00121': 'LV434201',
+    'LV434128': 'LV434201',
+    'EM27072DMV53X2SN': 'TCD3X630150CMX',
+    '48250500': '48250082',
+    '48250501': '48250082'
+} as const;
 
 export class AutomationService {
 
@@ -217,12 +232,133 @@ export class AutomationService {
             console.log(`[Automation Pipeline] 6. Applying Additional Control Wiring Rules (3P Contactors)`);
             await this.applyAdditionalControlWiringRules(boardId);
 
+            // 7. Power Meter Dependencies
+            console.log(`[Automation Pipeline] 7. Syncing Power Meter Dependencies`);
+            await this.syncPowerMeterDependencies(boardId);
+
             console.log(`[Automation Pipeline] Reconciliation Complete for board ${boardId}`);
         } catch (error) {
             console.error(`[Automation Pipeline] FAILED for board ${boardId}:`, error);
             // We log but do not throw to avoid crashing the request if part of a larger flow?
             // Actually, for duplication, we probably want to know.
             throw error;
+        }
+    }
+
+    /**
+     * Syncs mandatory dependencies for Power Meters.
+     */
+    static async syncPowerMeterDependencies(boardId: string) {
+        const SYSTEM_TAG = 'POWER_METER_DEP';
+
+        const board = await prisma.board.findUnique({
+            where: { id: boardId },
+            include: { items: true }
+        });
+        if (!board) return;
+
+        const allItems = board.items;
+        
+        // 1. Calculate required quantities
+        const requirements = new Map<string, { qty: number, sources: string[] }>();
+
+        for (const item of allItems) {
+            const partNum = item.partNumber;
+            if (!partNum) continue;
+
+            const dependency = (POWER_METER_DEPENDENCIES as any)[partNum];
+            if (dependency) {
+                const current = requirements.get(dependency) || { qty: 0, sources: [] };
+                current.qty += Number(item.quantity);
+                if (!current.sources.includes(partNum)) {
+                    current.sources.push(partNum);
+                }
+                requirements.set(dependency, current);
+            }
+        }
+
+        // 2. Sync System Items (Items managed by this rule)
+        const systemItems = allItems.filter(i => i.systemTag === SYSTEM_TAG);
+        const processedDeps = new Set<string>();
+
+        for (const [depPart, reqData] of requirements.entries()) {
+            processedDeps.add(depPart);
+            const reqQty = reqData.qty;
+            const sourcesJson = JSON.stringify(reqData.sources);
+
+            const existing = systemItems.find(i => i.partNumber === depPart);
+            
+            if (existing) {
+                const manualQty = Number(existing.manualQuantity || 0);
+                const totalQty = reqQty + manualQty;
+
+                if (Number(existing.requiredQty) !== reqQty || Number(existing.quantity) !== totalQty || (existing.dependencySources as string) !== sourcesJson) {
+                    await prisma.item.update({
+                        where: { id: existing.id },
+                        data: {
+                            quantity: totalQty,
+                            requiredQty: reqQty,
+                            cost: existing.unitPrice * totalQty,
+                            dependencySources: sourcesJson
+                        }
+                    });
+                }
+            } else {
+                // Create New
+                const catalogItem = await prisma.catalogItem.findFirst({
+                    where: { partNumber: depPart }
+                });
+
+                if (catalogItem) {
+                    await prisma.item.create({
+                        data: {
+                            boardId,
+                            category: catalogItem.category || 'Switchboard',
+                            subcategory: catalogItem.subcategory || 'Power Meter Accessories',
+                            name: depPart,
+                            partNumber: depPart,
+                            description: catalogItem.description,
+                            unitPrice: catalogItem.unitPrice,
+                            labourHours: catalogItem.labourHours,
+                            quantity: reqQty,
+                            requiredQty: reqQty,
+                            manualQuantity: 0,
+                            dependencySources: sourcesJson,
+                            cost: catalogItem.unitPrice * reqQty,
+                            isSystemManaged: true,
+                            autoAdded: true,
+                            systemTag: SYSTEM_TAG,
+                            systemRuleType: 'POWER_METER_AUTOMATION'
+                        }
+                    });
+                }
+            }
+        }
+
+        // 3. Cleanup Orphans
+        for (const item of systemItems) {
+            const pNum = item.partNumber;
+            if (pNum && !processedDeps.has(pNum)) {
+                const manualQty = Number(item.manualQuantity || 0);
+                if (manualQty > 0) {
+                    // Convert to manual item
+                    await prisma.item.update({
+                        where: { id: item.id },
+                        data: {
+                            quantity: manualQty,
+                            requiredQty: 0,
+                            cost: item.unitPrice * manualQty,
+                            dependencySources: null,
+                            isSystemManaged: false,
+                            autoAdded: false,
+                            systemTag: null,
+                            systemRuleType: null
+                        }
+                    });
+                } else {
+                    await prisma.item.delete({ where: { id: item.id } });
+                }
+            }
         }
     }
 

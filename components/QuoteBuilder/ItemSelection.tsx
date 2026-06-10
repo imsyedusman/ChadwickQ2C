@@ -493,7 +493,19 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
         items.forEach(i => {
             if (i.brand) brands.add(i.brand);
         });
-        const sortedBrands = Array.from(brands).sort();
+        const POWER_METER_BRAND_ORDER: Record<string, number> = {
+            'Schneider Electric': 1,
+            'MERCS': 2,
+            'NHP': 3,
+            'IPD': 4
+        };
+
+        const sortedBrands = Array.from(brands).sort((a, b) => {
+            const orderA = POWER_METER_BRAND_ORDER[a] || 99;
+            const orderB = POWER_METER_BRAND_ORDER[b] || 99;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.localeCompare(b);
+        });
 
         // 2. Filter Logic
         const filtered = items.filter(item => {
@@ -676,8 +688,18 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                 const data = await res.json();
                 if (data.length === 0) console.warn('[ItemSelection] WARNING: Empty response for params:', queryString);
 
-                // Filter out system-managed basics that shouldn't be added manually
-                const filteredData = data;
+                // Normalize brand names to prevent duplication (e.g., 'schneider electric' vs 'Schneider Electric')
+                const filteredData = data.map((item: any) => {
+                    if (item.brand) {
+                        const b = item.brand.trim().toLowerCase();
+                        if (b === 'schneider electric' || b === 'schneider') item.brand = 'Schneider Electric';
+                        else if (b === 'mercs') item.brand = 'MERCS';
+                        else if (b === 'nhp') item.brand = 'NHP';
+                        else if (b === 'ipd') item.brand = 'IPD';
+                        else item.brand = item.brand.trim();
+                    }
+                    return item;
+                });
 
                 // Apply Deterministic Sorting
                 const sortedData = [...filteredData].sort(compareItems);

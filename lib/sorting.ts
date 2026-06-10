@@ -8,6 +8,7 @@ export interface SortableItem {
     name?: string | null;          // Part Number (Item) or Part Number (CatalogItem via alias)
     partNumber?: string | null;    // CatalogItem has partNumber
     description?: string | null;
+    brand?: string | null;
 
     // Structured Category Fields (Future-proofing / if available)
     categoryPathSegments?: string[];
@@ -38,6 +39,71 @@ const MCCB_ACCESSORY_ORDER: Record<string, number> = {
     'Rotary Handle': 2
 };
 
+const POWER_METER_BRAND_ORDER: Record<string, number> = {
+    'Schneider Electric': 1,
+    'MERCS': 2,
+    'NHP': 3,
+    'IPD': 4
+};
+
+const SCHNEIDER_METER_ORDER = [
+    'A9MEM3155',
+    'A9MEM3355',
+    'A9MEM3255',
+    'METSEPM3250',
+    'METSEPM5110',
+    'METSEPM5350',
+    'METSEPM5560',
+    'METSEPM8240',
+    'LV434000',
+    'LV434001',
+    'LV434002',
+    'LV434205',
+    'LV454444',
+    'TRV00217',
+    'TRV00121',
+    'LV434128',
+    'LV434201'
+];
+
+const MERCS_METER_ORDER = [
+    'INT-STRIDER-M72-MODBUS-96MM',
+    'INT-STRIDER-M73-ETHERNET-96MM'
+];
+
+const NHP_METER_ORDER = [
+    'EM2172RVV53XOSX',
+    'EM24DINAV93XISX',
+    'EM24DINAV53DISX',
+    'MF72421',
+    'NEMO96HD1000',
+    'NEMO96HD1300',
+    'EM27072DMV53X2SN'
+];
+
+const IPD_METER_ORDER = [
+    '48250402',
+    '48250500',
+    '48250501',
+    '48290105',
+    '48290106',
+    '48290102',
+    '48290110',
+    '48290111',
+    '48290128',
+    '48290130',
+    '48290112',
+    '48290101',
+    '48290200',
+    '48290204',
+    '48290500',
+    '48290501',
+    '48290502',
+    '48290503',
+    '48290504',
+    '48290505',
+    '48290506'
+];
 
 export function getSortParts(item: SortableItem): any[] {
     const parts: any[] = [];
@@ -143,6 +209,43 @@ export function getSortParts(item: SortableItem): any[] {
         parts.push(ampRating);
     } else {
         parts.push(99999);
+    }
+
+    // 4.5. Power Meter Custom Ordering
+    const isPowerMeter = segments.includes('Power Metering') || segments.includes('Power Meters');
+    if (isPowerMeter) {
+        // We normalize the brand just in case it wasn't pre-normalized for sorting
+        let brand = item.brand || '';
+        const b = brand.trim().toLowerCase();
+        if (b === 'schneider electric' || b === 'schneider') brand = 'Schneider Electric';
+        else if (b === 'mercs') brand = 'MERCS';
+        else if (b === 'nhp') brand = 'NHP';
+        else if (b === 'ipd') brand = 'IPD';
+        else brand = brand.trim();
+
+        const brandOrder = POWER_METER_BRAND_ORDER[brand] || 99;
+        parts.push(brandOrder);
+
+        const partNum = (item.partNumber || item.name || '').trim().toUpperCase();
+
+        if (brand === 'Schneider Electric') {
+            const idx = SCHNEIDER_METER_ORDER.indexOf(partNum);
+            parts.push(idx !== -1 ? idx : 999);
+        } else if (brand === 'MERCS') {
+            const idx = MERCS_METER_ORDER.indexOf(partNum);
+            parts.push(idx !== -1 ? idx : 999);
+        } else if (brand === 'NHP') {
+            const idx = NHP_METER_ORDER.indexOf(partNum);
+            parts.push(idx !== -1 ? idx : 999);
+        } else if (brand === 'IPD') {
+            const idx = IPD_METER_ORDER.indexOf(partNum);
+            parts.push(idx !== -1 ? idx : 999);
+        } else {
+            parts.push(999);
+        }
+    } else {
+        parts.push(0);
+        parts.push(0);
     }
 
     // 5. Tie-Breakers
