@@ -187,7 +187,7 @@ function QuoteBuilderContent() {
                                 <ChevronUp size={16} />
                             </button>
 
-                             <div className="group relative flex-1 max-w-md">
+                            <div className="group relative flex-1 max-w-md">
                                 <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Project
                                 </label>
@@ -313,7 +313,7 @@ function QuoteBuilderContent() {
                                     </span>
                                 )}
                             </div>
-                            <Button 
+                            <Button
                                 onClick={() => setIsShareOpen(true)}
                                 className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 border-none font-bold text-sm h-10"
                             >
@@ -358,7 +358,7 @@ function QuoteBuilderContent() {
 
                 {/* Panel 2: Board Content (Center) */}
                 <div className="h-full min-h-0 bg-white flex flex-col min-w-0">
-                    <BoardContent 
+                    <BoardContent
                         activeStep={activeStep}
                         onStepClick={(stepId) => {
                             setActiveStep(stepId);
@@ -385,7 +385,7 @@ function QuoteBuilderContent() {
                             // Sync active step
                             if (cat === 'Switchboard') setActiveStep('switchgear');
                             else if (cat === 'Busbar') setActiveStep('busbars');
-                        }} 
+                        }}
                     />
                 </div>
 
@@ -435,14 +435,14 @@ function QuoteBuilderContent() {
                         {/* Slide-over Panel */}
                         {/* WIDTH ADJUSTMENT: Change w-[60%] to w-1/2 or other values to adjust drawer width */}
                         <div className="relative w-[60%] bg-white shadow-2xl h-full flex flex-col animate-in slide-in-from-right duration-300">
-                            <ItemSelection 
+                            <ItemSelection
                                 onClose={() => {
                                     setIsItemDrawerOpen(false);
                                     setDrawerL1(undefined);
                                     setDrawerL2(undefined);
                                     setDrawerL3(undefined);
-                                }} 
-                                initialCategory={drawerCategory} 
+                                }}
+                                initialCategory={drawerCategory}
                                 initialL1={drawerL1}
                                 initialL2={drawerL2}
                                 initialL3={drawerL3}
@@ -453,10 +453,10 @@ function QuoteBuilderContent() {
             }
 
             {/* Share Dialog */}
-            <ShareDialog 
-                quoteId={quoteId} 
-                isOpen={isShareOpen} 
-                onClose={() => setIsShareOpen(false)} 
+            <ShareDialog
+                quoteId={quoteId}
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
             />
         </div >
     );

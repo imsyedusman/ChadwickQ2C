@@ -5,15 +5,15 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSession, signOut } from 'next-auth/react';
-import { 
-    DropdownMenu, 
-    DropdownMenuContent, 
-    DropdownMenuItem, 
-    DropdownMenuLabel, 
-    DropdownMenuSeparator, 
-    DropdownMenuTrigger 
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Shield, ChevronDown, FileText, Briefcase, Settings, Menu, X } from 'lucide-react';
+import { LogOut, User, Shield, ChevronDown, FileText, Briefcase, Settings, Menu, X, Search } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Navbar() {
@@ -27,7 +27,7 @@ export default function Navbar() {
     const isProjects = pathname?.startsWith('/projects');
     const isAdmin = pathname === '/admin' || pathname?.startsWith('/admin/');
     const isProfile = pathname === '/profile';
-    
+
     // Dashboard is active if we are at root or not in other specific sections
     const isDashboard = pathname === '/' || (!isSettings && !isQuotePage && !isAdmin && !isProfile);
 
@@ -159,6 +159,21 @@ export default function Navbar() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Search Button */}
+                        <button
+                            onClick={() => window.dispatchEvent(new Event('open-command-palette'))}
+                            className={cn(
+                                "hidden sm:flex items-center gap-2 text-sm text-gray-500 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg px-3 transition-colors",
+                                isQuotePage ? "h-6 py-1" : "h-9 py-1.5 mr-2"
+                            )}
+                        >
+                            <Search size={14} className="text-gray-400" />
+                            <span className="font-medium mr-4">Search...</span>
+                            <kbd className="hidden md:inline-flex h-5 items-center gap-1 rounded border bg-white px-1.5 font-mono text-[10px] font-medium text-gray-500 opacity-100">
+                                <span className="text-xs">⌘</span>K
+                            </kbd>
+                        </button>
+
                         <div className="flex-shrink-0">
                             {user && (
                                 <DropdownMenu>
@@ -206,7 +221,7 @@ export default function Navbar() {
                                             </Link>
                                         )}
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem 
+                                        <DropdownMenuItem
                                             className="text-red-600 cursor-pointer focus:text-red-600 focus:bg-red-50 rounded-lg py-2"
                                             onClick={() => signOut({ callbackUrl: '/login' })}
                                         >

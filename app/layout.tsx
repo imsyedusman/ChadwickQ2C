@@ -4,6 +4,7 @@ import Navbar from "@/components/Shared/Navbar";
 import "./globals.css";
 import "react-day-picker/style.css";
 import { Toaster } from 'sonner';
+import { CommandPalette } from "@/components/Shared/CommandPalette";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -44,6 +45,7 @@ export default async function RootLayout({
       >
         <NextAuthProvider>
           {!hideNavbar && <Navbar />}
+          <CommandPalette />
           {children}
           <Toaster position="top-right" richColors />
         </NextAuthProvider>

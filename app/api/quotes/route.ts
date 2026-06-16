@@ -73,6 +73,8 @@ export async function GET(request: Request) {
 
         console.log(`[API GET Quotes] Request started. Search: "${search}", Status: ${quoteStatus}`);
 
+        const sortDate = searchParams.get('sortDate') === 'asc' ? 'asc' : 'desc';
+
         // Baseline count
         const baseCount = await (prisma as any).quote.count();
         console.log(`[API GET Quotes] Total quotes in DB baseline: ${baseCount}`);
@@ -95,7 +97,7 @@ export async function GET(request: Request) {
                     modifier: { select: { name: true } },
                     creator: { select: { name: true } }
                 },
-                orderBy: { updatedAt: 'desc' },
+                orderBy: { createdAt: sortDate },
                 skip,
                 take: limit,
             }),
