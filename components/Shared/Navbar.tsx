@@ -52,7 +52,7 @@ export default function Navbar() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
                 <div className="flex justify-between items-center h-full">
                     <div className="flex items-center gap-2 sm:gap-4">
-                        <Link href="/" className="flex-shrink-0 flex items-center gap-2">
+                        <Link href="/projects" className="flex-shrink-0 flex items-center gap-2">
                             <Image
                                 src="/chadwick-logo.svg"
                                 alt="Chadwick Logo"
@@ -68,18 +68,7 @@ export default function Navbar() {
                         {/* Desktop Nav - Hidden on Quote Pages */}
                         {!isQuotePage && (
                             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                                <Link
-                                    href="/"
-                                    className={cn(
-                                        "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors h-16 gap-2",
-                                        isDashboard
-                                            ? "border-blue-500 text-gray-900"
-                                            : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
-                                    )}
-                                >
-                                    <FileText size={18} />
-                                    Quotes
-                                </Link>
+
                                 <Link
                                     href="/projects"
                                     className={cn(
@@ -124,13 +113,7 @@ export default function Navbar() {
                         {/* Compact Nav - Inline Links for Quote Pages (Desktop) */}
                         {isQuotePage && (
                             <div className="hidden sm:flex items-center gap-4 ml-6 border-l border-gray-200 pl-6 h-4">
-                                <Link
-                                    href="/"
-                                    className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
-                                >
-                                    <FileText size={12} />
-                                    Quotes
-                                </Link>
+
                                 <Link
                                     href="/projects"
                                     className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-gray-900 transition-colors"
@@ -250,17 +233,7 @@ export default function Navbar() {
             {isMobileMenuOpen && !isQuotePage && (
                 <div className="sm:hidden absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-xl z-50 animate-in slide-in-from-top-4 duration-200">
                     <div className="px-4 py-6 space-y-3">
-                        <Link
-                            href="/"
-                            onClick={() => setIsMobileMenuOpen(false)}
-                            className={cn(
-                                "flex items-center gap-4 px-4 py-3 rounded-xl font-bold transition-all",
-                                isDashboard ? "bg-blue-50 text-blue-700" : "text-gray-600 hover:bg-gray-50"
-                            )}
-                        >
-                            <FileText size={20} />
-                            Quotes
-                        </Link>
+
                         <Link
                             href="/projects"
                             onClick={() => setIsMobileMenuOpen(false)}
