@@ -18,6 +18,7 @@ export interface MinimalItem {
     description?: string | null;
     isSystemManaged?: boolean;
     systemTag?: string | null;
+    partNumber?: string | null;
 }
 
 /**
