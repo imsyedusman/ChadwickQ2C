@@ -510,7 +510,6 @@ export default function EstimatorBoardContent({ items, setPresentationMode, onQu
                 </div>
             </div>
             
-            {/* Consolidated Board Header (Summary + Composition inline) */}
             <BoardComposition 
                 items={items} 
                 leftHeaderContent={<BoardSummary />} 
