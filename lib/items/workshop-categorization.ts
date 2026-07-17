@@ -1,3 +1,4 @@
+import { getDisplayPartNumber } from '../display-utils';
 import { MinimalItem, COST_CATEGORIES, resolveCostCategory, isCleatItem } from './categorization';
 
 // ---------------------------------------------------------
@@ -90,7 +91,8 @@ const EXPLICIT_PART_MAP: Record<string, string> = {
 // DETERMINISTIC RESOLVER (No Fallbacks)
 // ---------------------------------------------------------
 export function resolveWorkshopActivity(item: MinimalItem): string {
-    const partNumber = (item.partNumber || item.name || '').trim().toUpperCase();
+    const rawPartNumber = (item.partNumber || item.name || '').trim().toUpperCase();
+    const partNumber = getDisplayPartNumber(rawPartNumber);
 
     // 1. Check explicit part number mappings first
     if (EXPLICIT_PART_MAP[partNumber]) {
