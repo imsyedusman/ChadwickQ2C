@@ -128,7 +128,7 @@ const BoardComposition: React.FC<BoardCompositionProps> = ({ items, leftHeaderCo
             ...workshopGroupMeta[key],
             bucket: workshopBuckets[key]
         }))
-        .filter(g => g.bucket.items.length > 0);
+        .filter(g => g.key !== 'OTHER' && g.bucket.items.length > 0);
 
     const safePercentNum = (val: number, total: number) => total > 0 ? (val / total) * 100 : 0;
 
