@@ -96,8 +96,8 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
     return (
         <div
             className={cn(
-                "group bg-white px-6 py-5 rounded-md border transition-all flex items-center gap-6",
-                existingQty > 0 ? "border-blue-200 bg-blue-50/10 shadow-sm" : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+                "group px-6 py-5 border-b border-gray-200 transition-all flex items-center gap-6 rounded-none shadow-none",
+                existingQty > 0 ? "bg-blue-50/40" : "bg-white hover:bg-gray-50"
             )}
         >
             {/* Item Details */}
@@ -152,60 +152,47 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
             {/* Right Side: Logic */}
             <div className="flex items-center gap-4 shrink-0">
                 {/* Quantity Selector */}
-                <div
-                    className="flex items-center gap-0 bg-white border border-gray-300 rounded overflow-hidden h-9 shadow-sm"
-                    onClick={autoManaged ? handleManagedClick : undefined}
-                >
-                    <button
-                        onClick={(e) => {
-                            if (autoManaged) { handleManagedClick(e); return; }
-                            e.stopPropagation();
-                            const step = item.isCopperPriced ? 0.001 : 1;
-                            setQty(Math.max(item.isCopperPriced ? 0.001 : 1, qty - step));
-                        }}
-                        className={cn(
-                            "w-9 h-full flex items-center justify-center transition-colors border-r border-gray-200 active:bg-gray-100",
-                            autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
-                        )}
-                    >
-                        <Minus size={16} />
-                    </button>
-                    <input
-                        type="number"
-                        min={item.isCopperPriced ? "0.001" : "1"}
-                        step={item.isCopperPriced ? "0.001" : "1"}
-                        value={qty}
-                        readOnly={!!autoManaged}
-                        onChange={(e) => {
-                            const val = parseFloat(e.target.value);
-                            const minVal = item.isCopperPriced ? 0.001 : 1;
-                            setQty(isNaN(val) || val < minVal ? minVal : val);
-                        }}
-                        onClick={(e) => {
-                            if (autoManaged) { handleManagedClick(e as any); return; }
-                            e.stopPropagation();
-                        }}
-                        className={cn(
-                            "w-14 h-full text-center text-base font-semibold focus:outline-none focus:ring-inset focus:ring-1 focus:ring-blue-500 bg-transparent flex items-center justify-center p-0",
-                            autoManaged ? "text-gray-400 bg-gray-50 cursor-pointer" : "text-gray-900" // cursor-pointer on input to encourage click for toast? Or not-allowed? User said click.
-                        )}
-                        style={autoManaged ? { cursor: 'not-allowed' } : {}}
-                    />
-                    <button
-                        onClick={(e) => {
-                            if (autoManaged) { handleManagedClick(e); return; }
-                            e.stopPropagation();
-                            const step = item.isCopperPriced ? 0.001 : 1;
-                            setQty(qty + step);
-                        }}
-                        className={cn(
-                            "w-9 h-full flex items-center justify-center transition-colors border-l border-gray-200 active:bg-gray-100",
-                            autoManaged ? "text-gray-300 bg-gray-50 cursor-not-allowed" : "text-gray-500 hover:bg-gray-50 hover:text-blue-600"
-                        )}
-                    >
-                        <Plus size={16} />
-                    </button>
-                </div>
+                <input
+                    key={`qty-${existingQty}`}
+                    type="text"
+                    defaultValue={existingQty > 0 ? existingQty : ""}
+                    readOnly={!!autoManaged}
+                    onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setQty(isNaN(val) ? 0 : val);
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (autoManaged) return;
+                            const val = parseFloat(e.currentTarget.value);
+                            const finalQty = isNaN(val) ? 0 : val;
+                            if (finalQty > 0) {
+                                onAdd(item, finalQty, isCopper ? displayUnitPrice : undefined);
+                            }
+                        }
+                    }}
+                    onBlur={(e) => {
+                        if (existingQty > 0 && !autoManaged) {
+                            if (e.relatedTarget && (e.relatedTarget as HTMLElement).closest('button')) {
+                                return;
+                            }
+                            const val = parseFloat(e.currentTarget.value);
+                            const finalQty = isNaN(val) ? 0 : val;
+                            if (finalQty > 0) {
+                                onAdd(item, finalQty, isCopper ? displayUnitPrice : undefined);
+                            }
+                        }
+                    }}
+                    onClick={(e) => {
+                        if (autoManaged) { handleManagedClick(e as any); return; }
+                        e.stopPropagation();
+                    }}
+                    className={cn(
+                        "w-14 h-9 text-center text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white border border-gray-300 rounded-[4px] shadow-sm",
+                        autoManaged ? "text-gray-400 bg-gray-50 cursor-not-allowed" : "text-gray-900"
+                    )}
+                />
 
                 {/* Price */}
                 <div className="text-right min-w-[120px]">
@@ -981,7 +968,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
             )}
 
             {/* Item List */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div className="flex-1 overflow-y-auto py-4">
                 {/* Busbar Insulation Configuration */}
                 {activeCategory === 'Busbar' && (
                     <div className="mb-4 bg-blue-50 p-4 rounded-lg border border-blue-100 flex items-center justify-between">
@@ -1026,7 +1013,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                     <>
                         {/* Normal Navigation View (No Search) */}
                         {!searchQuery && (
-                            <div className="grid grid-cols-1 gap-3">
+                            <div className="grid grid-cols-1 gap-0">
                                 {/* Power Metering: Filter UI Header */}
                                 {isPowerMeterSelection && (
                                     <div className="mb-4 bg-white p-4 rounded-lg border border-blue-100 shadow-sm space-y-4">
@@ -1199,7 +1186,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                             <Zap size={16} className="text-amber-500 fill-amber-500" />
                                             Top Hits
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-0">
                                             {groupedItems.topHits.map(item => (
                                                 <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
@@ -1213,7 +1200,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-blue-500">
                                             Switchgears
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-0">
                                             {groupedItems.switchgears.map(item => (
                                                 <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
@@ -1227,7 +1214,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-green-500">
                                             Basics
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-0">
                                             {groupedItems.basics.map(item => (
                                                 <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
@@ -1241,7 +1228,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-amber-500">
                                             Busbars
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-0">
                                             {groupedItems.busbars.map(item => (
                                                 <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
@@ -1255,7 +1242,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 pl-1 border-l-4 border-gray-500">
                                             Other Matches
                                         </h3>
-                                        <div className="grid grid-cols-1 gap-3">
+                                        <div className="grid grid-cols-1 gap-0">
                                             {groupedItems.others.map(item => (
                                                 <ItemWrapper key={item.id} item={item} boards={boards} selectedBoardId={selectedBoardId} handleAddItem={handleAddItem} handleDeleteItem={handleDeleteItem} />
                                             ))}
