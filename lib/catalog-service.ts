@@ -1,3 +1,5 @@
+import prisma from '@/lib/prisma';
+
 export interface CatalogDetails {
     brand: string;
     category: string;
@@ -176,4 +178,106 @@ export function classifyCatalogItem(
         isCopperPriced,
         totalCopperWeightKgPerMeter
     };
+}
+
+export async function searchCatalog(params: { query?: string; brand?: string; category?: string }) {
+    const { query, brand, category } = params;
+    const search = query?.trim() || '';
+    
+    const take = 20;
+
+    // Build base filters (brand, category)
+    const baseWhere: any = {};
+    if (brand) {
+        baseWhere.brand = brand;
+    }
+    if (category) {
+        if (category.toLowerCase() === 'switchboard') {
+            baseWhere.OR = [
+                { brand: 'Schneider Electric' },
+                { brand: { not: null, notIn: ['Schneider Electric'] } }
+            ];
+        } else {
+            baseWhere.category = category;
+        }
+    }
+
+    if (search) {
+        // 1. Exact Match / Prefix Query (High Priority)
+        const exactMatches = await prisma.catalogItem.findMany({
+            where: {
+                ...baseWhere,
+                partNumber: { equals: search, mode: 'insensitive' }
+            },
+            take: 50
+        });
+
+        // 2. Broad Query (Contains)
+        // Construct where for broad query to avoid overriding the OR condition from category
+        const broadWhere = { ...baseWhere };
+        if (baseWhere.OR) {
+            broadWhere.AND = [{ OR: baseWhere.OR }];
+            delete broadWhere.OR;
+        }
+
+        const broadMatches = await prisma.catalogItem.findMany({
+            where: {
+                ...broadWhere,
+                OR: [
+                    { partNumber: { contains: search, mode: 'insensitive' } },
+                    { description: { contains: search, mode: 'insensitive' } },
+                    { subcategory: { contains: search, mode: 'insensitive' } },
+                    { category: { contains: search, mode: 'insensitive' } }
+                ]
+            },
+            take: take
+        });
+
+        // Merge and Deduplicate
+        const allDocs = [...exactMatches, ...broadMatches];
+        const uniqueDocs = Array.from(new Map(allDocs.map(item => [item.id, item])).values());
+
+        // Rank Results
+        const rankedDocs = uniqueDocs.map(item => {
+            let score = 0;
+            const partNo = (item.partNumber || '').toUpperCase();
+            const q = search.toUpperCase();
+
+            if (partNo === q) {
+                score = 100; // Exact Part Number
+            } else if (partNo.startsWith(q)) {
+                score = 80; // Prefix Part Number
+            } else if (partNo.includes(q)) {
+                score = 60; // Contains Part Number
+            } else if ((item.description || '').toUpperCase().includes(q)) {
+                score = 40; // Description
+            } else {
+                score = 20; // Category/Subcategory
+            }
+
+            return { item, score };
+        });
+
+        // Sort by Score DESC, then PartNumber ASC, then ID ASC
+        rankedDocs.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            // Tie-breaker: Part Number
+            const pA = (a.item.partNumber || '').toUpperCase();
+            const pB = (b.item.partNumber || '').toUpperCase();
+            if (pA < pB) return -1;
+            if (pA > pB) return 1;
+            return 0; // Stable
+        });
+
+        return rankedDocs.map(r => r.item).slice(0, take);
+    }
+
+    // Non-Search Filtering (if no search query provided)
+    const items = await prisma.catalogItem.findMany({
+        where: baseWhere,
+        take: take,
+        orderBy: { brand: 'asc' },
+    });
+
+    return items;
 }
