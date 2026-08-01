@@ -70,6 +70,7 @@ model Project {
   expectedCloseDate  DateTime?
   quoteFolder        String?
   pipedriveDealUrl   String?
+  pipedriveDealStatus String?
   pipedriveOwnerName String?
   pipedriveOwnerId   Int?
   source             String?

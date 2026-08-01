@@ -19,7 +19,7 @@ import { Share2 } from 'lucide-react';
 import { PipedriveSearchableDropdown } from '@/components/ui/PipedriveSearchableDropdown';
 
 function QuoteBuilderContent() {
-    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, pipedriveOwnerName, status, projectStatus, creator, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
+    const { boards, loading, saving, quoteNumber, revisionGroupId, formattedQuoteNumber, clientName, clientCompany, projectRef, pipedriveOwnerName, status, projectStatus, pipedriveDealStatus, creator, updateMetadata, updateStatus, updateProjectStatus, quoteId, selectedBoardId, setSelectedBoardId, refreshQuote } = useQuote();
     const [leftCollapsed, setLeftCollapsed] = useState(false);
     const [rightCollapsed, setRightCollapsed] = useState(false);
     const [isItemDrawerOpen, setIsItemDrawerOpen] = useState(false);
@@ -159,16 +159,6 @@ function QuoteBuilderContent() {
                             ) : (
                                 <Check className="w-3 h-3 text-green-500" />
                             )}
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsShareOpen(true);
-                                }}
-                                className="flex items-center gap-2 px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm ml-2"
-                            >
-                                <Share2 size={14} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Share</span>
-                            </button>
                         </div>
                     </div>
                 ) : (
@@ -196,7 +186,7 @@ function QuoteBuilderContent() {
                                     value={projectRef ?? ""}
                                     onSelect={(item) => { updateMetadata({ projectRef: item.name }); }}
                                     placeholder="Project Reference"
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
+                                    className="text-sm font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
                                 />
                             </div>
 
@@ -211,7 +201,7 @@ function QuoteBuilderContent() {
                                     value={clientName ?? ""}
                                     onSelect={(item) => { updateMetadata({ clientName: item.name, pipedrive_person_id: item.pipedriveId }); }}
                                     placeholder="Client Name"
-                                    className="text-lg font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
+                                    className="text-sm font-medium text-gray-800 bg-transparent border-b border-transparent hover:border-gray-300 focus-within:border-blue-500 focus-within:outline-none w-full transition-colors h-9"
                                 />
                             </div>
 
@@ -221,7 +211,7 @@ function QuoteBuilderContent() {
                                 <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Deal Owner
                                 </label>
-                                <div className="text-lg font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={pipedriveOwnerName || ""}>
+                                <div className="text-sm font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={pipedriveOwnerName || ""}>
                                     {pipedriveOwnerName || <span className="text-gray-300 italic text-xs">Unassigned</span>}
                                 </div>
                             </div>
@@ -232,7 +222,7 @@ function QuoteBuilderContent() {
                                 <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10">
                                     Estimator
                                 </label>
-                                <div className="text-lg font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={creator?.name || ""}>
+                                <div className="text-sm font-medium text-gray-400 bg-transparent border-b border-transparent h-9 flex items-center px-1 truncate" title={creator?.name || ""}>
                                     {creator?.name || <span className="text-gray-300 italic text-xs">Unassigned</span>}
                                 </div>
                             </div>
@@ -249,12 +239,9 @@ function QuoteBuilderContent() {
                                             type="text"
                                             value={quoteNumber ?? ""}
                                             onChange={(e) => updateMetadata({ quoteNumber: e.target.value })}
-                                            className="text-xl font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
+                                            className="text-base font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:outline-none w-32 transition-colors"
                                             placeholder="Q-..."
                                         />
-                                        {formattedQuoteNumber && formattedQuoteNumber.includes('-') && (
-                                            <span className="text-xl font-bold text-gray-400">-{formattedQuoteNumber.split('-').pop()}</span>
-                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -299,6 +286,27 @@ function QuoteBuilderContent() {
                                 </div>
                             )}
 
+                            {/* Deal Status Badge (Read-only) */}
+                            {pipedriveDealStatus && pipedriveDealStatus.trim() !== '' && (
+                                <div className="relative group">
+                                    <label className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold absolute -top-2 left-0 bg-white px-1 z-10 whitespace-nowrap">
+                                        DEAL STATUS
+                                    </label>
+                                    <div
+                                        className={cn(
+                                            "text-[10px] font-bold px-3 py-1.5 rounded-md border tracking-widest flex items-center h-full",
+                                            pipedriveDealStatus.toLowerCase() === 'open' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                            pipedriveDealStatus.toLowerCase() === 'won' ? 'bg-green-100 text-green-700 border-green-200' :
+                                            pipedriveDealStatus.toLowerCase() === 'lost' ? 'bg-red-100 text-red-700 border-red-200' :
+                                            pipedriveDealStatus.toLowerCase() === 'deleted' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                            'bg-gray-100 text-gray-600 border-gray-200'
+                                        )}
+                                    >
+                                        {pipedriveDealStatus.charAt(0).toUpperCase() + pipedriveDealStatus.slice(1).toLowerCase()}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Autosave Indicator */}
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                                 {saving ? (
@@ -313,13 +321,6 @@ function QuoteBuilderContent() {
                                     </span>
                                 )}
                             </div>
-                            <Button
-                                onClick={() => setIsShareOpen(true)}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 border-none font-bold text-sm h-10"
-                            >
-                                <Share2 size={16} />
-                                Share Quote
-                            </Button>
                         </div>
                     </div>
                 )}

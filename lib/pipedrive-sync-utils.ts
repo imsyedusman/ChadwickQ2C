@@ -117,6 +117,7 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
             expectedCloseDate,
+            pipedriveDealStatus: dealData.status || null,
             // Sync Safety: Only update owner if non-null
             ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
             ...(pipedriveOwnerName ? { pipedriveOwnerName } : {}),
@@ -132,6 +133,7 @@ export async function upsertPipedriveDealAsProject(dealId: number | string) {
             dealValue: dealData.value || null,
             currency: dealData.currency || null,
             expectedCloseDate,
+            pipedriveDealStatus: dealData.status || null,
             pipedriveOwnerId,
             pipedriveOwnerName,
             projectStatus: 'Tender',

@@ -98,6 +98,7 @@ interface Project {
     pipedriveOwnerId: number | null;
     client?: { name: string } | null;
     contact?: { name: string } | null;
+    pipedriveDealStatus?: string | null;
     quotes: { 
         id: string;
         updatedAt: string;
@@ -1022,6 +1023,7 @@ export default function ProjectsPage() {
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[80px] text-center">Est.</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest">Project</th>
                                 <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Status</th>
+                                <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[130px] text-center">Deal Status</th>
                                 <th 
                                     className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-widest w-[200px] text-right whitespace-nowrap cursor-pointer hover:text-slate-600 transition-colors group"
                                     onClick={() => handleSort('expectedCloseDate')}
@@ -1174,6 +1176,22 @@ export default function ProjectsPage() {
                                                 </span>
                                             </div>
                                         </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <div className="flex justify-center">
+                                                {group.projects[0].pipedriveDealStatus && group.projects[0].pipedriveDealStatus.trim() !== '' && (
+                                                    <span className={cn(
+                                                        "px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-widest shadow-sm",
+                                                        group.projects[0].pipedriveDealStatus.toLowerCase() === 'open' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                        group.projects[0].pipedriveDealStatus.toLowerCase() === 'won' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        group.projects[0].pipedriveDealStatus.toLowerCase() === 'lost' ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        group.projects[0].pipedriveDealStatus.toLowerCase() === 'deleted' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                        'bg-gray-100 text-gray-600 border-gray-200'
+                                                    )}>
+                                                        {group.projects[0].pipedriveDealStatus.charAt(0).toUpperCase() + group.projects[0].pipedriveDealStatus.slice(1).toLowerCase()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
                                         {visibleColumns.created && (
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col items-end">
@@ -1318,6 +1336,22 @@ export default function ProjectsPage() {
                                                 )}>
                                                     {project.projectStatus}
                                                 </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center">
+                                                {project.pipedriveDealStatus && project.pipedriveDealStatus.trim() !== '' && (
+                                                    <span className={cn(
+                                                        "px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-widest shadow-sm",
+                                                        project.pipedriveDealStatus.toLowerCase() === 'open' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                        project.pipedriveDealStatus.toLowerCase() === 'won' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                        project.pipedriveDealStatus.toLowerCase() === 'lost' ? 'bg-red-100 text-red-700 border-red-200' :
+                                                        project.pipedriveDealStatus.toLowerCase() === 'deleted' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                        'bg-gray-100 text-gray-600 border-gray-200'
+                                                    )}>
+                                                        {project.pipedriveDealStatus.charAt(0).toUpperCase() + project.pipedriveDealStatus.slice(1).toLowerCase()}
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         {visibleColumns.created && (

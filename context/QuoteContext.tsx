@@ -131,6 +131,7 @@ interface QuoteContextType {
     description: string;
     status: string;
     projectStatus: string | null;
+    pipedriveDealStatus: string | null;
     creator?: { name?: string; email?: string } | null;
     boards: Board[];
     globalSettings: QuoteSettings;
@@ -223,6 +224,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
         description: '',
         status: 'DRAFT',
         projectStatus: null as string | null,
+        pipedriveDealStatus: null as string | null,
         creator: null as { name?: string; email?: string } | null,
     });
     const [saving, setSaving] = useState(false);
@@ -272,6 +274,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                     description: data.description || '',
                     status: data.status || 'DRAFT',
                     projectStatus: data.project?.projectStatus || null,
+                    pipedriveDealStatus: data.project?.pipedriveDealStatus || null,
                     creator: data.creator || null,
                 });
 
@@ -800,6 +803,7 @@ export function QuoteProvider({ children, quoteId }: { children: ReactNode; quot
                 description: metadata.description,
                 status: metadata.status,
                 projectStatus: metadata.projectStatus,
+                pipedriveDealStatus: metadata.pipedriveDealStatus,
                 creator: metadata.creator,
                 boards,
                 globalSettings,

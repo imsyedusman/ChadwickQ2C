@@ -69,6 +69,7 @@ interface SimplifiedProject {
     client?: { name: string } | null;
     contact?: { name: string } | null;
     pipedriveOwnerName?: string | null;
+    pipedriveDealStatus?: string | null;
 }
 
 interface FullProject extends SimplifiedProject {
@@ -646,6 +647,19 @@ export default function GroupDetail() {
                                                     <SelectItem value="Live">Live</SelectItem>
                                                 </SelectContent>
                                             </Select>
+
+                                            {project.pipedriveDealStatus && project.pipedriveDealStatus.trim() !== '' && (
+                                                <span className={cn(
+                                                    "px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-widest shadow-sm",
+                                                    project.pipedriveDealStatus.toLowerCase() === 'open' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                                    project.pipedriveDealStatus.toLowerCase() === 'won' ? 'bg-green-100 text-green-700 border-green-200' :
+                                                    project.pipedriveDealStatus.toLowerCase() === 'lost' ? 'bg-red-100 text-red-700 border-red-200' :
+                                                    project.pipedriveDealStatus.toLowerCase() === 'deleted' ? 'bg-gray-100 text-gray-600 border-gray-200' :
+                                                    'bg-gray-100 text-gray-600 border-gray-200'
+                                                )}>
+                                                    {project.pipedriveDealStatus.charAt(0).toUpperCase() + project.pipedriveDealStatus.slice(1).toLowerCase()}
+                                                </span>
+                                            )}
                                             
                                             {project.pipedrive_deal_id && (
                                                 <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-[10px] font-bold border border-blue-100 uppercase tracking-wider whitespace-nowrap">
