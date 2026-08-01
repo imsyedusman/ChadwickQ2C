@@ -832,6 +832,38 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
         );
     };
 
+    const { tabCounts, l1Counts, l2Counts, l3Counts } = useMemo(() => {
+        const tCounts: Record<string, number> = {};
+        const l1c: Record<string, number> = {};
+        const l2c: Record<string, number> = {};
+        const l3c: Record<string, number> = {};
+
+        const selectedBoard = boards.find(b => b.id === selectedBoardId);
+        if (!selectedBoard) return { tabCounts: tCounts, l1Counts: l1c, l2Counts: l2c, l3Counts: l3c };
+
+        selectedBoard.items.forEach((item: any) => {
+
+            const cat = item.category || '';
+            tCounts[cat] = (tCounts[cat] || 0) + (Number(item.quantity) || 0);
+
+            if (cat === activeCategory && item.subcategory) {
+                const parts = normalizeSubcategory(item.subcategory, activeCategory);
+                if (parts.length > 0) {
+                    l1c[parts[0]] = (l1c[parts[0]] || 0) + (Number(item.quantity) || 0);
+                    if (parts.length > 1) {
+                        l2c[parts[1]] = (l2c[parts[1]] || 0) + (Number(item.quantity) || 0);
+                        if (parts.length > 2) {
+                            const l3Key = `${parts[1]} > ${parts[2]}`;
+                            l3c[l3Key] = (l3c[l3Key] || 0) + (Number(item.quantity) || 0);
+                        }
+                    }
+                }
+            }
+        });
+
+        return { tabCounts: tCounts, l1Counts: l1c, l2Counts: l2c, l3Counts: l3c };
+    }, [boards, selectedBoardId, activeCategory]);
+
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header & Tabs */}
@@ -880,6 +912,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                             >
                                 <cat.icon size={14} />
                                 {cat.label}
+                                {tabCounts[cat.value] > 0 && (
+                                    <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                                        {tabCounts[cat.value]}
+                                    </span>
+                                )}
                             </button>
                         ))}
                     </div>
@@ -905,6 +942,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         >
                                             <Folder size={16} className="text-blue-500 shrink-0" />
                                             <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
+                                            {l1Counts[cat] > 0 && (
+                                                <span className="ml-auto bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                                    {l1Counts[cat]}
+                                                </span>
+                                            )}
                                         </button>
                                     ))}
                                 </div>
@@ -920,6 +962,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         >
                                             <Folder size={14} className="text-blue-500 shrink-0" />
                                             <span className="text-xs font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
+                                            {l2Counts[cat] > 0 && (
+                                                <span className="ml-auto bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                                    {l2Counts[cat]}
+                                                </span>
+                                            )}
                                         </button>
                                     ))}
                                 </div>
@@ -931,9 +978,14 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                         <button
                                             key={cat}
                                             onClick={() => setSelectedL3(cat)}
-                                            className="px-3 py-2 bg-white border border-gray-200 rounded-full hover:border-blue-400 hover:shadow-sm transition-all text-sm text-gray-700 hover:text-blue-700 whitespace-nowrap"
+                                            className="px-3 py-2 bg-white border border-gray-200 rounded-full hover:border-blue-400 hover:shadow-sm transition-all text-sm text-gray-700 hover:text-blue-700 whitespace-nowrap flex items-center justify-center gap-2"
                                         >
-                                            {cat}
+                                            <span>{cat}</span>
+                                            {l3Counts[`${selectedL2} > ${cat}`] > 0 && (
+                                                <span className="bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                                    {l3Counts[`${selectedL2} > ${cat}`]}
+                                                </span>
+                                            )}
                                         </button>
                                     ))}
                                 </div>
@@ -952,6 +1004,11 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                                 >
                                     <Folder size={16} className="text-blue-500 shrink-0" />
                                     <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{cat}</span>
+                                    {l1Counts[cat] > 0 && (
+                                        <span className="ml-auto bg-blue-100 text-blue-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                            {l1Counts[cat]}
+                                        </span>
+                                    )}
                                 </button>
                             ))}
                         </div>
