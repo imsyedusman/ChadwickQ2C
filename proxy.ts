@@ -42,7 +42,8 @@ export const proxy = withAuth(
         if (
           path.startsWith("/login") || 
           path.startsWith("/shared-quote") ||
-          path.startsWith("/api/auth")
+          path.startsWith("/api/auth") ||
+          path.startsWith("/api/mcp")
         ) {
           return true;
         }
@@ -57,12 +58,13 @@ export const config = {
     /*
      * Match all request paths except for the ones starting with:
      * - api/auth (NextAuth endpoints)
+     * - api/mcp (MCP server)
      * - _next/static (static files)
      * - _next/image (images)
      * - favicon.ico (favicon)
      * - login (auth page)
      * - shared-quote (publicly shared links)
      */
-    "/((?!api/auth|_next|favicon.ico|login|shared-quote).*)",
+    "/((?!api/auth|api/mcp|_next|favicon.ico|login|shared-quote).*)",
   ],
 };
