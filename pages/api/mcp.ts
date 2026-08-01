@@ -3,6 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { searchCatalog } from '@/lib/catalog-service';
+import { searchProjects } from '@/lib/project-service';
 
 export const config = {
   api: {
@@ -33,6 +34,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     },
     async ({ query, brand, category }) => {
       const results = await searchCatalog({ query, brand, category });
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(results, null, 2)
+          }
+        ]
+      };
+    }
+  );
+
+  server.tool(
+    'search_projects',
+    'Search for Q2C projects by name, company, or client. Returns matching projects including their ID, company name, and quote count. Use this to find the right project before creating a quote. One project name may return multiple results if multiple companies are tendering — always confirm which company the estimator wants before proceeding.',
+    {
+      query: z.string()
+    },
+    async ({ query }) => {
+      const results = await searchProjects({ query });
       return {
         content: [
           {
