@@ -266,6 +266,7 @@ export async function POST(request: Request) {
                             expectedCloseDate,
                             quoteFolder,
                             pipedriveDealUrl,
+                            pipedriveDealStatus: deal.status || null,
                             // Sync Safety: Only include owner if non-null
                             ...(pipedriveOwnerId ? { pipedriveOwnerId } : {}),
                             ...(pipedriveOwnerName ? { pipedriveOwnerName } : {})
