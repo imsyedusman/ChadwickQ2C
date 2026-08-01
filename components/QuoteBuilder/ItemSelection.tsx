@@ -333,6 +333,29 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
     const [items, setItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === '/') {
+                const active = document.activeElement as HTMLElement;
+                if (
+                    active &&
+                    (active.tagName === 'INPUT' || 
+                     active.tagName === 'TEXTAREA' || 
+                     active.isContentEditable)
+                ) {
+                    return;
+                }
+                
+                e.preventDefault();
+                searchInputRef.current?.focus();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Hierarchical Navigation State
     const [allSubcategories, setAllSubcategories] = useState<string[]>([]); // Full list of subcat strings
@@ -884,6 +907,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                             <input
+                                ref={searchInputRef}
                                 type="text"
                                 placeholder="Search items..."
                                 value={searchQuery}
