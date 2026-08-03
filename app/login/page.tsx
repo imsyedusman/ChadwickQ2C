@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("from") || "/";
+  const callbackUrl = searchParams?.get("from") || "/";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
