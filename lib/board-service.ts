@@ -233,3 +233,21 @@ export async function createBoard(params: {
 
     return newBoard;
 }
+
+export function prepareBoardCloneData(board: any, overrides: any = {}) {
+    // Extract only the fields that should be cloned
+    const {
+        id,
+        createdAt,
+        updatedAt,
+        items,
+        quote,
+        ...rest
+    } = board;
+
+    // Merge with overrides
+    return {
+        ...rest,
+        ...overrides
+    };
+}
