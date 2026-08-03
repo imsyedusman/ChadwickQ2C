@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 
 export default function SharedQuoteView() {
     const params = useParams();
-    const token = params.token as string;
+    const token = params?.token as string;
     
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);

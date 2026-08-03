@@ -82,11 +82,11 @@ export default function GroupDetail() {
     const searchParams = useSearchParams();
     
     // Decoding the name from URL
-    const groupName = typeof params.name === 'string' ? decodeURIComponent(params.name) : '';
+    const groupName = typeof params?.name === 'string' ? decodeURIComponent(params?.name) : '';
     
     // Sort parameters (optional, could apply per table or globally)
-    const currentSort = searchParams.get('sort') || 'updatedAt';
-    const currentDir = (searchParams.get('dir') || 'desc') as 'asc' | 'desc';
+    const currentSort = searchParams?.get('sort') || 'updatedAt';
+    const currentDir = (searchParams?.get('dir') || 'desc') as 'asc' | 'desc';
 
     const [projects, setProjects] = useState<FullProject[]>([]);
     const [loading, setLoading] = useState(true);

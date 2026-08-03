@@ -227,16 +227,16 @@ export default function ProjectsPage() {
     const searchParams = useSearchParams();
 
     // URL-based state
-    const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('limit') || '27');
-    const search = searchParams.get('search') || '';
-    const estimatorId = searchParams.get('estimatorId') || 'all';
-    const dealOwner = searchParams.get('dealOwner') || 'all';
-    const closeDateFilter = searchParams.get('closeDateFilter') || 'all';
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const sortBy = searchParams.get('sortBy') || 'createdAt';
-    const sortOrder = (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc';
+    const page = parseInt(searchParams?.get('page') || '1');
+    const pageSize = parseInt(searchParams?.get('limit') || '27');
+    const search = searchParams?.get('search') || '';
+    const estimatorId = searchParams?.get('estimatorId') || 'all';
+    const dealOwner = searchParams?.get('dealOwner') || 'all';
+    const closeDateFilter = searchParams?.get('closeDateFilter') || 'all';
+    const startDate = searchParams?.get('startDate');
+    const endDate = searchParams?.get('endDate');
+    const sortBy = searchParams?.get('sortBy') || 'createdAt';
+    const sortOrder = (searchParams?.get('sortOrder') as 'asc' | 'desc') || 'desc';
 
     const [projects, setProjects] = useState<Project[]>([]);
     const [estimators, setEstimators] = useState<Estimator[]>([]);
