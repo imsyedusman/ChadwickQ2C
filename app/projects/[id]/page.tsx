@@ -78,8 +78,8 @@ export default function ProjectDetail() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const currentSort = searchParams.get('sort') || 'updatedAt';
-    const currentDir = (searchParams.get('dir') || 'desc') as 'asc' | 'desc';
+    const currentSort = searchParams?.get('sort') || 'updatedAt';
+    const currentDir = (searchParams?.get('dir') || 'desc') as 'asc' | 'desc';
 
     const [project, setProject] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
