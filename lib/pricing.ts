@@ -158,9 +158,9 @@ export function calculateBoardTotals(items: PricingItem[], settings: PricingSett
     }, 0);
 
     // Uplift Logic (Revised 2026-03-25):
-    // 1. Custom boards apply 4% uplift to all items marked as sheetmetal (isSheetmetal = true).
+    // 1. Custom boards apply 4.5% uplift to all items marked as sheetmetal (isSheetmetal = true).
     // 2. CUBIC enclosures (Cubic subcategory) now have 0% uplift to align exactly with Excel base pricing.
-    const customSheetmetalUplift = isCustomBoard ? sheetmetalSubtotal * 0.04 : 0;
+    const customSheetmetalUplift = isCustomBoard ? sheetmetalSubtotal * 0.045 : 0;
     const cubicEnclosureUplift = 0; // Explicitly 0% as per Excel logic
     const sheetmetalUplift = customSheetmetalUplift + cubicEnclosureUplift;
 

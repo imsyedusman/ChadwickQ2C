@@ -109,7 +109,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       baseRequired: z.string().optional().describe("'Yes' or 'No'"),
       cableZones: z.string().optional(),
       cableZoneCount: z.number().optional(),
-      includesAcbs: z.string().optional()
+      includesAcbs: z.string().optional(),
+      formOfSegregation: z.string().optional().describe("e.g. 'Form 2bi', 'Form 3b', 'Form 4b'"),
+      form: z.string().optional().describe("Form of segregation, e.g. '1', '2b', '2bi', '3b', '3bih', '4a', '4b', '4aih'"),
+      totalCompartments: z.number().optional().describe("Total number of compartments"),
+      boardWidth: z.number().optional().describe("Board width in millimetres"),
+      shippingSections: z.number().optional(),
+      drawingRef: z.string().optional().describe("The drawing reference number (or 'Yes'/'No' if just a toggle)"),
+      drawingRefNumber: z.string().optional().describe("The drawing reference number"),
+      wholeCurrentMetering: z.string().optional().describe("'Yes' or 'No'"),
+      ctSpareProvision: z.string().optional().describe("'Yes' or 'No'"),
+      ctSpareQuantity: z.number().optional(),
+      extraForDoorsOver: z.boolean().optional(),
+      isOver50kA: z.string().optional().describe("'Yes' or 'No'"),
+      isNonStandardColour: z.string().optional().describe("'Yes' or 'No'"),
+      internalNotes: z.string().optional(),
+      spd: z.string().optional(),
+      ctType: z.string().optional(),
+      ctRating: z.string().optional(),
+      ctQuantity: z.number().optional(),
+      wcType: z.string().optional(),
+      wcQuantity: z.number().optional(),
+      wholeCurrentMeters: z.array(z.object({
+        type: z.string(),
+        quantity: z.number()
+      })).optional(),
+      notes: z.string().optional(),
+      insulationLevel: z.string().optional().describe("'none', 'air', or 'fully'"),
+      bakeliteQty: z.number().optional()
     },
     async (args) => {
       const { quoteId, name, type, ...configArgs } = args;

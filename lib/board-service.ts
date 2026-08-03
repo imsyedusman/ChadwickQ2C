@@ -49,7 +49,7 @@ export async function createBoard(params: {
             return val;
         };
 
-        const stringBooleans = ['ctMetering', 'baseRequired', 'meterPanel', 'cableZones', 'includesAcbs', 'ctSpareProvision', 'extraForDoorsOver'];
+        const stringBooleans = ['ctMetering', 'baseRequired', 'meterPanel', 'cableZones', 'includesAcbs', 'ctSpareProvision', 'extraForDoorsOver', 'wholeCurrentMetering', 'isOver50kA', 'isNonStandardColour', 'drawingRef'];
         for (const key of stringBooleans) {
             if ((config as any)[key] !== undefined) {
                 (config as any)[key] = normalizeBool((config as any)[key]);
