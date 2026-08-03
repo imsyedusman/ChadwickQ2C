@@ -96,6 +96,7 @@ export default function ProjectDetail() {
     const [actionLoading, setActionLoading] = useState(false);
 
     const fetchProject = async () => {
+        if (!params) return;
         try {
             const url = `/api/projects/${params.id}`;
             const res = await fetch(url);
