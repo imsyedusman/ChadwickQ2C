@@ -464,7 +464,7 @@ export default function ProjectsPage() {
     }, [searchInput]);
 
     const updateUrl = (updates: Record<string, any>) => {
-        const params = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams?.toString());
         Object.entries(updates).forEach(([key, value]) => {
             if (value === null || value === undefined || value === 'all') {
                 params.delete(key);

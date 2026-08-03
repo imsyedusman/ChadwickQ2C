@@ -227,7 +227,7 @@ export default function GroupDetail() {
 
     const toggleSort = (column: string) => {
         const newDir = currentSort === column && currentDir === 'desc' ? 'asc' : 'desc';
-        const params = new URLSearchParams(searchParams.toString());
+        const params = new URLSearchParams(searchParams?.toString());
         params.set('sort', column);
         params.set('dir', newDir);
         router.push(`?${params.toString()}`);
