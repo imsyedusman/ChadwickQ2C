@@ -113,10 +113,10 @@ export default function ProjectDetail() {
     };
 
     useEffect(() => {
-        if (params.id) {
+        if (params?.id) {
             fetchProject();
         }
-    }, [params.id]);
+    }, [params?.id]);
 
     const handleCreateQuote = async () => {
         try {
@@ -198,7 +198,7 @@ export default function ProjectDetail() {
             const newQuote = await res.json();
             
             // Only update local table if it still belongs to this project
-            if (newQuote.projectId === params.id) {
+            if (newQuote.projectId === params?.id) {
                 setOptimisticQuotes(prev => {
                     const exists = prev.some(q => q.id === newQuote.id);
                     if (exists) {
@@ -277,10 +277,10 @@ export default function ProjectDetail() {
 
     const toggleSort = (column: string) => {
         const newDir = currentSort === column && currentDir === 'desc' ? 'asc' : 'desc';
-        const params = new URLSearchParams(searchParams.toString());
-        params.set('sort', column);
-        params.set('dir', newDir);
-        router.push(`?${params.toString()}`);
+        const urlParams = new URLSearchParams(searchParams?.toString() || '');
+        urlParams.set('sort', column);
+        urlParams.set('dir', newDir);
+        router.push(`?${urlParams.toString()}`);
     };
 
     const renderSortIcon = (column: string) => {
@@ -296,7 +296,7 @@ export default function ProjectDetail() {
             const detailRes = await fetch(`/api/pipedrive/deal/${deal.id}`);
             const fullDeal = await detailRes.json();
 
-            const res = await fetch(`/api/projects/${params.id}`, {
+            const res = await fetch(`/api/projects/${params?.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -340,7 +340,7 @@ export default function ProjectDetail() {
             const detailRes = await fetch(`/api/pipedrive/deal/${project.pipedrive_deal_id}`);
             const fullDeal = await detailRes.json();
 
-            const res = await fetch(`/api/projects/${params.id}`, {
+            const res = await fetch(`/api/projects/${params?.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
