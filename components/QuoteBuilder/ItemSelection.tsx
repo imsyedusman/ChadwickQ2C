@@ -173,7 +173,7 @@ function ItemRow({ item, existingQty = 0, existingItemId, isSystemManaged, onAdd
                         }
                     }}
                     onBlur={(e) => {
-                        if (existingQty > 0 && !autoManaged) {
+                        if (!autoManaged) {
                             if (e.relatedTarget && (e.relatedTarget as HTMLElement).closest('button')) {
                                 return;
                             }
