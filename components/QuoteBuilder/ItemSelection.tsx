@@ -11,6 +11,7 @@ import { computeBusbarPrice } from '@/utils/pricing/copperPricing';
 import { normalizeSubcategory, formatSubcategoryLabel } from '@/lib/category-utils';
 import { getDisplayPartNumber } from '@/lib/display-utils';
 import { AlertCircle } from 'lucide-react';
+import SgSheetView from './SgSheetView';
 
 interface CatalogItem {
     id: string;
@@ -277,6 +278,7 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
     const [activeCategory, setActiveCategoryState] = useState<'Basics' | 'Switchboard' | 'Busbar'>(
         initialCategory || 'Switchboard'
     );
+    const [viewMode, setViewMode] = useState<'browse' | 'sheet'>('browse');
 
     // Stable Tab Keys
     const TAB_KEYS = {
@@ -294,6 +296,9 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
 
     const setActiveCategory = (cat: 'Basics' | 'Switchboard' | 'Busbar') => {
         setActiveCategoryState(cat);
+        if (cat !== 'Switchboard') {
+            setViewMode('browse');
+        }
         // Persist
         updateUiState('lastActiveTab', TAB_KEYS[cat]);
     };
@@ -904,17 +909,19 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                         </h2>
 
                         {/* Search Bar - Prominent & Full Width */}
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                                ref={searchInputRef}
-                                type="text"
-                                placeholder="Search items..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg text-sm transition-all outline-none text-gray-900 placeholder:text-gray-500"
-                            />
-                        </div>
+                        {viewMode === 'browse' && (
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                <input
+                                    ref={searchInputRef}
+                                    type="text"
+                                    placeholder="Search items..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-gray-100 border-transparent focus:bg-white border focus:border-blue-500 rounded-lg text-sm transition-all outline-none text-gray-900 placeholder:text-gray-500"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     {/* Master Category Tabs - Compact */}
@@ -944,14 +951,42 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                             </button>
                         ))}
                     </div>
+
+                    {/* View Mode Toggle */}
+                    {activeCategory === 'Switchboard' && (
+                        <div className="flex bg-gray-100 p-1 rounded-lg self-start">
+                            <button
+                                onClick={() => setViewMode('browse')}
+                                className={cn(
+                                    "px-4 py-1 text-sm font-medium rounded-md transition-all",
+                                    viewMode === 'browse' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                Browse
+                            </button>
+                            <button
+                                onClick={() => setViewMode('sheet')}
+                                className={cn(
+                                    "px-4 py-1 text-sm font-medium rounded-md transition-all",
+                                    viewMode === 'sheet' ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                                )}
+                            >
+                                Sheet
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Hierarchical Navigation (Breadcrumbs) */}
-            {renderNavigation()}
+            {viewMode === 'browse' && renderNavigation()}
 
-            {/* Category Selection Grid (Drill-down) */}
-            {!searchQuery && (
+            {viewMode === 'sheet' && activeCategory === 'Switchboard' ? (
+                <SgSheetView onAdd={handleAddItem} />
+            ) : (
+                <>
+                    {/* Category Selection Grid (Drill-down) */}
+                    {!searchQuery && (
                 <div className="px-6 py-4 bg-gray-50">
                     {/* Switchboard & Busbar: Multi-level hierarchy */}
                     {(activeCategory === 'Switchboard' || activeCategory === 'Busbar') && (
@@ -1335,6 +1370,8 @@ export default function ItemSelection({ onClose, initialCategory, initialL1, ini
                     </>
                 )}
             </div>
+                </>
+            )}
         </div >
     );
 }
