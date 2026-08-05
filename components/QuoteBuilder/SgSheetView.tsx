@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { SG_CBS_LAYOUT } from './sheet-data/sg-cbs';
+import { SG_CBS_LAYOUT, SectionDef, RowDef } from './sheet-data/sg-cbs';
+import { SG_SPECIAL_CBS_LAYOUT, SpecialSectionDef, SpecialRowDef } from './sheet-data/sg-special-cbs';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -66,6 +67,9 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
     const { boards, selectedBoardId } = useQuote();
     const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'cbs' | 'special-cbs'>('cbs');
+
+    const activeLayout: (SectionDef | SpecialSectionDef)[] = activeTab === 'cbs' ? SG_CBS_LAYOUT : SG_SPECIAL_CBS_LAYOUT;
 
     useEffect(() => {
         let isMounted = true;
@@ -179,22 +183,43 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            <div className="bg-gray-50 border-b border-gray-200 px-6 pt-3 flex items-center shadow-sm z-10">
-                <div className="px-4 py-2 border-b-2 border-blue-600 text-blue-700 font-semibold text-sm bg-white rounded-t-md">
+            <div className="bg-gray-50 border-b border-gray-200 px-6 pt-3 flex items-center shadow-sm z-10 gap-2">
+                <button
+                    onClick={() => setActiveTab('cbs')}
+                    className={cn(
+                        "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
+                        activeTab === 'cbs' 
+                            ? "border-blue-600 text-blue-700 bg-white" 
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    )}
+                >
                     CBs
-                </div>
+                </button>
+                <button
+                    onClick={() => setActiveTab('special-cbs')}
+                    className={cn(
+                        "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
+                        activeTab === 'special-cbs' 
+                            ? "border-blue-600 text-blue-700 bg-white" 
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    )}
+                >
+                    Special CBs
+                </button>
             </div>
             
             <div className="flex-1 overflow-y-auto bg-gray-50">
                 <div className="flex flex-col w-full bg-white">
-                    {SG_CBS_LAYOUT.map((section, sIdx) => (
+                    {activeLayout.map((section, sIdx) => (
                         <div key={sIdx} className="flex flex-col">
                             <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
                                 {section.heading}
                             </div>
                             <div className="flex flex-col">
-                                {section.rows.map((row, rIdx) => {
-                                    if (row.type === 'single') {
+                                {section.rows.map((row: RowDef | SpecialRowDef, rIdx) => {
+                                    if (row.type === 'spacer') {
+                                        return <div key={rIdx} className="h-3 w-full bg-white" />;
+                                    } else if (row.type === 'single') {
                                         return (
                                             <div key={rIdx} className="w-full">
                                                 {renderPart(row.partNumber)}
