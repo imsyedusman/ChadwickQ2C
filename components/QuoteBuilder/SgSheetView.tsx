@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { SG_CBS_LAYOUT, SectionDef, RowDef } from './sheet-data/sg-cbs';
 import { SG_SPECIAL_CBS_LAYOUT, SpecialSectionDef, SpecialRowDef } from './sheet-data/sg-special-cbs';
 import { SG_MISC_LAYOUT, MiscSectionConfig } from './sheet-data/sg-misc';
+import { SG_SWITCHES_LAYOUT, SwitchesSectionConfig } from './sheet-data/sg-switches';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -70,7 +71,7 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
     const { boards, selectedBoardId } = useQuote();
     const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'cbs' | 'special-cbs' | 'misc'>('cbs');
+    const [activeTab, setActiveTab] = useState<'cbs' | 'special-cbs' | 'misc' | 'switches'>('cbs');
 
     const activeLayout: (SectionDef | SpecialSectionDef)[] = activeTab === 'cbs' ? SG_CBS_LAYOUT : SG_SPECIAL_CBS_LAYOUT;
 
@@ -274,6 +275,45 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
         });
     };
 
+    const renderSwitchesLayout = () => {
+        return SG_SWITCHES_LAYOUT.map((section, sIdx) => (
+            <div key={sIdx} className="flex flex-col">
+                <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
+                    {section.heading}
+                </div>
+                <div className="flex flex-col w-full">
+                    {section.rows.map((row, rIdx) => {
+                        if (row.type === 'subheading') {
+                            return (
+                                <div key={`${sIdx}-${rIdx}`} className="px-4 py-1.5 bg-gray-50 border-y border-gray-200 font-semibold text-xs text-gray-600 pl-6 border-l-4 border-l-gray-300">
+                                    {row.label}
+                                </div>
+                            );
+                        } else if (row.type === 'single') {
+                            return (
+                                <div key={`${sIdx}-${rIdx}`} className="w-full">
+                                    {renderPart(row.partNumber)}
+                                </div>
+                            );
+                        } else if (row.type === 'sideBySide') {
+                            return (
+                                <div key={`${sIdx}-${rIdx}`} className="flex w-full">
+                                    <div className="w-1/2 border-r border-gray-200">
+                                        {renderPart(row.partNumberA)}
+                                    </div>
+                                    <div className="w-1/2">
+                                        {renderPart(row.partNumberB)}
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+            </div>
+        ));
+    };
+
     if (loading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
@@ -319,11 +359,22 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
                 >
                     Misc
                 </button>
+                <button
+                    onClick={() => setActiveTab('switches')}
+                    className={cn(
+                        "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
+                        activeTab === 'switches' 
+                            ? "border-blue-600 text-blue-700 bg-white" 
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    )}
+                >
+                    Switches
+                </button>
             </div>
             
             <div className="flex-1 overflow-y-auto bg-gray-50">
                 <div className="flex flex-col w-full bg-white">
-                    {activeTab === 'misc' ? renderMiscLayout() : activeLayout.map((section, sIdx) => (
+                    {activeTab === 'switches' ? renderSwitchesLayout() : activeTab === 'misc' ? renderMiscLayout() : activeLayout.map((section, sIdx) => (
                         <div key={sIdx} className="flex flex-col">
                             <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
                                 {section.heading}
