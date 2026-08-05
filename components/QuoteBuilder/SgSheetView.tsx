@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { SG_CBS_LAYOUT, SectionDef, RowDef } from './sheet-data/sg-cbs';
 import { SG_SPECIAL_CBS_LAYOUT, SpecialSectionDef, SpecialRowDef } from './sheet-data/sg-special-cbs';
+import { SG_MISC_LAYOUT, MiscSectionConfig } from './sheet-data/sg-misc';
 import { useQuote } from '@/context/QuoteContext';
 import { cn } from '@/lib/utils';
 import { Loader2 } from 'lucide-react';
@@ -63,15 +64,24 @@ function CellInput({ item, existingQty, onAdd }: { item: CatalogItem, existingQt
     );
 }
 
+let cachedCatalogItems: CatalogItem[] | null = null;
+
 export default function SgSheetView({ onAdd }: SgSheetViewProps) {
     const { boards, selectedBoardId } = useQuote();
     const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'cbs' | 'special-cbs'>('cbs');
+    const [activeTab, setActiveTab] = useState<'cbs' | 'special-cbs' | 'misc'>('cbs');
+    const [meterBrandFilter, setMeterBrandFilter] = useState<string>('All');
 
     const activeLayout: (SectionDef | SpecialSectionDef)[] = activeTab === 'cbs' ? SG_CBS_LAYOUT : SG_SPECIAL_CBS_LAYOUT;
 
     useEffect(() => {
+        if (cachedCatalogItems) {
+            setCatalogItems(cachedCatalogItems);
+            setLoading(false);
+            return;
+        }
+
         let isMounted = true;
         const fetchCatalog = async () => {
             try {
@@ -79,6 +89,7 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
                 const res = await fetch('/api/catalog?category=Switchboard&take=100000');
                 if (res.ok) {
                     const data = await res.json();
+                    cachedCatalogItems = data;
                     if (isMounted) setCatalogItems(data);
                 }
             } catch (err) {
@@ -172,6 +183,125 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
         );
     };
 
+    const renderMiscLayout = () => {
+        return SG_MISC_LAYOUT.map((section, sIdx) => {
+            if (section.type === 'static') {
+                return (
+                    <div key={sIdx} className="flex flex-col">
+                        <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
+                            {section.heading}
+                        </div>
+                        <div className="flex flex-col w-full">
+                            {section.partNumbers.map((partNumber, rIdx) => (
+                                <div key={`${sIdx}-${rIdx}`} className="w-full">
+                                    {renderPart(partNumber)}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            // Dynamic section
+            const sectionItems = catalogItems.filter(item => {
+                const sub = item.subcategory;
+                if (!sub) return false;
+                if (section.subcategories.includes(sub)) return true;
+                if (section.subSections?.some(s => s.subcategory === sub)) return true;
+                return false;
+            });
+
+            const POWER_METER_BRAND_ORDER: Record<string, number> = {
+                'Schneider Electric': 1,
+                'MERCS': 2,
+                'NHP': 3,
+                'IPD': 4
+            };
+
+            const uniqueBrands = Array.from(new Set(sectionItems.map(i => i.brand).filter(Boolean))).sort((a, b) => {
+                const orderA = POWER_METER_BRAND_ORDER[a] || 99;
+                const orderB = POWER_METER_BRAND_ORDER[b] || 99;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.localeCompare(b);
+            });
+
+            let filteredItems = sectionItems;
+            if (section.brandFilter && meterBrandFilter !== 'All') {
+                filteredItems = sectionItems.filter(i => i.brand === meterBrandFilter);
+            }
+
+            return (
+                <div key={sIdx} className="flex flex-col">
+                    <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
+                        {section.heading}
+                    </div>
+                    
+                    {section.brandFilter && uniqueBrands.length > 0 && (
+                        <div className="px-4 py-3 bg-white border-b border-gray-100 flex items-center gap-2 flex-wrap">
+                            <button
+                                onClick={() => setMeterBrandFilter('All')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-full transition-colors",
+                                    meterBrandFilter === 'All' 
+                                        ? "bg-blue-600 text-white shadow-sm" 
+                                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                )}
+                            >
+                                All
+                            </button>
+                            {uniqueBrands.map(brand => (
+                                <button
+                                    key={brand}
+                                    onClick={() => setMeterBrandFilter(brand)}
+                                    className={cn(
+                                        "px-3 py-1 text-xs font-medium rounded-full transition-colors",
+                                        meterBrandFilter === brand 
+                                            ? "bg-blue-600 text-white shadow-sm" 
+                                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    )}
+                                >
+                                    {brand}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+
+                    <div className="flex flex-col w-full">
+                        {section.subSections && section.subSections.length > 0 ? (
+                            section.subSections.map((subSec, subIdx) => {
+                                const subItems = filteredItems.filter(i => i.subcategory === subSec.subcategory);
+                                if (subItems.length === 0) return null;
+                                return (
+                                    <div key={subIdx} className="flex flex-col w-full">
+                                        <div className="px-4 py-1.5 bg-gray-50 border-b border-gray-100 font-semibold text-xs text-gray-600 pl-6">
+                                            {subSec.subheading}
+                                        </div>
+                                        {subItems.map((item, iIdx) => (
+                                            <div key={item.id || `${subIdx}-${iIdx}`} className="w-full">
+                                                {renderPart(item.partNumber)}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            filteredItems.map((item, iIdx) => (
+                                <div key={item.id || iIdx} className="w-full">
+                                    {renderPart(item.partNumber)}
+                                </div>
+                            ))
+                        )}
+                        {filteredItems.length === 0 && (
+                            <div className="px-4 py-4 text-sm text-gray-500 italic text-center bg-white border-b border-gray-100">
+                                No items found
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        });
+    };
+
     if (loading) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center bg-gray-50">
@@ -185,7 +315,7 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
         <div className="flex flex-col h-full bg-white">
             <div className="bg-gray-50 border-b border-gray-200 px-6 pt-3 flex items-center shadow-sm z-10 gap-2">
                 <button
-                    onClick={() => setActiveTab('cbs')}
+                    onClick={() => { setActiveTab('cbs'); setMeterBrandFilter('All'); }}
                     className={cn(
                         "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
                         activeTab === 'cbs' 
@@ -196,7 +326,7 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
                     CBs
                 </button>
                 <button
-                    onClick={() => setActiveTab('special-cbs')}
+                    onClick={() => { setActiveTab('special-cbs'); setMeterBrandFilter('All'); }}
                     className={cn(
                         "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
                         activeTab === 'special-cbs' 
@@ -206,11 +336,22 @@ export default function SgSheetView({ onAdd }: SgSheetViewProps) {
                 >
                     Special CBs
                 </button>
+                <button
+                    onClick={() => setActiveTab('misc')}
+                    className={cn(
+                        "px-4 py-2 border-b-2 font-semibold text-sm rounded-t-md transition-colors",
+                        activeTab === 'misc' 
+                            ? "border-blue-600 text-blue-700 bg-white" 
+                            : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    )}
+                >
+                    Misc
+                </button>
             </div>
             
             <div className="flex-1 overflow-y-auto bg-gray-50">
                 <div className="flex flex-col w-full bg-white">
-                    {activeLayout.map((section, sIdx) => (
+                    {activeTab === 'misc' ? renderMiscLayout() : activeLayout.map((section, sIdx) => (
                         <div key={sIdx} className="flex flex-col">
                             <div className="px-4 py-2 bg-gray-100 border-y border-gray-200 font-bold text-sm text-gray-800">
                                 {section.heading}
