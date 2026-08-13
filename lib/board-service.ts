@@ -242,6 +242,7 @@ export function prepareBoardCloneData(board: any, overrides: any = {}) {
         updatedAt,
         items,
         quote,
+        quoteId,
         ...rest
     } = board;
 
