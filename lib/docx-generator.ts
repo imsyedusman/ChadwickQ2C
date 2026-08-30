@@ -184,7 +184,7 @@ export class DocxGenerator {
             bullets = generateDescriptionBullets(board).map(b => ({ text: b.text }));
         }
 
-        const boardTitle = `${board.name} (${board.type})`;
+        const boardTitle = `${board.type} ${board.name}`;
 
         return {
             itemNo: itemNo,
